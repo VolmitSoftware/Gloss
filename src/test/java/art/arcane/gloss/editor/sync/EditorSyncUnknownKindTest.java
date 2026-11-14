@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.Test;
 
-import java.time.Instant;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -16,12 +15,12 @@ public class EditorSyncUnknownKindTest {
   @Test
   public void aKindTheServerNoLongerKnowsIsAcceptedWhenTheEditorEchoesItUnchanged() {
     JsonObject base = workspaceWithUnknownKind(OPAQUE);
-    EditorSyncStoredSession session = session(base);
+    EditorSyncPublicationValidator.Base session = session(base);
     JsonObject published = workspaceWithUnknownKind(OPAQUE);
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), published),
+            new EditorSyncPublication(session.baseRevision(), published),
             1024 * 1024, base);
 
     assertTrue(validated.appliedDocuments().keySet().stream()
@@ -34,12 +33,12 @@ public class EditorSyncUnknownKindTest {
   public void aKindTheEditorInventedIsRejectedByName() {
     JsonObject base = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", MENU));
-    EditorSyncStoredSession session = session(base);
+    EditorSyncPublicationValidator.Base session = session(base);
     JsonObject published = workspaceWithUnknownKind(OPAQUE);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), published),
+            new EditorSyncPublication(session.baseRevision(), published),
             1024 * 1024, base));
 
     assertTrue(failure.getMessage(), failure.getMessage().contains("future-kind"));
@@ -48,13 +47,13 @@ public class EditorSyncUnknownKindTest {
   @Test
   public void anEditedUnknownKindIsRejected() {
     JsonObject base = workspaceWithUnknownKind(OPAQUE);
-    EditorSyncStoredSession session = session(base);
+    EditorSyncPublicationValidator.Base session = session(base);
     JsonObject published = workspaceWithUnknownKind(
         "{\"schemaVersion\":1,\"revision\":1,\"opaque\":false}");
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), published),
+            new EditorSyncPublication(session.baseRevision(), published),
             1024 * 1024, base));
 
     assertTrue(failure.getMessage(), failure.getMessage().contains("future-kind"));
@@ -69,11 +68,11 @@ public class EditorSyncUnknownKindTest {
     documentKinds.add("zzz-future-kind");
     createKinds.add("zzz-future-kind");
     EditorSyncTestProjects.sign(base);
-    EditorSyncStoredSession session = session(base);
+    EditorSyncPublicationValidator.Base session = session(base);
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), base.deepCopy()),
+            new EditorSyncPublication(session.baseRevision(), base.deepCopy()),
             1024 * 1024, base);
 
     assertTrue(validated.noOp());
@@ -91,10 +90,7 @@ public class EditorSyncUnknownKindTest {
     return EditorSyncTestProjects.sign(project);
   }
 
-  private static EditorSyncStoredSession session(JsonObject project) {
-    return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
-        new EditorSyncStoredSession.Subject(EditorSyncKind.WORKSPACE, "workspace"),
-        Instant.now().plusSeconds(3600L), 0L, project, null);
+  private static EditorSyncPublicationValidator.Base session(JsonObject project) {
+    return new EditorSyncPublicationValidator.Base(project);
   }
 }

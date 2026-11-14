@@ -11,11 +11,11 @@
 /// `labels.names` and `labels.useItemDisplayNames`. Changing any field in the
 /// inspector changes the stage the way it changes the server.
 ///
-/// Left alone, the stage rotates through one stack per model family — a cube,
-/// a flat item and a slab — changing on every completed drop, so a viewer sees
-/// all three shapes without touching anything. The shuffle button steps out of
-/// that rotation and through the whole themed sample table instead, and stays
-/// on whatever it lands on until it is pressed again.
+/// Left alone, the stage rotates through one stack per model family (a cube,
+/// a flat item and a slab), changing on every completed drop, so a viewer sees
+/// all three shapes without touching anything. The Next sample stack action
+/// steps out of that rotation and through the whole themed sample table
+/// instead, and stays on whatever it lands on until it is pressed again.
 ///
 /// The two optional blocks both reach the stage, and the difference between
 /// them is the one thing this surface must never blur:
@@ -30,8 +30,7 @@
 ///    game the pickup radius stays where Minecraft put it, and a display hidden
 ///    by `visible` is still a drop a player can walk over.
 ///
-/// Four things are the stage's own and are named as approximations in the
-/// readout:
+/// Four things are the stage's own approximations:
 ///
 ///  * **Ballistics.** Minecraft's `Item` entity falls and bounces; Gloss only
 ///    reacts to it. The arc here is a simple one, sized to show a tumble and a
@@ -43,10 +42,10 @@
 ///    pack: a placeable sample is its block model, everything else is the item
 ///    model at the `fixed` pose. Animated textures show their first frame, and
 ///    a material the resolver has no geometry for is drawn as its sprite.
-///  * **The environment the script reads.** `inWater` is the stage's water
-///    button, `inLava` is always false, and both light levels are 15. There is
-///    no world under this stage to read them off — see [DropStageEnvironment],
-///    which is where those values are decided and stated.
+///  * **The environment the script reads.** `inWater` and `inLava` are
+///    false and both light levels are 15. There is no world under this stage
+///    to read them off; see [DropStageEnvironment], which is where those
+///    values are decided and stated.
 ///  * **The glow outline.** `script.glow` reaches the renderer as the node's
 ///    `glowArgb`; how close that lands to the client's silhouette-through-
 ///    blocks outline is the renderer's business, not this view's.
@@ -55,13 +54,11 @@
 /// update, so a coarse `limits.updateIntervalTicks` reads as coarse here the
 /// way it does in game.
 ///
-/// The camera, the pointer, the keyboard and the wheel all belong to
-/// [McStage]. This view owns only the controller it hands over — the scene
-/// each frame, the home framing, and the label anchored in the stage's CSS-3D
-/// layer. The `gameContext` frame gets a `McStageKind.frame` controller at
-/// the client's own eye over the landing spot with `freeCamera: false`: that
-/// frame stands in for the client's own view, and a player does not get to
-/// fly.
+/// The camera belongs to [McStage]. This view owns only the controller it
+/// hands to the game frame: the scene each frame, the home framing, and the
+/// label anchored in the stage's CSS-3D layer. The controller stands at the
+/// client's own eye over the landing spot with `freeCamera: false`: the frame
+/// stands in for the client's own view, and a player does not get to fly.
 ///
 /// A material the pack resolves to a sprite fallback (`trident`, `shield`)
 /// reaches the stage as catalog-sprite billboards the size of the model,
@@ -69,7 +66,6 @@
 library;
 
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
@@ -78,7 +74,6 @@ import '../../config/showcase_flavor.dart';
 import '../../logic/gloss_text.dart';
 import '../../logic/gloss_particle_preview.dart';
 import '../../logic/gloss_particle_text.dart';
-import '../../logic/real_drop_model.dart';
 import '../../logic/gloss_show.dart';
 import '../../logic/real_drop_scene_nodes.dart';
 import '../../logic/real_drop_selection.dart';
@@ -89,46 +84,34 @@ import '../../mc/scene/mc_scene.dart';
 import '../../model/model.dart';
 import '../../preview/projection.dart' show huiPreviewPxPerBlock;
 import '../../state/editor_store.dart';
+import '../../ui/action_row.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_display_text.dart';
 import '../gloss/gloss_particle_overlay.dart';
 import '../gloss/gloss_text_line.dart';
 import '../mc/mc_asset_loader.dart';
 import '../mc/mc_dom_layer.dart';
-import '../mc/mc_stage.dart';
 import '../mc/mc_stage_controller.dart';
 import '../scoreboard/scoreboard_selection.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class RealDropsView extends StatefulWidget {
-  const RealDropsView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const RealDropsView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the stage inside the shared Minecraft game-screen frame instead of
-  /// the editor stage. False renders exactly the editor surface.
-  final bool gameContext;
 
   @override
   State<RealDropsView> createState() => _RealDropsViewState();
 }
 
 class _RealDropsViewState extends State<RealDropsView> {
-  /// The world under the stack and the camera over it. The editor stage
-  /// pivots on the landing spot, [dropStageThrowBlocks] forward of the throw,
-  /// on the ground; the game frame stands at the client's eye over that spot.
+  /// The world under the stack and the camera over it, at the client's eye
+  /// over the landing spot, [dropStageThrowBlocks] forward of the throw.
   late final McStageController _stage = McStageController(
-    kind: component.gameContext ? McStageKind.frame : McStageKind.drops,
-    homePivot: McVec3(
-      0.5,
-      component.gameContext ? mcCameraEyeHeight : 0,
-      0.5 + dropStageThrowBlocks,
-    ),
-    freeCamera: !component.gameContext,
+    kind: McStageKind.frame,
+    homePivot: const McVec3(0.5, mcCameraEyeHeight, 0.5 + dropStageThrowBlocks),
+    freeCamera: false,
   );
 
   /// Where the stack is thrown from: the world's spawn block, ground level.
@@ -160,20 +143,11 @@ class _RealDropsViewState extends State<RealDropsView> {
   /// rotates through one stack per model family on its own.
   int? _pinned;
 
-  /// Whether the stage is flooded to [dropStageWaterLevel].
-  ///
-  /// The one thing on this surface that is not in the document: `inWater` is
-  /// read off the world in game and there is no world here, so a script or a
-  /// buoyancy setting that only does something underwater would otherwise be
-  /// untestable. Off by default, and the readout says so either way.
-  bool _water = false;
-
-  /// Timeline memo, rebuilt when the document, the stack or the water changes.
+  /// Timeline memo, rebuilt when the document or the stack changes.
   DropStageTimeline? _timeline;
   GlossNamesCatalog? _timelineNames;
   int _timelineRevision = -1;
   ShowcaseDrop? _timelineDrop;
-  bool _timelineWater = false;
 
   EditorStore get _store => component.store;
 
@@ -221,7 +195,8 @@ class _RealDropsViewState extends State<RealDropsView> {
   }
 
   /// The no-WebGL sprite for a node, off the catalogs the store holds now.
-  String? _spriteFor(McSceneNode node) => mcCatalogSpriteFor(_store.catalogs, node);
+  String? _spriteFor(McSceneNode node) =>
+      mcCatalogSpriteFor(_store.catalogs, node);
 
   /// The camera moved, or the stage gave up on WebGL: the anchored label and
   /// particles are this view's, so they are re-projected here. The scene and
@@ -309,23 +284,19 @@ class _RealDropsViewState extends State<RealDropsView> {
     if (_timeline == null ||
         !identical(_timelineNames, _store.workspaceNames) ||
         _timelineRevision != _store.glossRevision ||
-        !identical(_timelineDrop, drop) ||
-        _timelineWater != _water) {
+        !identical(_timelineDrop, drop)) {
       _timeline = DropStageTimeline(
         doc,
         drop,
-        environment: DropStageEnvironment(water: _water),
+        environment: const DropStageEnvironment(water: false),
         names: _store.workspaceNames,
       );
       _timelineRevision = _store.glossRevision;
       _timelineNames = _store.workspaceNames;
       _timelineDrop = drop;
-      _timelineWater = _water;
     }
     return _timeline!;
   }
-
-  void _resetCamera() => _stage.resetCamera();
 
   // --- build ----------------------------------------------------------------
 
@@ -335,22 +306,16 @@ class _RealDropsViewState extends State<RealDropsView> {
     if (doc == null) {
       _ticker?.cancel();
       _ticker = null;
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.world,
-          label: huiText('Real drops in game'),
-        );
-      }
-      return const dom.div(
-        classes: 'hui-real-drops-stage is-empty',
-        <Widget>[],
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.world,
+        label: huiText('Real drops in game'),
       );
     }
 
     final int nowMs = _nowMs();
     final ShowcaseDrop drop = _dropAt(
       nowMs,
-      dropStageCycleMsFor(doc, water: _water),
+      dropStageCycleMsFor(doc, water: false),
     );
     final GlossConditionContext itemContext = GlossConditionContext(
       variables: <String, Object?>{
@@ -359,7 +324,7 @@ class _RealDropsViewState extends State<RealDropsView> {
         'drop.maxStackSize': drop.maxStackSize.toDouble(),
         'drop.world': 'world',
         'drop.onGround': false,
-        'drop.inWater': _water,
+        'drop.inWater': false,
         'drop.inLava': false,
         'drop.playerDropped': true,
         'drop.customNamed': false,
@@ -373,25 +338,6 @@ class _RealDropsViewState extends State<RealDropsView> {
     );
     final GlossRealDropPresentation selectedPresentation =
         glossResolveRealDropPresentation(doc, itemContext);
-    final String? selectedVariantId = glossResolveRealDropVariantId(
-      doc,
-      itemContext,
-    );
-    final GlossConditionContext audienceContext = GlossConditionContext(
-      variables: <String, Object?>{
-        ...itemContext.variables,
-        'viewer.world': 'world',
-        'viewer.health': 20.0,
-        'viewer.maxHealth': 20.0,
-        'viewer.healthPercent': 100.0,
-        'viewer.gameMode': 'SURVIVAL',
-      },
-      groups: const <String>{'player'},
-    );
-    final bool audienceVisible = glossRealDropAudienceVisible(
-      doc,
-      audienceContext,
-    );
     final GlossRealDropSettingsDoc selectedDoc = GlossRealDropSettingsDoc(
       revision: doc.revision,
       presentation: selectedPresentation,
@@ -403,163 +349,34 @@ class _RealDropsViewState extends State<RealDropsView> {
     _syncStage(drop, frame);
     final List<Widget> overlay = _overlay(selectedDoc, frame, nowMs);
 
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.world,
-        label: huiText('Real drops in game'),
-        // No water button in the frame: that frame stands in for the client's
-        // own view, and a player does not get to flood the world either. The
-        // editor stage is where the environment is simulated.
-        controls: <Widget>[_playPause(), _sampleButton(drop)],
-        world: _stage,
-        worldOverlay: overlay,
-        child: const dom.div(<Widget>[]),
-      );
-    }
-
-    return dom.div(classes: 'hui-real-drops-stage', <Widget>[
-      _scene(overlay),
-      dom.div(classes: 'hui-real-drops-controls', <Widget>[
-        _playPause(),
-        _sampleButton(drop),
-        _waterButton(),
-        _resetButton(),
-        _timelineControl(timeline, frame, nowMs),
-        dom.span(classes: 'hui-real-drops-readout-inline', <Widget>[
-          Text(
-            _readout(
-              selectedDoc,
-              drop,
-              timeline,
-              frame,
-              selectedVariantId,
-              audienceVisible,
-            ),
-          ),
-        ]),
-        dom.span(classes: 'hui-real-drops-hint', <Widget>[
-          Text(
-            huiText(
-              'Click the stage: drag orbits, WASD walks, space and shift lift, '
-              'wheel dollies',
-            ),
-          ),
-        ]),
-      ]),
-    ]);
-  }
-
-  Widget _playPause() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _togglePlaying,
-    attributes: <String, String>{
-      'aria-label': _playing ? huiText('Pause') : huiText('Play'),
-      'title': _playing ? huiText('Pause') : huiText('Play'),
-    },
-    icon: _playing
-        ? ArcaneIcon.pause(size: IconSize.sm)
-        : ArcaneIcon.play(size: IconSize.sm),
-  );
-
-  Widget _sampleButton(ShowcaseDrop drop) => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _nextSample,
-    attributes: <String, String>{
-      'aria-label': huiText('Next sample stack'),
-      'title': _pinned == null
-          ? huiText(
-              'Drop something else — the stage is rotating through the three '
-              'model families ({name})',
-              <String, Object?>{'name': huiText(drop.displayName)},
-            )
-          : huiText('Drop something else ({name})', <String, Object?>{
-              'name': huiText(drop.displayName),
-            }),
-    },
-    icon: ArcaneIcon.shuffle(size: IconSize.sm),
-  );
-
-  /// The stage's own control, not the document's — hence the wording, which
-  /// says what it floods rather than implying a setting exists for it.
-  Widget _waterButton() => Button(
-    variant: _water ? ButtonVariant.secondary : ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: () => setState(() => _water = !_water),
-    attributes: <String, String>{
-      'aria-label': _water
-          ? huiText('Drain the stage')
-          : huiText('Flood the stage'),
-      'title': _water
-          ? huiText('Drain the stage — inWater goes back to false')
-          : huiText(
-              'Flood the stage to {level} blocks, so inWater, waterBuoyancy '
-              'and waterDrag have something to act on',
-              <String, Object?>{'level': dropStageWaterLevel},
-            ),
-    },
-    icon: ArcaneIcon.droplet(size: IconSize.sm),
-  );
-
-  Widget _resetButton() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _resetCamera,
-    disabled: _stage.isHome,
-    attributes: <String, String>{
-      'aria-label': huiText('Reset view'),
-      'title': huiText('Reset view'),
-    },
-    icon: ArcaneIcon.maximize(size: IconSize.sm),
-  );
-
-  Widget _timelineControl(
-    DropStageTimeline timeline,
-    DropStageFrame frame,
-    int nowMs,
-  ) {
-    final int localMs = nowMs % timeline.cycleMs;
-    return dom.div(classes: 'hui-real-drops-timeline', <Widget>[
-      dom.span(
-        classes: 'hui-real-drops-phase is-${frame.phase.label}',
-        <Widget>[Text(_phaseLabel(frame.phase))],
-      ),
-      dom.input<num>(
-        type: dom.InputType.range,
-        classes: 'hui-range hui-real-drops-scrubber',
-        value: '$localMs',
-        onInput: (num next) => _scrubTo(next.toInt(), nowMs, timeline.cycleMs),
-        attributes: <String, String>{
-          'min': '0',
-          'max': '${math.max(0, timeline.cycleMs - 1)}',
-          'step': '25',
-          'aria-label': huiText('Scrub the dropped item animation timeline'),
-        },
-      ),
-      dom.span(classes: 'hui-real-drops-time', <Widget>[
-        Text(
-          huiText("{toStringAsFixed} / {toStringAsFixed2}s", <String, Object?>{
-            'toStringAsFixed': (localMs / 1000).toStringAsFixed(2),
-            'toStringAsFixed2': (timeline.cycleMs / 1000).toStringAsFixed(2),
-          }),
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.world,
+      label: huiText('Real drops in game'),
+      // No water action: the frame stands in for the client's own view, and
+      // a player does not get to flood the world either.
+      actions: <RowAction>[
+        RowAction(
+          _playing ? huiText('Pause') : huiText('Play'),
+          _togglePlaying,
+          icon: _playing ? ArcaneIcon.pause() : ArcaneIcon.play(),
+          iconOnly: true,
+          pressed: _playing,
         ),
-      ]),
-    ]);
+        RowAction(
+          huiText('Next sample stack'),
+          _nextSample,
+          icon: ArcaneIcon.shuffle(),
+          iconOnly: true,
+        ),
+      ],
+      world: _stage,
+      worldOverlay: overlay,
+      child: const dom.div(<Widget>[]),
+    );
   }
 
-  void _scrubTo(int localMs, int nowMs, int cycleMs) {
-    final int cycleStart = nowMs ~/ cycleMs * cycleMs;
-    setState(() {
-      _heldMs = cycleStart + localMs.clamp(0, cycleMs - 1);
-      _playing = false;
-      _ticker?.cancel();
-      _ticker = null;
-    });
-  }
-
-  /// Hands the frame to the stage: the displays, the shadow and the stage's
-  /// water as scene nodes, drawn from the client's own pack. A material the
+  /// Hands the frame to the stage: the displays and the shadow as scene
+  /// nodes, drawn from the client's own pack. A material the
   /// pack has no geometry for goes as its catalog sprite, decoded into the
   /// pack once; the stage is woken when that lands so a parked stack shows.
   void _syncStage(ShowcaseDrop drop, DropStageFrame frame) {
@@ -581,7 +398,7 @@ class _RealDropsViewState extends State<RealDropsView> {
         frame: frame,
         material: drop.material,
         block: drop.block,
-        water: _water && !component.gameContext,
+        water: false,
         origin: _origin,
         spriteFallback: spriteFallback,
         spriteUrl: spriteUrl,
@@ -619,29 +436,6 @@ class _RealDropsViewState extends State<RealDropsView> {
         _label(labels, frame, nowMs, doc.presentation.particleLayers),
     ];
   }
-
-  /// The stage itself, in a wrapper that gives it what is left after the
-  /// controls: a flex child that may shrink to nothing, so the canvas sizes
-  /// off the pane instead of its own content.
-  Widget _scene(List<Widget> overlay) => dom.div(
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'display': 'flex',
-        'flex': '1 1 auto',
-        'min-height': '0',
-      },
-    ),
-    <Widget>[
-      McStage(
-        controller: _stage,
-        overlay: overlay,
-        label: huiText(
-          'Drop stage. Drag to orbit, W A S D to walk, space and '
-          'shift to change height, scroll to dolly.',
-        ),
-      ),
-    ],
-  );
 
   /// The stack's own particle scopes, on an anchor at the carrier so they ride
   /// it. The bounds are the model's, in blocks, the way the plugin states them.
@@ -786,151 +580,4 @@ class _RealDropsViewState extends State<RealDropsView> {
       ],
     );
   }
-
-  String _readout(
-    GlossRealDropSettingsDoc doc,
-    ShowcaseDrop drop,
-    DropStageTimeline timeline,
-    DropStageFrame frame,
-    String? selectedVariantId,
-    bool audienceVisible,
-  ) {
-    final String kind = switch (frame.modelKind) {
-      DropModelKind.block => huiText('cube'),
-      DropModelKind.flat => huiText('flat'),
-      DropModelKind.thin => huiText('thin'),
-    };
-    final GlossRealDropPhysics? physics = doc.presentation.physics;
-    final bool physical = physics != null && physics.enabled;
-    // The resolver could not build geometry for this material, so the stage is
-    // drawing its sprite instead of a model. Worth saying: it is the one case
-    // where the stage's shape is not the client's.
-    final bool spriteFallback =
-        McAssetLoader.loaded?.manifest.spriteFallbacks.contains(
-          drop.material,
-        ) ??
-        false;
-    final int hidden = frame.visuals
-        .where((DropStageVisual visual) => !visual.visible)
-        .length;
-    return <String>[
-      huiText('{amount}x {type}', <String, Object?>{
-        'amount': drop.amount,
-        'type': _displayType(timeline),
-      }),
-      selectedVariantId == null
-          ? huiText('default presentation')
-          : huiText('variant {id}', <String, Object?>{'id': selectedVariantId}),
-      audienceVisible
-          ? huiText('visible to preview viewer')
-          : huiText('hidden from preview viewer'),
-      huiText('{kind} model at {scale}', <String, Object?>{
-        'kind': kind,
-        'scale': frame.modelScale.toStringAsFixed(2),
-      }),
-      huiText('{visible} of {maximum} displays', <String, Object?>{
-        'visible': timeline.visualCount,
-        'maximum': doc.presentation.limits.maxVisualsPerStack,
-      }),
-      huiText('{phase} for {ticks} ticks', <String, Object?>{
-        'phase': _phaseLabel(frame.phase),
-        'ticks': frame.phaseTimeTicks.toStringAsFixed(1),
-      }),
-      frame.settled
-          ? huiText('{mode} landing, {ticks}-tick ease', <String, Object?>{
-              'mode': doc.presentation.landing.mode.toLowerCase(),
-              'ticks': doc.presentation.landing.transitionTicks,
-            })
-          : doc.presentation.motion.tumble
-          ? huiText('tumbling {speed}x, bounce {bounce}', <String, Object?>{
-              'speed': doc.presentation.motion.speedMultiplier.toStringAsFixed(
-                2,
-              ),
-              'bounce': frame.bounceRevision,
-            })
-          : huiText('no tumble'),
-      huiText('{ticks}-tick updates', <String, Object?>{
-        'ticks': doc.presentation.limits.updateIntervalTicks,
-      }),
-      doc.presentation.labels.enabled
-          ? huiText('label {billboard}', <String, Object?>{
-              'billboard': doc.presentation.labels.style.billboard
-                  .toLowerCase(),
-            })
-          : huiText('no label'),
-      if (physical)
-        huiText(
-          'physics on: gravity {gravity}x, bounce {bounce} — on the stage\'s '
-          'arc, not the server\'s',
-          <String, Object?>{
-            'gravity': physics.gravityMultiplier.toStringAsFixed(2),
-            'bounce': physics.bounce.toStringAsFixed(2),
-          },
-        ),
-      if (timeline.scriptActive) _scriptReadout(frame),
-      if (frame.animationProfileId.isNotEmpty)
-        huiText('animation {id}: {physics}, light {light}', <String, Object?>{
-          'id': frame.animationProfileId,
-          'physics': frame.animationPhysics
-              ? huiText('physics')
-              : huiText('physics held'),
-          'light': frame.animationLightLevel,
-        }),
-      _water
-          ? huiText(
-              'stage flooded to {level} blocks: inWater is simulated, and so '
-              'are inLava, blockLight and skyLight',
-              <String, Object?>{'level': dropStageWaterLevel},
-            )
-          : huiText(
-              'no water on the stage: inWater, inLava, blockLight and '
-              'skyLight are simulated, not observed',
-            ),
-      if (hidden > 0)
-        huiPlural(
-          'real-drops.readout.hidden',
-          hidden,
-          oneEnglish:
-              '{count} display hidden by visible, still pickupable in game',
-          otherEnglish:
-              '{count} displays hidden by visible, still pickupable in game',
-        ),
-      huiText('stage toss; animated textures show their first frame'),
-      if (!_stage.webGlAvailable)
-        huiText(
-          'No WebGL2 in this browser: the world is a still and models are '
-          'sprites',
-        ),
-      if (spriteFallback)
-        huiText('{type} has no model geometry, drawn as its sprite', <String, Object?>{
-          'type': drop.material,
-        }),
-    ].join(' · ');
-  }
-
-  /// What the script did this frame, named the way the server names its own
-  /// fields so a warning in the console and this line read the same.
-  String _scriptReadout(DropStageFrame frame) {
-    if (frame.scriptFailures.isNotEmpty) {
-      final List<String> failed = frame.scriptFailures.toList()..sort();
-      return huiText('script running, {fields} fell back', <String, Object?>{
-        'fields': failed.join(', '),
-      });
-    }
-    return huiText('script running on the displays only, not the item');
-  }
-
-  String _displayType(DropStageTimeline timeline) =>
-      timeline.usesItemDisplayName
-      ? huiText(timeline.drop.displayName)
-      : timeline.plainTypeName;
-
-  String _phaseLabel(DropAnimationPhase phase) => switch (phase) {
-    DropAnimationPhase.airborne => huiText('airborne'),
-    DropAnimationPhase.rebounding => huiText('rebounding'),
-    DropAnimationPhase.rolling => huiText('rolling'),
-    DropAnimationPhase.settling => huiText('settling'),
-    DropAnimationPhase.settled => huiText('settled'),
-    DropAnimationPhase.submerged => huiText('submerged'),
-  };
 }

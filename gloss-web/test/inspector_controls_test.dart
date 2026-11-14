@@ -9,8 +9,8 @@ library;
 
 import 'dart:io';
 
-import 'package:gloss_editor/components/common/hui_color_field.dart';
-import 'package:gloss_editor/components/common/hui_duration_field.dart';
+import 'package:gloss_editor/ui/color_value.dart';
+import 'package:gloss_editor/ui/duration_value.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -95,11 +95,13 @@ void main() {
     final String editor = File(
       'lib/components/inspector/text_icon_editor.dart',
     ).readAsStringSync();
-    const String handler =
-        "(event) => _insertColor(domInputValue(event.target))";
-
-    expect(editor, contains("'change': $handler"));
-    expect(editor, isNot(contains("'input': $handler")));
+    expect(editor, contains('commit: true'));
+    expect(editor, contains('onPicked: _insertColor'));
+    final String swatch = File('lib/ui/color_swatch.dart').readAsStringSync();
+    expect(
+      swatch,
+      contains('onChange: commit ? (dom.Color next) => onPicked(next.value)'),
+    );
   });
 
   test(
@@ -109,7 +111,7 @@ void main() {
         'lib/components/inspector/entity_picker.dart',
       ).readAsStringSync();
 
-      expect(picker, contains('RegistryOption(entityType)'));
+      expect(picker, contains('PickerOption(entityType)'));
       expect(picker, isNot(contains('String _label(')));
     },
   );

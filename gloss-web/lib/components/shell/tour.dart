@@ -3,15 +3,14 @@
 /// The spotlight is four dimming rectangles around the target rather than one
 /// scrim with a hole. A `box-shadow` cut-out would have been fewer nodes, but
 /// pointer events do not hit a shadow, so that shape cannot block clicks
-/// anywhere — the four-rect form blocks everything outside the highlight while
-/// leaving the highlighted region genuinely usable.
+/// anywhere; the four rectangles block everything outside the highlight
+/// while leaving the highlighted region usable.
 ///
 /// Targets are resolved by selector at measure time, and every step lists
-/// fallbacks. Nothing here reaches into another module's markup by structure:
-/// `.hui-rail`, `.hui-center` and `.hui-inspector` are written by
-/// `editor_shell.dart` itself, and the other two are class hooks the shell
-/// mounts. A step whose target is missing at this viewport width still shows
-/// its card, centred, rather than breaking the run.
+/// fallbacks. Every target is a hook the shell itself writes (`data-pane`,
+/// `#gloss-main`, the top-bar ids). A step whose target is missing at this
+/// width still shows its card, centred. The shell never shows the tour over a
+/// pairing or sync dialog.
 ///
 /// The seen flag lives under `gloss.tour.v1` in the workspace's storage, not
 /// in the store: it is a property of this browser, never of the document, and
@@ -24,6 +23,8 @@ import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 import 'package:web/web.dart' as web;
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+
+import '../../ui/action_row.dart';
 
 /// Storage key for "this browser has been shown the tour".
 const String huiTourSeenKey = 'gloss.tour.v1';
@@ -46,86 +47,56 @@ class HuiTourStep {
   final String? hint;
 }
 
-/// The steps follow the order a menu is actually built — pick a component,
-/// place it, tune it, check it, then find everything else — behind the one
-/// piece of navigation that frames all of it: the kind the workspace is
-/// showing.
+/// One stop per region of the shell, in the order a first document is
+/// made: find it, look at it, tune it, switch views, search, connect, get
+/// help. At 1024 px and below the panes are drawers, so their steps point at
+/// the top-bar buttons that open them.
 const List<HuiTourStep> huiTourSteps = <HuiTourStep>[
   HuiTourStep(
-    title: 'Choose the document kind',
+    title: 'Your library',
     body:
-        'The kind strip or picker scopes the library to one document type — '
-        'menus, scoreboards, holograms, tab lists — and points New document '
-        'at it. All keeps the whole workspace in view.',
-    selectors: <String>[
-      '.hui-kind-tabs',
-      '.hui-kind-picker',
-      '.hui-bar-center',
-    ],
-    hint: 'Opening a document from search or the palette moves the tab to it.',
+        'Every document in this browser. Search, filter by kind, and press '
+        'New to make one.',
+    selectors: <String>['[data-pane="library"]', '#hui-open-library'],
   ),
   HuiTourStep(
-    title: 'Components live in the rail',
-    body:
-        'Add a button, toggle or decoration from the split button at the '
-        'top, then pick a row to select it. Right-click a row — or use its ⋮ '
-        'button — for duplicate, restack and delete.',
-    selectors: <String>['.hui-rail', '.hui-mobile-panes'],
-    hint:
-        'The nearest overlapping hitbox fires. Rail order breaks an exact '
-        'distance tie.',
+    title: 'The stage',
+    body: 'The open document, drawn the way players will see it.',
+    selectors: <String>['#gloss-main'],
   ),
   HuiTourStep(
-    title: 'The artboard places them',
+    title: 'The inspector',
     body:
-        'Drag a component to move it. On touch, drag empty canvas to pan. '
-        'With a mouse, drag empty space to marquee-select, hold Shift to add, '
-        'and Space-drag or middle-drag to pan. Scroll zooms.',
-    selectors: <String>['.hui-center', '.hui-canvas'],
-    hint:
-        'X is mirrored against the JSON on purpose — the runtime negates it, '
-        'so the artboard shows what the player sees.',
+        'Every setting of the open document. The (i) buttons explain a '
+        'field.',
+    selectors: <String>['[data-pane="inspector"]', '#hui-open-inspector'],
   ),
   HuiTourStep(
-    title: 'The inspector tunes them',
+    title: 'Views',
     body:
-        'Everything about the selection is edited here: id, offset, icon, '
-        'actions and any extra keys the file carried. The ? button beside a '
-        'field explains what Gloss does with it.',
-    selectors: <String>['.hui-inspector', '.hui-mobile-panes'],
+        'Menus and container previews switch between Edit and Preview. Code '
+        'shows the JSON.',
+    selectors: <String>['#hui-view-controls', '#hui-bar-more-button', '#hui-bar'],
   ),
   HuiTourStep(
-    title: 'Four modes, whatever is open',
-    body:
-        'Visual is the document\'s own editing surface, Preview renders it '
-        'the way the server does, Code is its JSON, and Split shows both. A '
-        'mode a document cannot serve says why instead of disappearing.',
-    selectors: <String>[
-      '.hui-view-switcher',
-      '.hui-bar-view-picker',
-      '.hui-bar-views',
-    ],
-    hint:
-        'For a menu, Preview runs hover push, click dispatch and the distance '
-        'close, logging every command and sound instead of firing it.',
+    title: 'Search',
+    body: 'Run any command or open any document by name.',
+    hint: 'Ctrl+K, or Cmd+K on a Mac.',
+    selectors: <String>['#hui-bar-search', '#hui-bar-more-button'],
   ),
   HuiTourStep(
-    title: 'Export puts it on the server',
+    title: 'Your server',
     body:
-        'This page never writes your Minecraft server. Download the JSON, '
-        'drop it into plugins/Gloss/menus/, then /gloss menu open <id>. Live '
-        'sync only exists when /gloss web edit or /gloss web workspace gave you a capability link.',
-    selectors: <String>['.hui-bar'],
-    hint:
-        'File → Export, or the command palette. Images unzip into '
-        'plugins/Gloss/images/.',
+        'Pair with the link from /gloss editor pair, or export files '
+        'to copy into plugins/Gloss.',
+    selectors: <String>['#gloss-server-button', '#hui-bar-more-button'],
   ),
   HuiTourStep(
-    title: 'Everything else is one keystroke away',
+    title: 'Help and settings',
     body:
-        'The command palette in the Editor cluster runs any command by name, '
-        'including this tour. Press ? at any time for the full shortcut sheet.',
-    selectors: <String>['.hui-bar'],
+        'Help, shortcuts, this tour and settings. Simple mode hides expert '
+        'fields; Advanced shows them all.',
+    selectors: <String>['#hui-help-menu-button'],
   ),
 ];
 
@@ -155,7 +126,7 @@ class HuiTour extends StatefulWidget {
     required this.onFinish,
     required this.onSkip,
     required this.onNever,
-    this.leaving = false,
+    this.compact = false,
     super.key,
   });
 
@@ -169,9 +140,8 @@ class HuiTour extends StatefulWidget {
   /// Never again. Marks it seen.
   final void Function() onNever;
 
-  /// The caller has started the dismissal and unmounts after the exit
-  /// animation.
-  final bool leaving;
+  /// Drawers instead of panes: remeasure when this changes.
+  final bool compact;
 
   @override
   State<HuiTour> createState() => _HuiTourState();
@@ -202,6 +172,14 @@ class _HuiTourState extends State<HuiTour> {
     if (listener != null) web.window.removeEventListener('resize', listener);
     _resizeListener = null;
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(HuiTour oldComponent) {
+    super.didUpdateWidget(oldComponent);
+    if (oldComponent.compact != component.compact) {
+      web.window.requestAnimationFrame(((double _) => _measure()).toJS);
+    }
   }
 
   void _measure() {
@@ -324,9 +302,7 @@ class _HuiTourState extends State<HuiTour> {
   /// onboarding, and an overlay you cannot get out of by clicking away is the
   /// worst thing onboarding can be.
   Widget _dim(Map<String, String> rect) => dom.div(
-    classes: component.leaving
-        ? 'hui-tour-dim hui-anim-fade-out'
-        : 'hui-tour-dim',
+    classes: 'hui-tour-dim',
     styles: dom.Styles(raw: rect),
     events: dom.events<Null>(onClick: component.onSkip),
     const <Widget>[],
@@ -339,9 +315,7 @@ class _HuiTourState extends State<HuiTour> {
       // which is the only signal that the card moved rather than just changed
       // its text.
       key: ValueKey<String>('card-$_step'),
-      classes: component.leaving
-          ? 'hui-tour-card hui-anim-out'
-          : 'hui-tour-card',
+      classes: 'hui-tour-card',
       styles: dom.Styles(
         raw: <String, String>{'left': '${left}px', 'top': '${top}px'},
       ),
@@ -350,7 +324,7 @@ class _HuiTourState extends State<HuiTour> {
         'aria-label': huiText(step.title),
       },
       <Widget>[
-        dom.div(classes: 'hui-tour-eyebrow', <Widget>[
+        dom.p(classes: 'hui-tour-step', <Widget>[
           Text(
             huiText("Step {value} of {length}", <String, Object?>{
               'value': _step + 1,
@@ -359,55 +333,21 @@ class _HuiTourState extends State<HuiTour> {
           ),
         ]),
         dom.h2(classes: 'hui-tour-title', <Widget>[Text(huiText(step.title))]),
-        dom.p(classes: 'hui-tour-body', <Widget>[Text(huiText(step.body))]),
+        dom.p(<Widget>[Text(huiText(step.body))]),
         if (step.hint != null)
           dom.p(classes: 'hui-tour-hint', <Widget>[Text(huiText(step.hint!))]),
-        dom.div(classes: 'hui-tour-actions', <Widget>[
-          Button(
-            variant: ButtonVariant.ghost,
-            size: ButtonSize.small,
-            onPressed: component.onNever,
-            label: huiText("Don't show again"),
-            attributes: <String, String>{
-              'aria-label': huiText('Never show the guided tour again'),
-            },
+        ActionRow.footer(
+          dense: true,
+          secondary: <RowAction>[
+            RowAction(huiText("Don't show again"), component.onNever),
+            if (_step > 0) RowAction(huiText('Back'), () => _goto(_step - 1)),
+          ],
+          cancel: RowAction(huiText('Skip'), component.onSkip),
+          primary: RowAction(
+            last ? huiText('Done') : huiText('Next'),
+            last ? component.onFinish : () => _goto(_step + 1),
           ),
-          const dom.span(classes: 'hui-tour-spacer', <Widget>[]),
-          Button(
-            variant: ButtonVariant.ghost,
-            size: ButtonSize.small,
-            onPressed: component.onSkip,
-            label: huiText('Skip'),
-            attributes: <String, String>{
-              'aria-label': huiText('Close the tour for now'),
-            },
-          ),
-          if (_step > 0)
-            Button(
-              variant: ButtonVariant.outline,
-              size: ButtonSize.small,
-              onPressed: () => _goto(_step - 1),
-              label: huiText('Back'),
-            ),
-          Button(
-            // Arcane renders a Button's attributes one build behind (C15);
-            // keying it on the step keeps the label and its aria-label from
-            // reporting the previous step.
-            key: ValueKey<int>(_step),
-            variant: ButtonVariant.primary,
-            size: ButtonSize.small,
-            onPressed: last ? component.onFinish : () => _goto(_step + 1),
-            label: last ? huiText('Done') : huiText('Next'),
-            attributes: <String, String>{
-              'aria-label': last
-                  ? huiText('Finish the tour')
-                  : huiText('Go to step {step} of {count}', <String, Object?>{
-                      'step': _step + 2,
-                      'count': huiTourSteps.length,
-                    }),
-            },
-          ),
-        ]),
+        ),
       ],
     );
   }

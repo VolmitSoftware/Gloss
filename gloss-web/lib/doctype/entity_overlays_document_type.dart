@@ -20,8 +20,6 @@ final class EntityOverlaysDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('entity-overlay settings');
   @override
-  String get createLabel => huiText('Entity overlays');
-  @override
   String get pluralLabel => huiText('Entity overlays');
   @override
   int get tabOrder => 96;

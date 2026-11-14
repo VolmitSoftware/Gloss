@@ -51,6 +51,7 @@
 #   {expected}  保存编辑时的预期修订版本
 #   {experience}  获得的经验值
 #   {failed}  失败的操作数量
+#   {folders}  编辑器令牌可修改的文件夹
 #   {from}  源值或范围起点
 #   {fuel}  容器内剩余燃料
 #   {group}  语言编辑器类别
@@ -69,6 +70,7 @@
 #   {labels}  文本标签数量
 #   {legacy}  导入源中的标识符
 #   {level}  显示等级
+#   {lifetime}  编辑器令牌失效前的闲置时长
 #   {limit}  允许的限制
 #   {line}  消息内的行号
 #   {locale}  语言代码
@@ -79,6 +81,7 @@
 #   {message}  反馈或诊断消息
 #   {migrated}  已转换条目数量
 #   {minimum}  允许的最小值
+#   {minutes}  时间（分钟）
 #   {mode}  所选操作或显示模式
 #   {name}  对象名称
 #   {oldBoard}  之前的看板标识符
@@ -108,9 +111,9 @@
 #   {roll}  滚转角度
 #   {rotation}  显示旋转
 #   {scale}  显示或预览缩放比例
+#   {scopes}  编辑器令牌允许的操作
 #   {seconds}  时间（秒）
 #   {section}  语言编辑器分区
-#   {session}  编辑会话标识符
 #   {severity}  诊断严重程度
 #   {skipped}  已跳过条目数量
 #   {slots}  物品栏位数量
@@ -118,12 +121,12 @@
 #   {special}  特殊显示元素数量
 #   {state}  当前状态
 #   {style}  显示样式
-#   {subject}  网页编辑会话的对象
 #   {target}  应用语言选择的插件
 #   {temporary}  临时对象数量
 #   {text}  显示文本
 #   {title}  显示标题
 #   {to}  目标值或范围终点
+#   {token}  编辑器令牌 ID
 #   {total}  条目总数
 #   {type}  预期的值或对象类型
 #   {updated}  语言更新中更改的消息数
@@ -295,16 +298,11 @@ preview = "预览文档工具"
 "preview.dump" = "构建一次预览文档并输出其元素计数"
 "preview.list" = "列出预览文档及其匹配规则"
 "preview.reset" = "恢复内置的预览默认配置(不会移除可能遮盖它们的额外用户文档)"
-web = "打开和管理 Gloss 网页编辑器"
-"web.open" = "打开托管的空白 Gloss 编辑器"
-"web.edit" = "打开一个实时 Gloss 文档"
-"web.edit.document" = "在网页编辑器中打开此实时文档"
-"web.workspace" = "打开完整的实时 Gloss 工作区"
-"web.sessions" = "管理活跃的网页编辑器会话"
-"web.sessions.list" = "列出活跃的网页编辑器会话"
-"web.sessions.pull" = "立即查询网页编辑器会话的更新"
-"web.sessions.revoke" = "撤销网页编辑授权"
-"web.sessions.status" = "显示一个网页编辑器会话"
+editor = "将网页编辑器与此服务器配对"
+"editor.pair" = "生成用于配对浏览器的一次性链接"
+"editor.status" = "显示编辑器的监听器、中继服务器和指纹"
+"editor.tokens" = "列出已配对的浏览器"
+"editor.revoke" = "结束配对或取消链接"
 language = "选择你的语言或服务器默认语言"
 
 "import.mode" = "preview 或 apply"
@@ -334,7 +332,6 @@ panel_y = "绝对或 ~相对 Y 坐标"
 panel_yaw = "绝对或 ~相对偏航角"
 panel_z = "绝对或 ~相对 Z 坐标"
 content_menu = "已加载的菜单 ID"
-web_subject = "实时 Gloss 文档 ID"
 hologram_id = "新全息图及其根菜单的 ID"
 hologram_text = "可选的 MiniMessage 文本"
 image_path = "Gloss 的 images 文件夹下的文件"
@@ -355,7 +352,11 @@ row_x = "绝对或 ~相对行 X 坐标"
 row_y = "绝对或 ~相对行 Y 坐标"
 row_z = "绝对或 ~相对行 Z 坐标"
 source_menu = "已加载的源菜单 ID"
-web_session = "网页编辑器会话 ID"
+editor_label = "令牌列表中显示的名称"
+editor_scopes = "编辑器可执行的操作，以逗号分隔"
+editor_folders = "限定的文件夹，以逗号分隔"
+editor_expires = "未使用时的有效期，例如 7d、12h 或 30m"
+editor_token = "令牌 ID 或 all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &c你没有权限。"
@@ -391,6 +392,7 @@ lines = "{count} 行"
 header = "&8[&dGloss&8] &d{id} &7位于 &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8缩放 &f{scale} &8广告牌 &f{billboard} &8偏航角 &f{yaw} &8俯仰角 &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7位于未加载的世界 &f{world}&7。"
 
 [command.board]
 exists = "&8[&dGloss&8] &c记分板 '&f{id}&c' 已存在。"
@@ -505,13 +507,12 @@ execution_failed = "执行命令 {command} 失败: {reason}"
 menu_name_required = "菜单名称不能为空"
 hologram_id_required = "全息图 ID 不能为空"
 panel_id_required = "面板 ID 不能为空"
-web_subject_required = "网页编辑器文档 ID 不能为空"
-web_session_required = "网页编辑器会话 ID 不能为空"
 panel_player_required = "目标玩家不能为空"
 row_icon_type_required = "图标类型不能为空"
 row_style_property_required = "样式属性不能为空"
 import_source_required = "旧版数据导入来源不能为空"
 import_source_unknown = "未知的旧版数据导入来源：{source}"
+editor_token_required = "请指定令牌 ID 或 all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &c你没有权限 &f{permission}&c。"
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &c菜单 &f{menu}&c 的内容操作失败：{reason}"
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &c此命令仅供玩家使用。"
 
-[gloss.message.web]
-header = "网页编辑器"
-open_hover = "点击打开 Gloss 网页编辑器。"
-open = "&8[&dGloss&8]: &7网页编辑器：&f{url}"
-preparing = "&8[&dGloss&8]: &7正在为 &f{subject}&7 准备安全的编辑器同步会话..."
-unavailable = "&8[&dGloss&8]: &c实时网页编辑不可用。请检查编辑器同步配置及与中继服务器的连接。"
-open_failed = "&8[&dGloss&8]: &c无法在实时网页编辑器中打开 &f{kind}={subject}&c：{reason}"
-open_console = "&8[&dGloss&8]: &7编辑授权链接（&f{subject}&7）：&f{url}"
-capability_warning = "&8[&dGloss&8]: &e此 URL 可在授权被撤销或过期前将更改发布到服务器。请妥善保密。"
+[gloss.message.editor]
+link_ready = "链接已就绪。请在 {minutes} 分钟内打开"
+link_console = "&8[&dGloss&8]: &a链接已就绪。请在 {minutes} 分钟内打开：&f{url}"
+link_details = "&8[&dGloss&8]: &7权限范围 {scopes}；{folders}；闲置 {lifetime} 后失效；令牌 {token}"
+all_folders = "所有文件夹"
+some_folders = "文件夹 {folders}"
 open_label = "打开编辑器"
-copy_label = "复制链接"
-revoke_label = "撤销授权"
-link_hover = "打开编辑器、复制编辑授权链接，或撤销会话 {session}。"
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7没有活跃的编辑器同步会话。"
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7距离过期=&f{seconds}秒 &7已发布修订号=&f{revision} &7待处理=&f{pending}"
-revoked = "&8[&dGloss&8]: &a已撤销编辑器同步会话 &f{session}&a。"
-pulled = "&8[&dGloss&8]: &a已查询编辑器同步会话 &f{session}&a 的更新。"
-unknown = "&8[&dGloss&8]: &c编辑器同步会话 &f{session}&c 不存在或已过期。"
-failed = "&8[&dGloss&8]: &c编辑器同步会话 &f{session}&c 的操作失败：{reason}"
+open_hover = "在浏览器中打开"
+copy_label = "复制"
+copy_hover = "复制链接"
+revoke_label = "撤销"
+revoke_hover = "取消此链接，或断开通过它配对的编辑器"
+details_label = "详情"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &c编辑器未运行；请在 gloss.toml 中设置 [editor] enabled = true"
+tokens_empty = "&8[&dGloss&8]: &7没有编辑器令牌。"
+unknown_token = "&8[&dGloss&8]: &c令牌 &f{token}&c 不存在。"
+revoked_one = "&8[&dGloss&8]: &a已撤销 1 个令牌，其连接已关闭。"
+revoked_many = "&8[&dGloss&8]: &a已撤销 {count} 个令牌，其连接已关闭。"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7正在扫描 &f{source}&7，以预览迁移结果；不会更改现有数据..."

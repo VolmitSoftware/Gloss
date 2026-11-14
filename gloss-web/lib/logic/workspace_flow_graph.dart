@@ -1,5 +1,7 @@
 library;
 
+import 'dart:math' as math;
+
 import '../model/model.dart';
 import '../doctype/doctype.dart';
 import '../state/workspace.dart';
@@ -187,14 +189,31 @@ Map<String, WorkspacePanelPoint> arrangeWorkspaceFlowGraph(
     depth.putIfAbsent(doc.id, () => cycleDepth);
   }
 
-  final Map<int, int> rows = <int, int>{};
+  // A layer taller than [perColumn] wraps into more columns: many menus at
+  // one depth (often every menu without inbound links) draw as a block the
+  // frame can show at a readable zoom, not as one tall tower. A column is
+  // 292 px wide and a row 172 px tall, so 1.5 times as many rows as columns
+  // keeps the block about square.
+  final int perColumn = _maxInt(
+    4,
+    math.sqrt(graph.documents.length * 1.5).ceil(),
+  );
+  final Map<int, List<String>> layers = <int, List<String>>{};
+  for (final WorkspaceDoc doc in graph.documents) {
+    layers.putIfAbsent(depth[doc.id]!, () => <String>[]).add(doc.id);
+  }
   final Map<String, WorkspacePanelPoint> positions =
       <String, WorkspacePanelPoint>{};
-  for (final WorkspaceDoc doc in graph.documents) {
-    final int column = depth[doc.id]!;
-    final int row = rows[column] ?? 0;
-    rows[column] = row + 1;
-    positions[doc.id] = WorkspacePanelPoint(64 + column * 292, 72 + row * 172);
+  int column = 0;
+  for (final int layer in layers.keys.toList()..sort()) {
+    final List<String> ids = layers[layer]!;
+    for (int index = 0; index < ids.length; index++) {
+      positions[ids[index]] = WorkspacePanelPoint(
+        64 + (column + index ~/ perColumn) * 292,
+        72 + (index % perColumn) * 172,
+      );
+    }
+    column += (ids.length + perColumn - 1) ~/ perColumn;
   }
   return positions;
 }

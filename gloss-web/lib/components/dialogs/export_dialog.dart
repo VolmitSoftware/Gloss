@@ -1,19 +1,25 @@
-/// Export dialog: canonical runtime file name, downloads and install location
-/// for every transferable Gloss document kind.
+/// Export dialog: the runtime file name, downloads and install steps for
+/// every transferable Gloss document kind. The id is renamed in the library,
+/// so the file name here is read only.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show ListenableBuilder;
+import 'package:jaspr/jaspr.dart' show Component, ListenableBuilder;
 
-import '../../config/defaults.dart';
 import '../../config/links.dart';
 import '../../services/clipboard.dart';
 import '../../services/file_transfer.dart';
 import '../../services/image_library.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
-import 'dialog_parts.dart';
+import '../../ui/action_row.dart';
+import '../../ui/alert.dart';
+import '../../ui/dialog.dart';
+import '../../ui/field.dart';
+import '../../ui/field_group.dart';
+import '../../ui/technical_input.dart';
+import '../../logic/image_paths.dart' show huiFormatBytes, huiUsedImagePaths;
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class ExportDialog extends StatefulWidget {
@@ -37,78 +43,26 @@ class ExportDialog extends StatefulWidget {
 }
 
 class _ExportDialogState extends State<ExportDialog> {
-  late String _name;
   bool _zipping = false;
 
   EditorStore get _store => component.store;
 
   ImageLibrary? get _images => component.images ?? _store.images;
 
-  @override
-  void initState() {
-    super.initState();
-    _name = _store.menuId;
-  }
+  String get _documentId => _store.menuId;
 
-  @override
-  void didUpdateWidget(ExportDialog oldComponent) {
-    super.didUpdateWidget(oldComponent);
-    // Reopening always shows the document's current id, never a stale edit.
-    if (!oldComponent.isOpen && component.isOpen) {
-      _name = _store.menuId;
-    }
-  }
+  /// Relative to the plugin folder, from the kind table the plugin writes.
+  String get _dataPath =>
+      _store.docType.dataPath(_documentId) ?? '$_documentId.json';
 
-  String get _documentId => sanitizeMenuId(_name);
+  String get _fileName => _dataPath.split('/').last;
 
-  String? get _wireKind => _store.docType.syncWireKind;
+  /// Kinds whose runtime file name never follows the document id.
+  bool get _fixedFileName => _store.docType.fixedRuntimeId != null;
 
-  bool get _fixedFileName =>
-      _wireKind == 'motd' ||
-      _wireKind == 'connections' ||
-      _wireKind == 'tablist' ||
-      _wireKind == 'real-drops' ||
-      _wireKind == 'entity-overlays' ||
-      _wireKind == 'damage-indicators';
-
-  String get _fileName => switch (_wireKind) {
-    'motd' => 'motd.json',
-    'connections' => 'connections.json',
-    'tablist' => 'tablist.json',
-    'real-drops' => 'default.json',
-    'damage-indicators' => 'default.json',
-    'entity-overlays' => 'default.json',
-    _ => '$_documentId.json',
-  };
-
-  String get _installPath => switch (_wireKind) {
-    'menu' => '$huiMenuFolder$_fileName',
-    'hologram' => '$huiHologramFolder$_fileName',
-    'animation' => '$huiAnimationFolder$_fileName',
-    'scoreboard' => '$huiScoreboardFolder$_fileName',
-    'surface' => '$huiSurfaceFolder$_fileName',
-    'motd' => huiMotdFile,
-    'connections' => huiConnectionsFile,
-    'emoji' => '$huiEmojiFolder$_fileName',
-    'bubble-style' => '$huiBubbleFolder$_fileName',
-    'tablist' => huiTablistFile,
-    'real-drops' => huiRealDropsFile,
-    'damage-indicators' => huiDamageIndicatorsFile,
-    'entity-overlays' => huiEntityOverlaysFile,
-    'inventory' => '$huiInventoryFolder$_fileName',
-    'nameplate' => '$huiNameplateFolder$_fileName',
-    'nametag' => '$huiNametagFolder$_fileName',
-    'marker' => '$huiMarkerFolder$_fileName',
-    _ => '$huiPreviewFolder$_fileName',
-  };
-
-  void _commitName() {
-    if (_fixedFileName) return;
-    if (_store.menuId != _documentId) _store.setMenuId(_documentId);
-  }
+  String get _installPath => '$huiPluginFolder$_dataPath';
 
   void _downloadJson() {
-    _commitName();
     downloadText(_fileName, _store.exportJson());
     toast.success(
       huiText("Saved {fileName}", <String, Object?>{'fileName': _fileName}),
@@ -116,7 +70,6 @@ class _ExportDialogState extends State<ExportDialog> {
   }
 
   Future<void> _copyJson() async {
-    _commitName();
     final bool copied = await copyText(_store.exportJson());
     if (!mounted) return;
     if (copied) {
@@ -148,457 +101,176 @@ class _ExportDialogState extends State<ExportDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (!_store.canTransferDocument) return const dom.div(<Widget>[]);
-    return ArcaneDialog(
-      id: 'hui-export-dialog',
-      isOpen: component.isOpen,
-      onClose: component.onClose,
-      title: huiText("Export {noun}", <String, Object?>{
-        'noun': _store.docType.noun,
-      }),
-      maxWidth: 720,
-      actions: <Widget>[
-        Button(
-          variant: ButtonVariant.outline,
-          onPressed: component.onClose,
-          label: huiText('Close'),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _store,
+    builder: (BuildContext inner) {
+      final bool transferable = _store.canTransferDocument;
+      final bool open = component.isOpen && transferable;
+      // The export text is only built while the dialog shows: every edit
+      // notifies the store, and a closed dialog has nothing to draw.
+      final Set<String> used = open && _store.isMenuDoc
+          ? huiUsedImagePaths(_store.menu)
+          : const <String>{};
+      final ImageLibrary? library = _images;
+      final bool hasImages = library != null && library.images.isNotEmpty;
+      return AppDialog(
+        id: 'hui-export-dialog',
+        open: open,
+        onClose: component.onClose,
+        wide: true,
+        title: huiText("Export {noun}", <String, Object?>{
+          'noun': _store.docType.noun,
+        }),
+        footer: DialogFooter(
+          secondary: <RowAction>[
+            RowAction(
+              huiText('Copy JSON'),
+              open ? _copyJson : null,
+              icon: ArcaneIcon.clipboardCopy(),
+            ),
+            if (used.isNotEmpty)
+              RowAction(
+                huiText('Download images.zip'),
+                hasImages && !_zipping ? _downloadImages : null,
+                icon: ArcaneIcon.fileArchive(),
+                loading: _zipping,
+              ),
+          ],
+          cancel: RowAction(huiText('Close'), component.onClose),
+          primary: RowAction(
+            huiText('Download'),
+            open ? _downloadJson : null,
+            icon: ArcaneIcon.download(),
+          ),
         ),
-      ],
-      children: <Widget>[
-        ListenableBuilder(
-          listenable: _store,
-          builder: (BuildContext inner) {
-            if (!_store.canTransferDocument) {
-              return const dom.div(<Widget>[]);
-            }
-            if (_store.isMenuDoc) return _menuBody();
-            if (_store.isPreviewDoc) return _previewBody();
-            return _runtimeBody();
-          },
-        ),
-      ],
-    );
-  }
+        children: open ? _body(used) : const <Widget>[],
+      );
+    },
+  );
 
-  Widget _menuBody() {
+  List<Widget> _body(Set<String> used) {
     final ImageLibrary? library = _images;
-    final Set<String> used = huiUsedImagePaths(_store.menu);
     final int missing = library == null
         ? used.length
         : used.where((String path) => !library.contains(path)).length;
-    final String json = _store.exportJson();
-
-    return dom.div(classes: 'hui-dialog-body hui-stagger', <Widget>[
-      if (_store.hasErrors)
-        ArcaneAlert.error(
-          title: huiPlural(
-            'export.menu_error_count',
-            _store.errorCount,
-            oneEnglish: '{count} error in this menu',
-            otherEnglish: '{count} errors in this menu',
-          ),
-          message: huiText(
-            'The file will still export, but Gloss may refuse to open '
-            'it. Check the validation panel before you ship it.',
-          ),
-        ),
-      HuiDialogSection(
-        title: huiText('File name'),
-        description: huiText(
-          'The name becomes the menu id, the open command and the '
-          'permission node.',
-        ),
-        children: <Widget>[
-          HuiField(
-            label: huiText('Menu id'),
-            help: huiText(
-              'Lowercase letters, digits, underscore and hyphen. '
-              'Anything else is replaced.',
-            ),
-            control: TextInput(
-              value: _name,
-              size: ComponentSize.sm,
-              fullWidth: true,
-              placeholder: huiDefaultMenuId,
-              onChanged: (String value) => setState(() => _name = value),
-              onBlur: _commitName,
-              attributes: <String, String>{
-                'aria-label': huiText('Menu id'),
-                'autocomplete': 'off',
-                'spellcheck': 'false',
-                'dir': 'ltr',
-              },
-            ),
-          ),
-          HuiCodeBlock(text: '$huiMenuFolder$_fileName'),
-        ],
-      ),
-      HuiDialogSection(
-        title: huiText('Download'),
-        description: huiText(
-          'Everything the server needs, in the layout it expects.',
-        ),
-        children: <Widget>[
-          dom.div(classes: 'hui-dialog-actions', <Widget>[
-            Button(
-              variant: ButtonVariant.primary,
-              size: ButtonSize.small,
-              onPressed: _downloadJson,
-              icon: ArcaneIcon.download(size: IconSize.sm),
-              label: huiText("Download {fileName}", <String, Object?>{
-                'fileName': _fileName,
-              }),
-            ),
-            Button(
-              variant: ButtonVariant.outline,
-              size: ButtonSize.small,
-              onPressed: _copyJson,
-              icon: ArcaneIcon.clipboardCopy(size: IconSize.sm),
-              label: huiText('Copy JSON'),
-            ),
-            if (used.isNotEmpty)
-              Button(
-                variant: ButtonVariant.outline,
-                size: ButtonSize.small,
-                loading: _zipping,
-                disabled: library == null || library.images.isEmpty,
-                onPressed: _downloadImages,
-                icon: ArcaneIcon.fileArchive(size: IconSize.sm),
-                label: huiText('Download images.zip'),
-              ),
-          ]),
-          if (used.isNotEmpty)
-            dom.p(classes: 'hui-dialog-note', <Widget>[
-              Text(
-                huiPlural(
-                  'export.menu_image_count',
-                  used.length,
-                  oneEnglish:
-                      'This menu uses {count} image. Unzip images.zip into '
-                      '{folder}, keeping the folder structure.',
-                  otherEnglish:
-                      'This menu uses {count} images. Unzip images.zip into '
-                      '{folder}, keeping the folder structure.',
-                  arguments: <String, Object?>{'folder': huiImageFolder},
+    final bool menu = _store.isMenuDoc;
+    final bool preview = _store.isPreviewDoc;
+    return <Widget>[
+      if (_store.hasErrors && !preview)
+        AppAlert(
+          tone: AlertTone.error,
+          title: menu
+              ? huiPlural(
+                  'export.menu_error_count',
+                  _store.errorCount,
+                  oneEnglish: '{count} error in this menu',
+                  otherEnglish: '{count} errors in this menu',
+                )
+              : huiPlural(
+                  'export.document_error_count',
+                  _store.errorCount,
+                  oneEnglish: '{count} error in this {document}',
+                  otherEnglish: '{count} errors in this {document}',
+                  arguments: <String, Object?>{'document': _store.docType.noun},
                 ),
-              ),
-            ]),
-          if (missing > 0)
-            ArcaneAlert.warning(
-              message: huiPlural(
-                'export.missing_image_count',
-                missing,
-                oneEnglish:
-                    '{count} referenced image is not in the local library, '
-                    'so it will not be in the zip. Upload the file or copy it '
-                    'to the server by hand.',
-                otherEnglish:
-                    '{count} referenced images are not in the local library, '
-                    'so they will not be in the zip. Upload the files or copy '
-                    'them to the server by hand.',
-              ),
-            ),
-        ],
-      ),
-      HuiDialogSection(
-        title: huiText('Install on your server'),
-        description: huiText(
-          'Gloss watches the folder, so no restart is needed.',
-        ),
-        children: <Widget>[
-          HuiSteps(
-            steps: <String>[
-              huiText(
-                'Drop {fileName} under {menuFolder}. Slash-separated menu '
-                'ids use matching subfolders and stay part of the runtime id.',
-                <String, Object?>{
-                  'fileName': _fileName,
-                  'menuFolder': huiMenuFolder,
-                },
-              ),
-              if (used.isNotEmpty)
-                huiText(
-                  'Unzip images.zip into {imageFolder} so every icon path '
-                  'resolves.',
-                  <String, Object?>{'imageFolder': huiImageFolder},
-                ),
-              huiText(
-                'New and changed menus load within about a second at the '
-                'default watch interval, and any open session of a changed '
-                'menu closes with DEFINITION_RELOADED. A deleted menu '
-                'unregisters after 3 to 4 seconds.',
-              ),
-              huiText(
-                'Grant gloss.menus.open, gloss.menus.move and '
-                'gloss.open.{documentId} — the per-menu node is not declared '
-                'in plugin.yml, so it has to be granted explicitly.',
-                <String, Object?>{'documentId': _documentId},
-              ),
-              huiText(
-                'Test it with /gloss menu open {documentId} '
-                '(aliases: gl, glo, gg).',
-                <String, Object?>{'documentId': _documentId},
-              ),
-              huiText(
-                'To re-anchor the open session, stand at its new origin and '
-                'run /gloss menu move. This keeps the configured offset and '
-                'does not rewrite {fileName}.',
-                <String, Object?>{'fileName': _fileName},
-              ),
-            ],
-          ),
-          HuiCodeBlock(text: '/gloss menu open $_documentId\n/gloss menu move'),
-        ],
-      ),
-      HuiDialogSection(
-        title: huiText('Preview'),
-        description: huiText('{characters}, {components}.', <String, Object?>{
-          'characters': huiPlural(
-            'export.character_count',
-            json.length,
-            oneEnglish: '{count} character',
-            otherEnglish: '{count} characters',
-          ),
-          'components': huiPlural(
-            'export.component_count',
-            _store.menu.components.length,
-            oneEnglish: '{count} component',
-            otherEnglish: '{count} components',
-          ),
-        }),
-        children: <Widget>[HuiCodeBlock(text: json, scroll: true)],
-      ),
-    ]);
-  }
-
-  Widget _previewBody() {
-    final String json = _store.exportJson();
-    final int elementCount = _store.previewDoc?.elements.length ?? 0;
-
-    return dom.div(classes: 'hui-dialog-body hui-stagger', <Widget>[
-      HuiDialogSection(
-        title: huiText('File name'),
-        description: huiText(
-          'Only used to name the file on disk and in error logs '
-          '— unlike a menu, a container-preview document carries no id of '
-          'its own.',
-        ),
-        children: <Widget>[
-          HuiField(
-            label: huiText('File name'),
-            help: huiText(
-              'Lowercase letters, digits, underscore and hyphen. '
-              'Anything else is replaced.',
-            ),
-            control: TextInput(
-              value: _name,
-              size: ComponentSize.sm,
-              fullWidth: true,
-              placeholder: huiDefaultMenuId,
-              onChanged: (String value) => setState(() => _name = value),
-              onBlur: _commitName,
-              styles: huiTechnicalInputStyles,
-              attributes: <String, String>{
-                ...huiTechnicalInputAttributes,
-                'aria-label': huiText('File name'),
-              },
-            ),
-          ),
-          HuiCodeBlock(text: '$huiPreviewFolder$_fileName'),
-        ],
-      ),
-      HuiDialogSection(
-        title: huiText('Download'),
-        description: huiText(
-          "The document, ready to drop into {huiPreviewFolder}. There is no images zip: the preview format has no image icons.",
-          <String, Object?>{'huiPreviewFolder': huiPreviewFolder},
-        ),
-        children: <Widget>[
-          dom.div(classes: 'hui-dialog-actions', <Widget>[
-            Button(
-              variant: ButtonVariant.primary,
-              size: ButtonSize.small,
-              onPressed: _downloadJson,
-              icon: ArcaneIcon.download(size: IconSize.sm),
-              label: huiText("Download {fileName}", <String, Object?>{
-                'fileName': _fileName,
-              }),
-            ),
-            Button(
-              variant: ButtonVariant.outline,
-              size: ButtonSize.small,
-              onPressed: _copyJson,
-              icon: ArcaneIcon.clipboardCopy(size: IconSize.sm),
-              label: huiText('Copy JSON'),
-            ),
-          ]),
-        ],
-      ),
-      HuiDialogSection(
-        title: huiText('Install on your server'),
-        description: huiText(
-          'Previews are not menus: they draw automatically, with '
-          'no open command.',
-        ),
-        children: <Widget>[
-          HuiSteps(
-            steps: <String>[
-              huiText(
-                'Drop {fileName} into {previewFolder} — the folder is flat, '
-                'files in subfolders are never registered.',
-                <String, Object?>{
-                  'fileName': _fileName,
-                  'previewFolder': huiPreviewFolder,
-                },
-              ),
-              huiText(
-                'Editing, adding or deleting a file there takes effect within '
-                'a few ticks: no reload command and no restart.',
-              ),
-              huiText(
-                'Grant gloss.preview to whoever should see it (operators '
-                'have it by default); a viewer without it sees the locked '
-                'document instead.',
-              ),
-              huiText(
-                'It draws automatically over any block or entity its `match` '
-                'names — there is no open command for a preview.',
-              ),
-            ],
-          ),
-        ],
-      ),
-      HuiDialogSection(
-        title: huiText('Preview'),
-        description: huiText('{characters}; {elements}.', <String, Object?>{
-          'characters': huiPlural(
-            'export.character_count',
-            json.length,
-            oneEnglish: '{count} character',
-            otherEnglish: '{count} characters',
-          ),
-          'elements': huiPlural(
-            'export.element_count',
-            elementCount,
-            oneEnglish: '{count} element',
-            otherEnglish: '{count} elements',
-          ),
-        }),
-        children: <Widget>[HuiCodeBlock(text: json, scroll: true)],
-      ),
-    ]);
-  }
-
-  Widget _runtimeBody() {
-    final String json = _store.exportJson();
-    final String noun = _store.docType.noun;
-
-    return dom.div(classes: 'hui-dialog-body hui-stagger', <Widget>[
-      if (_store.hasErrors)
-        ArcaneAlert.error(
-          title: huiPlural(
-            'export.document_error_count',
-            _store.errorCount,
-            oneEnglish: '{count} error in this {document}',
-            otherEnglish: '{count} errors in this {document}',
-            arguments: <String, Object?>{'document': noun},
-          ),
           message: huiText(
-            'The file will still export, but Gloss may refuse to load it. '
-            'Check the validation panel before installing it.',
+            'Gloss may refuse to load it. Check Validation first.',
           ),
         ),
-      HuiDialogSection(
-        title: _fixedFileName ? huiText('Runtime file') : huiText('File name'),
-        description: _fixedFileName
+      if (missing > 0)
+        AppAlert(
+          tone: AlertTone.warning,
+          message: huiPlural(
+            'export.missing_in_browser',
+            missing,
+            oneEnglish: '{count} image is not in this browser, so images.zip leaves it out.',
+            otherEnglish: '{count} images are not in this browser, so images.zip leaves them out.',
+          ),
+        ),
+      Field(
+        label: huiText('File'),
+        forId: 'hui-export-file',
+        tip: _fixedFileName
             ? huiText(
                 'Gloss uses a fixed runtime file name for this document type.',
               )
-            : huiText('The file name becomes this document\'s runtime id.'),
-        children: <Widget>[
-          if (!_fixedFileName)
-            HuiField(
-              label: huiText('Document id'),
-              help: huiText(
-                'Lowercase letters, digits, underscore, hyphen and nested '
-                'path segments. Anything else is replaced.',
-              ),
-              control: TextInput(
-                value: _name,
-                size: ComponentSize.sm,
-                fullWidth: true,
-                onChanged: (String value) => setState(() => _name = value),
-                onBlur: _commitName,
-                attributes: <String, String>{
-                  'aria-label': huiText('Document id'),
-                  'autocomplete': 'off',
-                  'spellcheck': 'false',
-                  'dir': 'ltr',
-                },
-              ),
-            ),
-          HuiCodeBlock(text: _installPath),
-        ],
+            : huiText('Rename the document in the library to change it.'),
+        // Read only and selectable, so the path can be copied; as the first
+        // field it also takes the dialog's initial focus.
+        child: TextInput(
+          id: 'hui-export-file',
+          value: _installPath,
+          readOnly: true,
+          fullWidth: true,
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+        ),
       ),
-      HuiDialogSection(
-        title: huiText('Download'),
-        description: huiText('Canonical JSON ready for the Gloss runtime.'),
+      FieldGroup(
+        title: huiText('Install on your server'),
+        tip: menu
+            ? huiText(
+                'Gloss loads new and changed menus within about a second, '
+                'with no restart. gloss.open.<id> is not declared in '
+                'plugin.yml, so grant it explicitly. /gloss menu move '
+                're-anchors an open menu.',
+              )
+            : preview
+            ? huiText(
+                'A preview draws by itself over the blocks and entities it '
+                'matches. Changes apply right away; subfolders are not read.',
+              )
+            : huiText(
+                'Check the server console after replacing the file. A parse failure leaves the last working {document} active.',
+                <String, Object?>{'document': _store.docType.noun},
+              ),
         children: <Widget>[
-          dom.div(classes: 'hui-dialog-actions', <Widget>[
-            Button(
-              variant: ButtonVariant.primary,
-              size: ButtonSize.small,
-              onPressed: _downloadJson,
-              icon: ArcaneIcon.download(size: IconSize.sm),
-              label: huiText("Download {fileName}", <String, Object?>{
-                'fileName': _fileName,
-              }),
-            ),
-            Button(
-              variant: ButtonVariant.outline,
-              size: ButtonSize.small,
-              onPressed: _copyJson,
-              icon: ArcaneIcon.clipboardCopy(size: IconSize.sm),
-              label: huiText('Copy JSON'),
-            ),
+          // The theme resets list markers, so the numbers are part of the text.
+          dom.ol(<Widget>[
+            for (final (int index, String step) in _steps(
+              used.isNotEmpty,
+            ).indexed)
+              dom.li(<Widget>[Component.text('${index + 1}. $step')]),
           ]),
         ],
       ),
-      HuiDialogSection(
-        title: huiText('Install on your server'),
-        description: huiText(
-          'Gloss watches runtime JSON and applies valid changes.',
-        ),
+      FieldGroup(
+        title: huiText('JSON'),
         children: <Widget>[
-          HuiSteps(
-            steps: <String>[
-              huiText('Drop {fileName} at {installPath}.', <String, Object?>{
-                'fileName': _fileName,
-                'installPath': _installPath,
-              }),
-              huiText(
-                'Keep the schema version and server-owned revision valid; the validation panel reports anything Gloss will reject.',
-              ),
-              huiText(
-                'Check the server console after replacing the file. A parse failure leaves the last working {document} active.',
-                <String, Object?>{'document': noun},
-              ),
-            ],
+          dom.pre(
+            classes: 'hui-codeblock is-scroll',
+            attributes: const <String, String>{'dir': 'ltr'},
+            <Widget>[Component.text(_store.exportJson())],
           ),
         ],
       ),
-      HuiDialogSection(
-        title: huiText('Preview'),
-        description: huiPlural(
-          'export.json_character_count',
-          json.length,
-          oneEnglish: '{count} character in the exported {noun} JSON.',
-          otherEnglish: '{count} characters in the exported {noun} JSON.',
-          arguments: <String, Object?>{'noun': noun},
-        ),
-        children: <Widget>[HuiCodeBlock(text: json, scroll: true)],
-      ),
-    ]);
+    ];
   }
+
+  List<String> _steps(bool usesImages) => <String>[
+    huiText('Drop {fileName} at {installPath}.', <String, Object?>{
+      'fileName': _fileName,
+      'installPath': _installPath,
+    }),
+    if (_store.isMenuDoc) ...<String>[
+      if (usesImages)
+        huiText(
+          'Unzip images.zip into {imageFolder} so every icon path '
+          'resolves.',
+          <String, Object?>{'imageFolder': huiImageFolder},
+        ),
+      huiText(
+        'Grant gloss.menus.open and gloss.open.{documentId}.',
+        <String, Object?>{'documentId': _documentId},
+      ),
+      huiText(
+        'Test it with /gloss menu open {documentId} '
+        '(aliases: gl, glo, gg).',
+        <String, Object?>{'documentId': _documentId},
+      ),
+    ] else if (_store.isPreviewDoc)
+      huiText('Grant gloss.preview to viewers. Operators have it by default.')
+    else
+      huiText('Check the server console for errors.'),
+  ];
 }

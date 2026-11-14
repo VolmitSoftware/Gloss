@@ -31,7 +31,6 @@ import 'dart:math' as math;
 
 import 'package:web/web.dart' as web;
 
-import '../../l10n/hui_localizations.dart';
 import '../../model/hui_menu.dart' show huiMaxDistanceCeiling;
 import '../../preview/preview_scene.dart';
 import '../../preview/preview_types.dart';
@@ -133,11 +132,6 @@ abstract interface class PreviewInputHost {
 
   /// One of [huiPreviewToggleKeys], already lower-cased.
   void onInputToggle(String key);
-
-  /// The user is driving the stage rather than reading it: an orbit or pan
-  /// drag, a dolly, or a click. Fires on every one of those, so the host has
-  /// to be idempotent — it exists to retire one-time chrome, not to animate.
-  void onInputEngaged();
 }
 
 /// Every pointer, wheel and key the stage listens to, plus Player mode.
@@ -369,10 +363,8 @@ class PreviewInput {
     switch (_drag) {
       case PreviewDragMode.orbit:
         _orbitBy(dx, dy);
-        _host.onInputEngaged();
       case PreviewDragMode.pan:
         _panBy(dx, dy);
-        _host.onInputEngaged();
       case PreviewDragMode.press:
       case PreviewDragMode.none:
         // Aiming only; the ray already moved with the cursor.
@@ -426,7 +418,6 @@ class PreviewInput {
     if (_host.inputPlayerMode) return;
     final double delta = _normalizedWheelDelta(event);
     if (delta == 0) return;
-    _host.onInputEngaged();
     final PreviewPose pose = _host.inputPose;
     pose.orbit = pose.orbit
         .copyWith(
@@ -643,32 +634,6 @@ double huiPreviewBareRange(PreviewSimulation sim) {
 double huiPreviewEffectiveRange(PreviewSimulation sim) {
   final double bare = huiPreviewBareRange(sim);
   return math.sqrt(bare * bare + sim.menuOffset.lengthSquared);
-}
-
-/// What the range check will compare against, spelled out for the HUD.
-String huiPreviewRangeSummary(PreviewSimulation sim) {
-  final double bare = huiPreviewBareRange(sim);
-  if (bare >= huiMaxDistanceCeiling) {
-    return huiText(
-      'unbounded - maxDistance absent (ring clamped to {blocks})',
-      <String, Object?>{'blocks': huiPreviewMaxRangeBlocks.toStringAsFixed(0)},
-    );
-  }
-  final double effective = huiPreviewEffectiveRange(sim);
-  final String text = effective > bare + 5e-3
-      ? huiText(
-          '{bare} -> {effective} effective (+ menu offset)',
-          <String, Object?>{
-            'bare': bare.toStringAsFixed(2),
-            'effective': effective.toStringAsFixed(2),
-          },
-        )
-      : huiText('{blocks} blocks', <String, Object?>{
-          'blocks': bare.toStringAsFixed(2),
-        });
-  return effective > huiPreviewMaxRangeBlocks
-      ? huiText('{summary} - ring clamped', <String, Object?>{'summary': text})
-      : text;
 }
 
 // ---------------------------------------------------------------------------

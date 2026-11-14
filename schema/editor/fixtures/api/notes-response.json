@@ -1,0 +1,24 @@
+{
+  "notesHash": "sha256:627a1549381fce7d72c9dc6fb506c542482d12cec70f0bb0ce490e01ca232d91",
+  "notes": {
+    "format": "gloss-editor-notes",
+    "version": 1,
+    "warnings": [],
+    "history": [
+      {
+        "kind": "holograms",
+        "id": "spawn",
+        "version": 1700,
+        "source": "watchdog",
+        "bytes": 12
+      },
+      {
+        "kind": "holograms",
+        "id": "welcome",
+        "version": 1700,
+        "source": "watchdog",
+        "bytes": 12
+      }
+    ]
+  }
+}

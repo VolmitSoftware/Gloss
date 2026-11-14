@@ -3,7 +3,11 @@ package art.arcane.gloss.entity;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.text.ClientTextLines;
+import art.arcane.gloss.text.ClientTextLines.Run;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.TextUtils;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.ChatColor;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityOverlayTextTest {
     private static final java.util.function.Predicate<String> SHARED_CLIPS = line -> false;
+    private static final int WHITE = NamedTextColor.WHITE.value();
+    private static final int RED = NamedTextColor.RED.value();
+    private static final int GRAY = NamedTextColor.GRAY.value();
 
     private static final EntityOverlayText.Snapshot NAMED = new EntityOverlayText.Snapshot(
         "Sentinel", 15, 20, 20, 5, 7, 4, 12, "zombie", 3.5);
@@ -87,6 +94,26 @@ class EntityOverlayTextTest {
         assertEquals(String.join("\n", payload, payload, payload), plain(frame));
         assertEquals(0, calls.get());
         assertTrue(frame.spans().isEmpty());
+    }
+
+    @Test
+    void aColourInAValueClearsTheTemplateFormatUntilTheValueEnds() {
+        EntityOverlayDoc settings = doc("""
+            "lines":[{"id":"name","text":"&lHP {name} &7left"}]
+            """);
+        ParticleText.Rendered frame = render(settings, NAMED.withName("&cBob"), List.of());
+        assertEquals(List.of(List.of(Run.bold("HP ", WHITE), Run.plain("Bob", RED), Run.bold(" ", WHITE),
+            Run.plain("left", GRAY))), runs(frame));
+    }
+
+    @Test
+    void aResetInAValueReturnsToTheDisplayDefault() {
+        EntityOverlayDoc settings = doc("""
+            "lines":[{"id":"detail","type":"insight","text":"&l{insight}!"}]
+            """);
+        ParticleText.Rendered frame = render(settings, NAMED, List.of("&nA&rB"));
+        assertEquals(List.of(List.of(new Run("A", WHITE, true, false, true, false, false), Run.plain("B", WHITE),
+            Run.bold("!", WHITE))), runs(frame));
     }
 
     @Test
@@ -165,6 +192,10 @@ class EntityOverlayTextTest {
 
     private static String plain(ParticleText.Rendered frame) {
         return ChatColor.stripColor(frame.text());
+    }
+
+    private static List<List<Run>> runs(ParticleText.Rendered frame) {
+        return ClientTextLines.lines(TextUtils.parseLegacy(frame.text()));
     }
 
     private static ExprScope scope(Map<String, Object> values) {

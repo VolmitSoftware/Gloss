@@ -23,8 +23,6 @@ final class RealDropDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('real-drop settings');
 
-  @override
-  String get createLabel => huiText('Real drops');
 
   @override
   String get pluralLabel => huiText('Real drops');

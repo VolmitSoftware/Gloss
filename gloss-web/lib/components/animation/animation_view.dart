@@ -8,40 +8,30 @@
 /// timeline. Playback state lives in `logic/gloss_animation_player.dart`
 /// under an injectable clock; this file owns only the repaint timer and DOM.
 ///
-/// With `gameContext` the current frame mounts alone into the shared
-/// game-screen frame — an animation has no HUD slot of its own, so it is
-/// shown in-world at the size a hologram would draw it, with the transport
-/// floated over the frame.
+/// The current frame mounts alone into the shared game-screen frame: an
+/// animation has no HUD slot of its own, so it is shown in-world at the size
+/// a hologram would draw it, with the transport in the frame's header.
 library;
 
 import 'dart:async';
-import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show EventCallback;
 
 import '../../logic/gloss_animation_player.dart';
 import '../../logic/gloss_text.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
+import '../../ui/action_row.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_text_line.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class AnimationView extends StatefulWidget {
-  const AnimationView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const AnimationView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the current frame inside the shared Minecraft game-screen frame
-  /// instead of the editor player. False renders exactly the editor surface.
-  final bool gameContext;
 
   @override
   State<AnimationView> createState() => _AnimationViewState();
@@ -112,15 +102,9 @@ class _AnimationViewState extends State<AnimationView> {
     if (doc == null) {
       _ticker?.cancel();
       _ticker = null;
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.world,
-          label: huiText('Animation frame in game'),
-        );
-      }
-      return const dom.div(
-        classes: 'hui-animation-player is-empty',
-        <Widget>[],
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.world,
+        label: huiText('Animation frame in game'),
       );
     }
     _syncTicker(doc);
@@ -130,156 +114,61 @@ class _AnimationViewState extends State<AnimationView> {
     final int index = sample.frameIndex;
     final String frame = sample.frameText;
 
-    final Widget currentFrame = dom
-        .div(classes: 'hui-animation-frame-large', <Widget>[
-          GlossTextLine(
-            render: renderGlossAnimationFramePreview(
-              frame,
-              emoji: _store.workspaceEmoji,
-              nowMs: sample.nowMs,
+    final Widget currentFrame = dom.div(
+      classes: 'hui-animation-frame-large',
+      <Widget>[
+        GlossTextLine(
+          render: renderGlossAnimationFramePreview(
+            frame,
+            emoji: _store.workspaceEmoji,
+            nowMs: sample.nowMs,
+          ),
+        ),
+      ],
+    );
+
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.world,
+      label: huiText('Animation frame in game'),
+      fit: true,
+      actions: <RowAction>[
+        RowAction(
+          huiText('Previous frame'),
+          () => setState(() => _player.step(-1, doc, id)),
+          icon: ArcaneIcon.skipBack(),
+          iconOnly: true,
+        ),
+        RowAction(
+          _player.playing ? huiText('Pause') : huiText('Play'),
+          () => setState(() => _player.toggle(doc, id)),
+          icon: _player.playing ? ArcaneIcon.pause() : ArcaneIcon.play(),
+          iconOnly: true,
+        ),
+        RowAction(
+          huiText('Next frame'),
+          () => setState(() => _player.step(1, doc, id)),
+          icon: ArcaneIcon.skipForward(),
+          iconOnly: true,
+        ),
+      ],
+      status: doc.frames.isEmpty
+          ? huiText('No frames')
+          : huiText(
+              'Frame {current} of {total} · {interval} ms · '
+              '{mode}{paused}',
+              <String, Object?>{
+                'current': index + 1,
+                'total': doc.frames.length,
+                'interval': doc.effectiveFrameIntervalMs,
+                'mode':
+                    doc.normalizedMode ??
+                    huiText('{mode} (invalid)', <String, Object?>{
+                      'mode': doc.mode,
+                    }),
+                'paused': _player.playing ? '' : huiText(' · paused'),
+              },
             ),
-          ),
-        ]);
-
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.world,
-        label: huiText('Animation frame in game'),
-        controls: <Widget>[
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.iconSm,
-            onPressed: () => setState(() => _player.toggle(doc, id)),
-            attributes: <String, String>{
-              'aria-label': _player.playing
-                  ? huiText('Pause')
-                  : huiText('Play'),
-              'title': _player.playing ? huiText('Pause') : huiText('Play'),
-            },
-            icon: _player.playing
-                ? ArcaneIcon.pause(size: IconSize.sm)
-                : ArcaneIcon.play(size: IconSize.sm),
-          ),
-        ],
-        child: currentFrame,
-      );
-    }
-
-    return dom.div(classes: 'hui-animation-player', <Widget>[
-      dom.div(classes: 'hui-animation-frame-stage', <Widget>[
-        currentFrame,
-        dom.div(classes: 'hui-animation-frame-meta', <Widget>[
-          Text(
-            doc.frames.isEmpty
-                ? huiText('No frames')
-                : huiText(
-                    'Frame {current} of {total} · {interval} ms · '
-                    '{mode}{paused}',
-                    <String, Object?>{
-                      'current': index + 1,
-                      'total': doc.frames.length,
-                      'interval': doc.effectiveFrameIntervalMs,
-                      'mode':
-                          doc.normalizedMode ??
-                          huiText('{mode} (invalid)', <String, Object?>{
-                            'mode': doc.mode,
-                          }),
-                      'paused': _player.playing ? '' : huiText(' · paused'),
-                    },
-                  ),
-          ),
-        ]),
-      ]),
-      _transport(doc, id, index),
-      _strip(doc, id, index, sample.nowMs),
-    ]);
-  }
-
-  Widget _transport(GlossAnimationDoc doc, String id, int index) =>
-      dom.div(classes: 'hui-animation-transport', <Widget>[
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.iconSm,
-          onPressed: () => setState(() => _player.step(-1, doc, id)),
-          attributes: <String, String>{'aria-label': huiText('Previous frame')},
-          icon: ArcaneIcon.skipBack(size: IconSize.sm),
-        ),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.iconSm,
-          onPressed: () => setState(() => _player.toggle(doc, id)),
-          attributes: <String, String>{
-            'aria-label': _player.playing ? huiText('Pause') : huiText('Play'),
-          },
-          icon: _player.playing
-              ? ArcaneIcon.pause(size: IconSize.sm)
-              : ArcaneIcon.play(size: IconSize.sm),
-        ),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.iconSm,
-          onPressed: () => setState(() => _player.step(1, doc, id)),
-          attributes: <String, String>{'aria-label': huiText('Next frame')},
-          icon: ArcaneIcon.skipForward(size: IconSize.sm),
-        ),
-        dom.input(
-          classes: 'hui-animation-scrub',
-          attributes: <String, String>{
-            'type': 'range',
-            'min': '0',
-            'max': '${doc.frames.isEmpty ? 0 : doc.frames.length - 1}',
-            'step': '1',
-            'value': '$index',
-            'aria-label': huiText('Scrub frames'),
-          },
-          events: <String, EventCallback>{
-            'input': (Object? event) {
-              final String? raw = _rangeValue(event);
-              final int? next = raw == null ? null : int.tryParse(raw);
-              if (next != null) {
-                setState(() => _player.scrubTo(next, doc));
-              }
-            },
-          },
-        ),
-      ]);
-
-  Widget _strip(GlossAnimationDoc doc, String id, int index, int nowMs) =>
-      dom.div(classes: 'hui-animation-strip', <Widget>[
-        for (int i = 0; i < doc.frames.length; i++)
-          dom.button(
-            classes:
-                'hui-animation-strip-frame${i == index ? ' is-active' : ''}',
-            attributes: <String, String>{
-              'type': 'button',
-              'aria-label': huiText("Show frame {value}", <String, Object?>{
-                'value': i + 1,
-              }),
-            },
-            events: <String, EventCallback>{
-              'click': (Object? _) => setState(() => _player.scrubTo(i, doc)),
-            },
-            <Widget>[
-              dom.span(classes: 'hui-animation-strip-index', <Widget>[
-                Text(huiText("{value}", <String, Object?>{'value': i + 1})),
-              ]),
-              GlossTextLine(
-                render: renderGlossAnimationFramePreview(
-                  doc.frames[i],
-                  emoji: _store.workspaceEmoji,
-                  nowMs: nowMs,
-                ),
-              ),
-            ],
-          ),
-      ]);
-
-  /// The range input's value, off `event.target.value`.
-  static String? _rangeValue(Object? event) {
-    final JSObject? object = event as JSObject?;
-    final JSAny? target = object?.getProperty<JSAny?>('target'.toJS);
-    if (target == null || !target.isA<JSObject>()) return null;
-    final JSAny? value = (target as JSObject).getProperty<JSAny?>('value'.toJS);
-    return value.isA<JSString>() ? (value! as JSString).toDart : null;
+      child: currentFrame,
+    );
   }
 }

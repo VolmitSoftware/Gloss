@@ -20,11 +20,16 @@ import 'package:jaspr/jaspr.dart' show ChangeNotifier;
 import '../config/defaults.dart';
 import '../config/gloss_templates.dart';
 import '../doctype/doctype.dart';
+import '../logic/advanced_notice.dart' show ArrivedDocument;
+import '../logic/authored_source.dart';
 import '../logic/canvas_scene.dart';
 import '../logic/document_presets.dart';
 import '../logic/gloss_text.dart';
 import '../logic/validation.dart';
+import '../logic/preview_card_edit.dart' show PreviewCardView;
 import '../logic/preview_sim_controls.dart';
+import '../logic/viewport_math.dart' show CanvasTransform;
+import '../mc/scene/mc_camera.dart' show McCamera;
 import '../l10n/hui_localizations.dart';
 import '../model/model.dart';
 import '../preview/preview_types.dart';
@@ -51,6 +56,11 @@ enum EditorView { visual, preview, code, split }
 enum HuiBackdropMode { none, dark, light, image }
 
 typedef EditorMessageSink = void Function(String message);
+
+/// The documents an import wrote, with the kinds they hold now, and its
+/// note (null when the result is already on screen).
+typedef EditorImportSink =
+    void Function(List<ArrivedDocument> documents, String? message);
 
 const Set<String> _directHistoryLabels = <String>{
   'add card',
@@ -104,6 +114,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     HuiCatalogs? catalogs,
     ImageLibrary? images,
     this.autosaveDelay = const Duration(milliseconds: 500),
+    this.seedDocument = true,
     bool autoLoad = true,
   }) : workspace = workspace ?? Workspace(),
        _catalogs = catalogs ?? HuiCatalogs.empty(),
@@ -140,9 +151,17 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   /// Debounce window for the workspace autosave.
   final Duration autosaveDelay;
 
+  /// An empty workspace starts with a menu to edit. A server's workspace
+  /// holds only the server's documents, so it starts empty instead.
+  final bool seedDocument;
+
   /// Routed to the toast stack by the shell.
   EditorMessageSink? onError;
   EditorMessageSink? onInfo;
+
+  /// Where imports land, so Simple can say when only Advanced lists them.
+  /// Unset, an import's note goes to [onInfo].
+  EditorImportSink? onImported;
 
   late HuiMenu _menu;
   String _menuId = huiDefaultMenuId;
@@ -165,7 +184,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   /// null while another kind is open. Always written through [_setGlossDoc].
   GlossDoc? _glossDoc;
   DocumentPresets _activePresets = DocumentPresets.empty;
-  InheritedDocumentSource? _inheritedSource;
+  AuthoredSource? _authored;
   String? _presetFailureSource;
   String? _panelCacheSource;
   DocumentPresets? _panelCachePresets;
@@ -178,7 +197,22 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   /// Bumped on every change to [_previewDoc], whether it was swapped wholesale
   /// or edited in place.
   int _previewRevision = 0;
-  int _canvasFitRequest = 0;
+
+  /// Fit requests per document id: an import, a template or a randomize asks
+  /// the pan-and-zoom stages to frame that document again.
+  final Map<String, int> _canvasFitRequests = <String, int>{};
+
+  /// Cameras the user set by hand on the menu canvas, per document id. They
+  /// outlive the canvas, so a document keeps its zoom across switches; a fit
+  /// request forgets them.
+  final Map<String, CanvasTransform> canvasCameras =
+      <String, CanvasTransform>{};
+
+  /// The same for the container card.
+  final Map<String, PreviewCardView> cardCameras = <String, PreviewCardView>{};
+
+  /// The same for the 3D stages (moved away from their home framing).
+  final Map<String, McCamera> worldCameras = <String, McCamera>{};
 
   /// The one [PreviewSim] the preview-card viewport and the simulation panel
   /// (task E8) share — see [PreviewSimController]'s own doc comment for why
@@ -233,7 +267,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   bool _previewShowDistanceSphere = false;
   bool _previewShowGroundGrid = true;
   bool _previewLogOpen = true;
-  bool _previewBannerDismissed = false;
   PreviewCameraMode _previewCameraMode = PreviewCameraMode.orbit;
 
   List<HuiIssue> _issues = const <HuiIssue>[];
@@ -264,7 +297,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   bool _keepWorkspaceEmpty = false;
   String Function()? _lastError;
   String Function()? _codeError;
-  String? _preservedMenuSource;
   int _documentRevision = 0;
   int? _pendingDocumentRevision;
   int? _pendingWorkspaceRevision;
@@ -456,11 +488,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _glossRevision++;
   }
 
-  /// The byte-exact source the active menu document was decoded from, kept
-  /// until the first semantic edit. Null for every other kind.
-  @override
-  String? get preservedMenuSource => _preservedMenuSource;
-
   /// Monotonic counter over every change to [previewDoc] — an edit, an undo, a
   /// code commit, an import, a document switch.
   ///
@@ -473,11 +500,18 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   /// more than it saved.
   int get previewRevision => _previewRevision;
 
-  int get canvasFitRequest => _canvasFitRequest;
+  /// The active document's fit request count.
+  int get canvasFitRequest => _canvasFitRequests[workspace.activeId] ?? 0;
 
+  /// Asks the menu canvas or the container card to frame the active document
+  /// again, forgetting a camera set by hand.
   void requestCanvasFit() {
     if (!isMenuDoc && !isPreviewDoc) return;
-    _canvasFitRequest++;
+    final String? id = workspace.activeId;
+    if (id == null) return;
+    _canvasFitRequests[id] = canvasFitRequest + 1;
+    canvasCameras.remove(id);
+    cardCameras.remove(id);
     _notify();
   }
 
@@ -967,18 +1001,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _savePreference();
   }
 
-  /// Whether the in-stage facing note has been closed for good. Set by its own
-  /// close button and by the first real camera or click interaction, because
-  /// someone who has started using the preview has stopped reading it. The
-  /// copy stays reachable from the toolbar's facing help.
-  bool get previewBannerDismissed => _previewBannerDismissed;
-
-  set previewBannerDismissed(bool value) {
-    if (_previewBannerDismissed == value) return;
-    _previewBannerDismissed = value;
-    _savePreference();
-  }
-
   PreviewCameraMode get previewCameraMode => _previewCameraMode;
 
   set previewCameraMode(PreviewCameraMode value) {
@@ -1208,9 +1230,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     if (afterSemantic == beforeSemantic) {
       _notify();
       return;
-    }
-    if (_preservedMenuSource != null) {
-      _menu = decodeHuiMenu(afterSemantic);
     }
     // Adding or removing a component is a step in its own right, however fast
     // it follows the last one; field edits are not.
@@ -2091,17 +2110,20 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   // --- import / export ------------------------------------------------------
 
   /// The active document's JSON, in whichever shape [docKind] says it is.
-  String exportJson() => _presetFailureSource ?? (_inheritedSource == null ? _docType.exportJson(this) : _snapshot());
-
-  String formattedJson() => _presetFailureSource ?? (_inheritedSource == null ? _docType.formattedJson(this) : _snapshot());
+  String exportJson() => _presetFailureSource ?? (_authored == null ? _docType.exportJson(this) : _snapshot());
 
   /// Replaces the active document with [content], auto-detecting whether it
   /// is a Gloss menu or a container-preview document via
   /// [looksLikePreviewDoc]. Only malformed JSON is refused: a well-formed
   /// document of either shape always replaces the current one, reporting
-  /// through [onInfo]. A parse failure reports through [onError] and leaves
-  /// the current document untouched.
+  /// through [onImported]. A parse failure reports through [onError] and
+  /// leaves the current document untouched. With no document open there is
+  /// nothing to replace, so the import becomes a new document instead.
   void importJson(String name, String content) {
+    if (!hasActiveDocument) {
+      importJsonAsNewDocument(name, content);
+      return;
+    }
     if (isPanelDoc) {
       _fail('Open a menu or preview document before importing runtime JSON.');
       return;
@@ -2123,15 +2145,30 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       _fail('That file could not be read as JSON.');
       return;
     }
+    final bool replaced;
     if (looksLikePreviewDoc(decoded)) {
-      _importPreviewJson(name, content);
-      return;
-    }
-    final GlossDocumentTypeAdapter? gloss = _glossKindOf(decoded);
-    if (gloss != null) {
-      _importGlossJson(gloss, name, content);
+      replaced = _importPreviewJson(name, content);
     } else {
-      _importMenuJson(name, content);
+      final GlossDocumentTypeAdapter? gloss = _glossKindOf(decoded);
+      replaced = gloss != null
+          ? _importGlossJson(gloss, name, content)
+          : _importMenuJson(name, content);
+    }
+    // An import is a new picture: the stages frame it from scratch.
+    requestCanvasFit();
+    if (replaced) {
+      _imported(<ArrivedDocument>[(id: workspace.activeId!, kind: docKind)]);
+    }
+  }
+
+  /// Says where an import's documents landed: to [onImported] when the shell
+  /// listens, else [message] as a note.
+  void _imported(List<ArrivedDocument> documents, [String? message]) {
+    final EditorImportSink? sink = onImported;
+    if (sink != null) {
+      sink(documents, message);
+    } else if (message != null) {
+      onInfo?.call(message);
     }
   }
 
@@ -2204,9 +2241,14 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       json: content,
     );
     if (created) {
-      _inform('Imported {id} as a new menu.', <String, Object?>{
-        'id': runtimeId,
-      });
+      _imported(
+        <ArrivedDocument>[
+          (id: workspace.activeId!, kind: DocumentTypes.menu.kind),
+        ],
+        huiText('Imported {id} as a new menu.', <String, Object?>{
+          'id': runtimeId,
+        }),
+      );
     }
     return created;
   }
@@ -2240,12 +2282,13 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     if (existing != null) {
       if (!openDocument(existing.id)) return false;
       _replaceImportedGloss(parsed, content);
+      _imported(<ArrivedDocument>[(id: existing.id, kind: type.kind)]);
       return true;
     }
     final String runtimeId =
         type.fixedRuntimeId ?? _availableRuntimeId(type.kind, requestedId);
     flushAutosave();
-    workspace.create(
+    final WorkspaceDoc created = workspace.create(
       title: runtimeId,
       runtimeId: runtimeId,
       json: content,
@@ -2253,16 +2296,19 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       presetContext: workspace.active?.presetContext,
     );
     _adoptActiveDocument();
-    _inform('Imported {id} as a new {document}.', <String, Object?>{
-      'id': runtimeId,
-      'document': type.noun,
-    });
+    _imported(
+      <ArrivedDocument>[(id: created.id, kind: type.kind)],
+      huiText('Imported {id} as a new {document}.', <String, Object?>{
+        'id': runtimeId,
+        'document': type.noun,
+      }),
+    );
     return true;
   }
 
   /// Replaces the active document with Gloss-kind JSON — the Gloss arm of
-  /// [importJson], mirroring [_importPreviewJson].
-  void _importGlossJson(
+  /// [importJson], mirroring [_importPreviewJson]. False when refused.
+  bool _importGlossJson(
     GlossDocumentTypeAdapter type,
     String name,
     String content,
@@ -2279,7 +2325,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
           'path': e.path,
         }),
       );
-      return;
+      return false;
     } catch (_) {
       _failResolved(
         () => huiText(
@@ -2287,12 +2333,13 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
           <String, Object?>{'document': type.noun},
         ),
       );
-      return;
+      return false;
     }
     final WorkspaceDoc? existing = _fixedGlossDocument(type);
     if (existing != null) {
-      if (openDocument(existing.id)) _replaceImportedGloss(parsed, content);
-      return;
+      if (!openDocument(existing.id)) return false;
+      _replaceImportedGloss(parsed, content);
+      return true;
     }
     _lastError = null;
     _codeError = null;
@@ -2306,20 +2353,20 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _activePresets = presets;
     _setPreviewDoc(null);
     _setGlossDoc(parsed);
-    _resetInheritedSource(content);
+    _resetAuthoredSource(content);
     _animationCache = null;
     _emojiCache = null;
     _namesCache = null;
     _menuId = importedId;
     _coerceView();
     _afterChange();
-    _inform('Imported {id}.', <String, Object?>{'id': importedId});
+    return true;
   }
 
   void _replaceImportedGloss(GlossDoc parsed, String source) {
     final String before = _snapshot();
     _setGlossDoc(parsed);
-    _resetInheritedSource(source);
+    _resetAuthoredSource(source);
     _animationCache = null;
     _emojiCache = null;
     _namesCache = null;
@@ -2347,7 +2394,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       requestedId,
     );
     flushAutosave();
-    workspace.create(
+    final WorkspaceDoc created = workspace.create(
       title: runtimeId,
       runtimeId: runtimeId,
       json: content,
@@ -2355,9 +2402,14 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       presetContext: workspace.active?.presetContext,
     );
     _adoptActiveDocument();
-    _inform('Imported {id} as a new preview.', <String, Object?>{
-      'id': runtimeId,
-    });
+    _imported(
+      <ArrivedDocument>[
+        (id: created.id, kind: DocumentTypes.containerPreview.kind),
+      ],
+      huiText('Imported {id} as a new preview.', <String, Object?>{
+        'id': runtimeId,
+      }),
+    );
     return true;
   }
 
@@ -2398,7 +2450,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     return sanitizeMenuId('$prefix${DateTime.now().microsecondsSinceEpoch}');
   }
 
-  void _importMenuJson(String name, String content) {
+  bool _importMenuJson(String name, String content) {
     final HuiMenu parsed;
     final DocumentPresets presets;
     try {
@@ -2411,10 +2463,10 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
           'path': e.path,
         }),
       );
-      return;
+      return false;
     } catch (_) {
       _fail('That file could not be read as Gloss menu JSON.');
-      return;
+      return false;
     }
     _lastError = null;
     _codeError = null;
@@ -2429,7 +2481,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _setPreviewDoc(null);
     _setGlossDoc(null);
     _menu = parsed;
-    _resetInheritedSource(content);
+    _resetAuthoredSource(content);
     _menuId = importedId;
     _coerceView();
     if (wasMenu) {
@@ -2442,11 +2494,11 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       _undo.clear();
       _clearCoalesce();
     }
-    _afterChange(menuSource: content);
-    _inform('Imported {id}.', <String, Object?>{'id': importedId});
+    _afterChange();
+    return true;
   }
 
-  void _importPreviewJson(String name, String content) {
+  bool _importPreviewJson(String name, String content) {
     final HuiPreviewDoc parsed;
     final DocumentPresets presets;
     try {
@@ -2459,10 +2511,10 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
           'path': e.path,
         }),
       );
-      return;
+      return false;
     } catch (_) {
       _fail('That file could not be read as a container-preview document.');
-      return;
+      return false;
     }
     _lastError = null;
     _codeError = null;
@@ -2476,11 +2528,11 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _activePresets = presets;
     _setPreviewDoc(parsed);
     _setGlossDoc(null);
-    _resetInheritedSource(content);
+    _resetAuthoredSource(content);
     _menuId = importedId;
     _coerceView();
     _afterChange();
-    _inform('Imported {id}.', <String, Object?>{'id': importedId});
+    return true;
   }
 
   String? get codeError => _codeError?.call();
@@ -2517,10 +2569,10 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       return true;
     }
     _menu = parsed;
-    _resetInheritedSource(text);
+    _resetAuthoredSource(text);
     _pruneSelection();
     _pushUndo('code edit', before);
-    _afterChange(menuSource: text);
+    _afterChange();
     return true;
   }
 
@@ -2566,12 +2618,12 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     }
     _codeError = null;
     final String before = _snapshot();
-    if (encodeHuiPreviewDoc(parsed) == before) {
+    if (text == before) {
       _notify();
       return true;
     }
     _setPreviewDoc(parsed);
-    _resetInheritedSource(text);
+    _resetAuthoredSource(text);
     _pushUndo('code edit', before);
     _prunePreviewSelection();
     _afterChange();
@@ -2614,12 +2666,12 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     }
     _codeError = null;
     final String before = _snapshot();
-    if (type.encodeDoc(parsed) == before) {
+    if (text == before) {
       _notify();
       return true;
     }
     _setGlossDoc(parsed);
-    _resetInheritedSource(text);
+    _resetAuthoredSource(text);
     _animationCache = null;
     _emojiCache = null;
     _namesCache = null;
@@ -2823,6 +2875,10 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   WorkspaceDoc? _fixedGlossDocument(GlossDocumentTypeAdapter type) {
     final String? id = type.fixedRuntimeId;
     if (id == null) return null;
+    // The active entry's kind and id are written by autosave; an in-place
+    // import inside the autosave delay would otherwise match the kind it
+    // replaced.
+    flushAutosave(notify: false);
     for (final WorkspaceDoc document in workspace.docs) {
       if (document.kind == type.kind && document.runtimeId == id) {
         return document;
@@ -2860,8 +2916,9 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     final Map<String, dynamic>? baseline = panelDoc?.runtimeBoard;
     final Map<String, dynamic>? edited = panel.runtimeBoard;
     final WorkspacePanelData nextPanel = authored == null || baseline == null || edited == null ? panel
-        : panel.copyWith(runtimeBoard: jsonDecode(InheritedDocumentSource(jsonEncode(authored),
-            jsonEncode(baseline)).encode(jsonEncode(edited))) as Map<String, dynamic>);
+        : panel.copyWith(runtimeBoard: jsonDecode(AuthoredSource(jsonEncode(authored), jsonEncode(baseline),
+            inherits: _activePresets.applies('panel', jsonEncode(authored))).encode(jsonEncode(edited)))
+            as Map<String, dynamic>);
     final String next = encodeWorkspacePanel(nextPanel);
     if (before == next) return true;
     final bool saved = workspace.updateActive(json: next);
@@ -2878,6 +2935,12 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   void createDocumentFromPreview(String name, HuiPreviewDoc template) {
     newPreviewDocument(name: name, from: template);
     requestCanvasFit();
+  }
+
+  /// Closes the open document and shows the empty workspace.
+  void closeDocument() {
+    flushAutosave();
+    if (workspace.close()) _adoptEmptyWorkspace();
   }
 
   bool openDocument(String docId, {bool refresh = false}) {
@@ -2920,7 +2983,13 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   bool deleteDocument(String docId) {
     final bool wasActive = docId == workspace.activeId;
     if (!workspace.delete(docId)) return false;
-    if (wasActive) {
+    // The last document going leaves an empty library; only a first visit
+    // seeds the sample document.
+    if (workspace.isEmpty) {
+      _documentDirty = false;
+      _documentPersistedInWorkspace = false;
+      adoptEmptyWorkspace();
+    } else if (wasActive) {
       _documentDirty = false;
       _documentPersistedInWorkspace = false;
       _adoptActiveDocument();
@@ -3005,23 +3074,44 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     return uniqueComponentId(id, taken);
   }
 
-  /// The active document, encoded in whichever shape [docKind] says it is.
-  /// Menu-editing call sites only ever run while [_menuWritable] is true, so
-  /// they always see the menu encoding; the adapter dispatch is what lets
-  /// [flushAutosave] persist a preview document too.
+  /// The active document as its file holds it: the text it was read from
+  /// with the edits since written in key by key (see [AuthoredSource]), else
+  /// the model's own encoding. Undo snapshots, autosave and export all read
+  /// this, so an edit undone or typed back is the file's bytes again.
   String _snapshot() => _presetFailureSource ?? (isPanelDoc ? workspace.active!.json
-      : _inheritedSource?.encode(_canonicalSnapshot()) ?? _docType.snapshot(this));
+      : _authored?.encode(_canonicalSnapshot()) ?? _docType.snapshot(this));
 
   String _canonicalSnapshot() => _menuWritable ? encodeHuiMenu(_menu) : _docType.snapshot(this);
 
   DocumentPresets get _importPresets => _docType.syncWireKind == 'presets'
       ? DocumentPresets.parse(_snapshot()) : _activePresets;
 
-  void _resetInheritedSource(String source) {
+  /// Makes [source] the text edits are written into, for every kind with a
+  /// runtime file. The panel wrapper is the editor's own and keeps its board
+  /// sparse in [updatePanel].
+  void _resetAuthoredSource(String source) {
     _presetFailureSource = null;
-    _inheritedSource = !isPanelDoc && _activePresets.applies(_docType.syncWireKind, source)
-        ? InheritedDocumentSource(source, _canonicalSnapshot()) : null;
+    _authored = null;
+    if (isPanelDoc) return;
+    final DocumentTypeAdapter type = _docType;
+    final DocumentPresets presets = _activePresets;
+    try {
+      _authored = AuthoredSource(source, _canonicalSnapshot(),
+          inherits: presets.applies(type.syncWireKind, source),
+          modelText: (String json) => _modelText(type, presets.resolve(type.syncWireKind, json)));
+    } on FormatException {
+      _authored = null;
+    }
   }
+
+  /// [json] read into [type]'s model and encoded again: what
+  /// [_canonicalSnapshot] gives for that document.
+  static String _modelText(DocumentTypeAdapter type, String json) => switch (type.decodeSnapshot(json)) {
+    final HuiMenu menu => encodeHuiMenu(menu),
+    final HuiPreviewDoc doc => encodeHuiPreviewDoc(doc),
+    final GlossDoc doc => (type as GlossDocumentTypeAdapter).encodeDoc(doc),
+    _ => throw StateError('No model text for ${type.kind}.'),
+  };
 
   DocumentPresets _presetsFor(WorkspaceDoc document) {
     if (DocumentTypeRegistry.of(document.kind).syncWireKind == 'presets') return DocumentPresets.empty;
@@ -3101,8 +3191,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _coalesceAt = null;
   }
 
-  void _afterChange({String? menuSource}) {
-    if (_menuWritable) _preservedMenuSource = menuSource;
+  void _afterChange() {
     _refreshIssues();
     _documentDirty = true;
     _documentRevision++;
@@ -3118,7 +3207,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     try {
       _installModel(_docType.decodeSnapshot(isPanelDoc ? snapshot
           : _activePresets.resolve(_docType.syncWireKind, snapshot)));
-      _resetInheritedSource(snapshot);
+      _resetAuthoredSource(snapshot);
       if (isPanelDoc) {
         _documentRevision++;
         _lastSavedAt = DateTime.now();
@@ -3139,7 +3228,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     } else {
       _pruneSelection();
     }
-    _afterChange(menuSource: _docType.sourcePreserving ? snapshot : null);
+    _afterChange();
     return true;
   }
 
@@ -3261,7 +3350,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
   void _adoptActiveDocument() {
     final WorkspaceDoc? doc = workspace.active;
     if (doc == null) {
-      if (_keepWorkspaceEmpty) {
+      if (_keepWorkspaceEmpty || !seedDocument) {
         _adoptEmptyWorkspace();
         return;
       }
@@ -3302,12 +3391,11 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
 
   void _adoptEmptyWorkspace() {
     _activePresets = DocumentPresets.empty;
-    _inheritedSource = null;
+    _authored = null;
     _presetFailureSource = null;
     _docType = DocumentTypes.menu;
     _menu = HuiMenu();
     _menuId = '';
-    _preservedMenuSource = null;
     _setPreviewDoc(null);
     _setGlossDoc(null);
     _animationCache = null;
@@ -3328,15 +3416,10 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _notify();
   }
 
-  void _adoptMenu(HuiMenu menu, String menuId, {String? source}) =>
-      _adoptDocument(
-        DocumentTypes.menu,
-        AdoptedDocument(
-          editorId: sanitizeMenuId(menuId),
-          model: menu,
-          preservedSource: source,
-        ),
-      );
+  void _adoptMenu(HuiMenu menu, String menuId) => _adoptDocument(
+    DocumentTypes.menu,
+    AdoptedDocument(editorId: sanitizeMenuId(menuId), model: menu),
+  );
 
   /// The preview counterpart of [_adoptMenu].
   void _adoptPreview(HuiPreviewDoc doc, String docId) => _adoptDocument(
@@ -3355,9 +3438,8 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     }
     _docType = type;
     _activePresets = presets ?? DocumentPresets.empty;
-    _inheritedSource = null;
+    _authored = null;
     _presetFailureSource = null;
-    _preservedMenuSource = adopted.preservedSource;
     final Object? model = adopted.model;
     // The menu slot is cleared, not left behind, when another kind takes over.
     // Holding the previous menu made every consumer of [menu] a trap: the
@@ -3366,7 +3448,7 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _menu = model is HuiMenu ? model : HuiMenu();
     _setPreviewDoc(model is HuiPreviewDoc ? model : null);
     _setGlossDoc(model is GlossDoc ? model : null);
-    if (authoredSource != null && adopted.failure == null) _resetInheritedSource(authoredSource);
+    if (authoredSource != null && adopted.failure == null) _resetAuthoredSource(authoredSource);
     _animationCache = null;
     _emojiCache = null;
     _namesCache = null;
@@ -3424,10 +3506,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     );
     _previewShowGroundGrid = _readBool(decoded['previewShowGroundGrid'], true);
     _previewLogOpen = _readBool(decoded['previewLogOpen'], true);
-    _previewBannerDismissed = _readBool(
-      decoded['previewBannerDismissed'],
-      false,
-    );
     _previewCameraMode = PreviewCameraMode.fromName(
       decoded['previewCameraMode'],
     );
@@ -3473,7 +3551,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
       'previewShowDistanceSphere': _previewShowDistanceSphere,
       'previewShowGroundGrid': _previewShowGroundGrid,
       'previewLogOpen': _previewLogOpen,
-      'previewBannerDismissed': _previewBannerDismissed,
       'previewCameraMode': _previewCameraMode.name,
     }),
   );
@@ -3498,7 +3575,6 @@ class EditorStore extends ChangeNotifier implements DocumentStateView {
     _previewShowDistanceSphere = false;
     _previewShowGroundGrid = true;
     _previewLogOpen = true;
-    _previewBannerDismissed = false;
     _previewCameraMode = PreviewCameraMode.orbit;
     _preferencesDirty = false;
     _catalogs = _catalogs.withCustomItems(HuiCustomItemCatalog.empty());

@@ -85,6 +85,19 @@ public class GlossPackInstallTest {
   }
 
   @Test
+  public void aServerCommandIsStrippedHoweverItsSourceIsSpelled() {
+    String menu = "{\"components\":[{\"id\":\"a\",\"offset\":[0,0,0],\"data\":{\"type\":\"button\",\"actions\":["
+        + "{\"type\":\"command\",\"source\":\"GLOBAL\",\"command\":\"op mallory\"},"
+        + "{\"type\":\"command\",\"source\":\"global\",\"command\":\"spawn\"}]}}]}";
+
+    GlossPackInstaller.Stripped stripped = GlossPackInstaller.stripServerCommands(menu, false);
+
+    assertEquals(1, stripped.removed());
+    assertFalse(stripped.source(), stripped.source().contains("op mallory"));
+    assertTrue(stripped.source(), stripped.source().contains("spawn"));
+  }
+
+  @Test
   public void serverCommandActionsSurviveWhenBothSidesAllowThem() throws Exception {
     Path data = temp.newFolder("allowed").toPath();
     GlossPackInstaller installer = installer(data, true);

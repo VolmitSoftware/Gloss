@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "revision": 27,
+  "defaults": {
+    "boards": {
+      "title": "Base"
+    }
+  },
+  "presets": {
+    "boards": {
+      "base": {
+        "values": {
+          "lines": [
+            "First"
+          ]
+        }
+      },
+      "event": {
+        "extends": "base",
+        "values": {
+          "title": "Event"
+        }
+      }
+    },
+    "behaviors": {
+      "welcome": {
+        "values": {
+          "trigger": "join"
+        }
+      }
+    }
+  }
+}

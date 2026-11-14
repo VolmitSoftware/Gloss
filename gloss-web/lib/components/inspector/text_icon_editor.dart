@@ -1,39 +1,45 @@
-/// `text` icon editor: the multiline field, the formatting palette and the live
-/// preview.
+/// `text` icon editor: the multiline field with its formatting row, and the
+/// live in-game preview.
 ///
-/// The palette splices tags around the current selection. Because jaspr renders
-/// a textarea's value as a child text node — which the browser stops mirroring
-/// once the field is user-dirty — every splice writes the DOM `value` property
-/// directly and restores the caret before notifying the store.
+/// The formatting row splices tags around the current selection. Because
+/// jaspr renders a textarea's value as a child text node, which the browser
+/// stops mirroring once the field is user-dirty, every splice writes the DOM
+/// `value` property directly and restores the caret before notifying the
+/// store.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
-import 'package:arcane_jaspr/core/dom_value.dart';
-import 'package:jaspr/jaspr.dart' show Component, EventCallback;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../logic/gloss_text.dart' show GlossEmojiResolver, GlossNoEmoji;
 import '../../logic/validation.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/color_swatch.dart';
+import '../../ui/field.dart';
+import '../../ui/menu.dart';
 import 'dom_bridge.dart';
-import 'inspector_widgets.dart';
 import 'mc_text_preview.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
-/// One formatting button. [close] null means "insert at the caret" rather than
+/// One formatting tag. [close] null means "insert at the caret" rather than
 /// "wrap the selection".
 class _TagAction {
   const _TagAction({
     required this.label,
     required this.open,
-    required this.hint,
+    required this.icon,
+    this.hint,
     this.close,
   });
 
   final String label;
   final String open;
   final String? close;
-  final String hint;
+  final ArcaneGlyph Function() icon;
+
+  /// What the tag does, shown under its menu entry.
+  final String? hint;
 }
 
 class TextIconEditor extends StatefulWidget {
@@ -70,6 +76,9 @@ class _TextIconEditorState extends State<TextIconEditor> {
   /// node and the browser ignores that once the field is user-dirty.
   late String _known;
 
+  /// The colour the swatch shows: the last one inserted.
+  String _swatch = '#ffaa00';
+
   @override
   void initState() {
     super.initState();
@@ -102,41 +111,48 @@ class _TextIconEditorState extends State<TextIconEditor> {
     component.onChanged(label, next);
   }
 
-  static const List<_TagAction> _tags = <_TagAction>[
+  /// Shown as icon buttons; the legacy codes for each are in the field tip.
+  static const List<_TagAction> _styles = <_TagAction>[
     _TagAction(
       label: 'Bold',
       open: '<bold>',
       close: '</bold>',
-      hint: 'MiniMessage <bold>. The legacy code &l does the same thing.',
+      icon: ArcaneIcon.bold,
     ),
     _TagAction(
       label: 'Italic',
       open: '<italic>',
       close: '</italic>',
-      hint: 'MiniMessage <italic>. Legacy &o.',
+      icon: ArcaneIcon.italic,
     ),
     _TagAction(
       label: 'Underlined',
       open: '<underlined>',
       close: '</underlined>',
-      hint: 'MiniMessage <underlined>. Legacy &n.',
+      icon: ArcaneIcon.underline,
     ),
     _TagAction(
       label: 'Strikethrough',
       open: '<strikethrough>',
       close: '</strikethrough>',
-      hint: 'MiniMessage <strikethrough>. Legacy &m.',
+      icon: ArcaneIcon.strikethrough,
     ),
+  ];
+
+  /// Rarer tags, in the row's `...` menu.
+  static const List<_TagAction> _extras = <_TagAction>[
     _TagAction(
       label: 'Obfuscated',
       open: '<obfuscated>',
       close: '</obfuscated>',
+      icon: ArcaneIcon.shuffle,
       hint: 'Scrambling text. Legacy &k.',
     ),
     _TagAction(
       label: 'Gradient',
       open: '<gradient:#ffffff:#5599ff>',
       close: '</gradient>',
+      icon: ArcaneIcon.blend,
       hint:
           'Interpolates colour across the wrapped characters. Add more '
           'colours by appending :#rrggbb.',
@@ -144,6 +160,7 @@ class _TextIconEditorState extends State<TextIconEditor> {
     _TagAction(
       label: 'Reset',
       open: '<reset>',
+      icon: ArcaneIcon.removeFormatting,
       hint: 'Drops all colour and formatting from this point on. Legacy &r.',
     ),
   ];
@@ -186,6 +203,7 @@ class _TextIconEditorState extends State<TextIconEditor> {
     final String next = text.replaceRange(start, start, tag);
     final int caret = start + tag.length;
     writeTextValue(_fieldId, next, selectionStart: caret, selectionEnd: caret);
+    setState(() => _swatch = normalized);
     _push('text colour', next);
   }
 
@@ -202,85 +220,62 @@ class _TextIconEditorState extends State<TextIconEditor> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      dom.div(classes: 'hui-text-editor', <Widget>[
-        HuiField(
-          label: component.label ?? huiText('Text'),
-          help: huiText(
-            'One stacked line per line break; each is parsed on its own.',
-          ),
-          control: dom.div(classes: 'hui-text-editor-control', <Widget>[
-            _toolbar(),
-            TextArea(
-              id: _fieldId,
-              value: _text,
-              rows: 4,
-              fullWidth: true,
-              resize: TextAreaResize.vertical,
-              placeholder: huiText('&6&lShop\n&7Click to browse'),
-              onChanged: (String raw) => _push('text', raw),
-            ),
-            HuiInlineIssues(component.issues),
-          ]),
+  Widget build(BuildContext context) => Component.fragment(<Widget>[
+    Field(
+      label: component.label ?? huiText('Text'),
+      forId: _fieldId,
+      tip:
+          '${huiText('One stacked line per line break; each is parsed on its own.')} '
+          '${huiText('Legacy codes work too: &0-&f for colour, &k obfuscated, &l bold, &m strikethrough, &n underlined, &o italic, &r reset.')}',
+      problems: component.issues,
+      child: Component.fragment(<Widget>[
+        _toolbar(),
+        TextArea(
+          id: _fieldId,
+          value: _text,
+          rows: 4,
+          fullWidth: true,
+          resize: TextAreaResize.vertical,
+          placeholder: huiText('&6&lShop\n&7Click to browse'),
+          onChanged: (String raw) => _push('text', raw),
         ),
-        dom.div(classes: 'hui-text-preview-block', <Widget>[
-          HuiEyebrow(huiText('In-game preview')),
-          McTextPreview(raw: _text, emoji: component.emoji),
-        ]),
-        HuiMore(
-          summary: huiText('Legacy formatting codes'),
-          children: <Widget>[
-            HuiNote(
-              huiText(
-                'Legacy codes work too: &0-&f for colour, &k obfuscated, '
-                '&l bold, &m strikethrough, &n underlined, &o italic, '
-                '&r reset.',
-              ),
-            ),
-          ],
-        ),
-      ]);
-
-  Widget _toolbar() => dom.div(classes: 'hui-text-toolbar', <Widget>[
-    _colorControl(),
-    for (final _TagAction tag in _tags)
-      ArcaneTooltip(
-        text: huiText(tag.hint),
-        child: dom.button(
-          classes: 'hui-text-tag',
-          attributes: <String, String>{
-            'type': 'button',
-            'aria-label': huiText("Insert {label}", <String, Object?>{
-              'label': huiText(tag.label),
-            }),
-          },
-          events: <String, EventCallback>{'click': (_) => _apply(tag)},
-          <Widget>[Text(huiText(tag.label))],
-        ),
-      ),
+      ]),
+    ),
+    Field(
+      label: huiText('In-game preview'),
+      child: McTextPreview(raw: _text, emoji: component.emoji),
+    ),
   ]);
 
-  Widget _colorControl() => ArcaneTooltip(
-    text: huiText(
-      'Insert a <#rrggbb> colour tag at the caret. Everything after it '
-      'takes that colour until the next colour tag or <reset>.',
-    ),
-    child: dom.label(classes: 'hui-text-color', <Widget>[
-      ArcaneIcon.palette(size: IconSize.sm),
-      Component.element(
-        tag: 'input',
-        classes: 'hui-text-color-input',
-        attributes: <String, String>{
-          'type': 'color',
-          'value': '#ffaa00',
-          'aria-label': huiText('Insert a colour tag'),
-        },
-        // `event` is jaspr's `EventCallback` argument; its type is left to
-        // inference so this file never imports `package:web`.
-        events: <String, EventCallback>{
-          'change': (event) => _insertColor(domInputValue(event.target)),
-        },
-      ),
-    ]),
+  Widget _toolbar() => ActionRow(
+    dense: true,
+    label: huiText('Text formatting'),
+    leading: <Widget>[_colorControl()],
+    more: <AppMenuEntry>[
+      for (final _TagAction tag in _extras)
+        AppMenuEntry(
+          huiText(tag.label),
+          () => _apply(tag),
+          icon: tag.icon(),
+          description: tag.hint == null ? null : huiText(tag.hint!),
+        ),
+    ],
+    secondary: <RowAction>[
+      for (final _TagAction tag in _styles)
+        RowAction(
+          huiText(tag.label),
+          () => _apply(tag),
+          icon: tag.icon(),
+          iconOnly: true,
+        ),
+    ],
+  );
+
+  /// The kit swatch: picking inserts a `<#rrggbb>` tag at the caret.
+  Widget _colorControl() => ColorSwatch(
+    label: huiText('Insert a colour tag'),
+    rgb: _swatch,
+    commit: true,
+    onPicked: _insertColor,
   );
 }

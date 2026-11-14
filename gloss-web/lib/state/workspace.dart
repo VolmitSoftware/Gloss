@@ -9,6 +9,7 @@ import 'package:jaspr/jaspr.dart' show ChangeNotifier;
 import '../config/defaults.dart';
 import '../l10n/hui_localizations.dart';
 import '../services/storage_service.dart';
+import 'workspace_records.dart';
 import 'workspace_repository.dart';
 
 typedef StorageReader = String? Function(String key);
@@ -46,7 +47,8 @@ enum WorkspaceDocKind {
   waypoint,
   glyph,
   behavior,
-  presets;
+  presets,
+  leaderboard;
 
   bool get hasRuntimeId => this != WorkspaceDocKind.panel;
 
@@ -260,6 +262,7 @@ class Workspace extends ChangeNotifier {
     WorkspaceRepository? repository,
     WorkspaceIdFactory idFactory = newWorkspaceUuid,
     bool autoLoad = true,
+    this.key = storageKey,
   }) : _idFactory = idFactory {
     this.repository =
         repository ??
@@ -282,16 +285,22 @@ class Workspace extends ChangeNotifier {
     }
     _resetToEmpty();
     if (autoLoad) {
-      _ready = _load();
+      _ready = _load().then((void _) => _takeRescue());
     } else {
       _isReady = true;
       _ready = Future<void>.value();
     }
   }
 
-  static const int schemaVersion = 2;
+  static const int schemaVersion = wholeWorkspaceSchema;
+
+  /// The browser workspace's record.
   static const String storageKey = 'gloss.workspace.v2';
   static const String legacyStorageKey = 'gloss.workspace.v1';
+
+  /// The record of a paired server's workspace.
+  static String serverStorageKey(String serverId) =>
+      'gloss.workspace.server.$serverId';
 
   /// Pre-rebrand key names. [StorageService] migrates the localStorage copies
   /// and the IndexedDB repository migrates its records, but explicit clears
@@ -301,6 +310,10 @@ class Workspace extends ChangeNotifier {
 
   final StorageReader read;
   final StorageWriter write;
+
+  /// The record this workspace lives in: [storageKey] for the browser
+  /// workspace, [serverStorageKey] for a paired server's.
+  final String key;
   late final WorkspaceRepository repository;
   final WorkspaceIdFactory _idFactory;
 
@@ -314,6 +327,16 @@ class Workspace extends ChangeNotifier {
   int _lastStamp = 0;
   int _saveRevision = 0;
   int _persistedRevision = 0;
+
+  /// The revision of the workspace storage holds, read back at load; every
+  /// write carries the next one.
+  int _storedRevision = 0;
+  int _issuedRevision = 0;
+
+  /// What a layered store holds, as far as this tab wrote or read it; a save
+  /// writes only what differs. Unset until storage is known to match.
+  _StoredLayout? _stored;
+
   bool _loadProtected = false;
   bool _requiresReload = false;
   Future<void>? _writeTail;
@@ -324,6 +347,7 @@ class Workspace extends ChangeNotifier {
     StorageReader read = defaultStorageRead,
     StorageWriter write = defaultStorageWrite,
     WorkspaceIdFactory idFactory = newWorkspaceUuid,
+    String key = storageKey,
   }) async {
     final Workspace workspace = Workspace(
       read: read,
@@ -331,6 +355,7 @@ class Workspace extends ChangeNotifier {
       repository: repository,
       idFactory: idFactory,
       autoLoad: false,
+      key: key,
     );
     await workspace.load();
     return workspace;
@@ -377,13 +402,56 @@ class Workspace extends ChangeNotifier {
 
   bool get requiresReload => _requiresReload;
 
-  bool get canWrite => _isReady && !_loadProtected && !_requiresReload;
+  bool get canWrite =>
+      _isReady && !_loadProtected && !_requiresReload && !_writesPaused;
+
+  /// Another tab of this browser holds this workspace: it is shown read
+  /// only and nothing is written until this tab takes it over.
+  bool get writesPaused => _writesPaused;
+  bool _writesPaused = false;
+
+  void pauseWrites() {
+    if (_writesPaused) return;
+    _writesPaused = true;
+    // A change heard before this tab knew it waits was the holder's write;
+    // this tab reads the workspace again when it takes over.
+    if (_requiresReload) {
+      _requiresReload = false;
+      _quotaExceeded = false;
+      _lastError = null;
+    }
+    notifyListeners();
+  }
 
   int get saveRevision => _saveRevision;
 
   int get persistedRevision => _persistedRevision;
 
+  /// Bumped on every notification, so per-render lookups can be cached.
+  int _version = 0;
+
+  /// Changes whenever the workspace notifies: a key for caches built from it.
+  int get version => _version;
+  int _conflictsVersion = -1;
+  List<WorkspaceRuntimeIdConflict> _conflicts =
+      const <WorkspaceRuntimeIdConflict>[];
+
+  @override
+  void notifyListeners() {
+    _version++;
+    super.notifyListeners();
+  }
+
+  /// Runtime ids shared by two documents of one kind. Cached until the
+  /// workspace changes: the library asks once per row.
   List<WorkspaceRuntimeIdConflict> get runtimeIdConflicts {
+    if (_conflictsVersion == _version) return _conflicts;
+    _conflicts = _computeRuntimeIdConflicts();
+    _conflictsVersion = _version;
+    return _conflicts;
+  }
+
+  List<WorkspaceRuntimeIdConflict> _computeRuntimeIdConflicts() {
     final Map<String, List<WorkspaceDoc>> grouped =
         <String, List<WorkspaceDoc>>{};
     for (final WorkspaceDoc doc in _docs) {
@@ -408,7 +476,7 @@ class Workspace extends ChangeNotifier {
       (WorkspaceRuntimeIdConflict a, WorkspaceRuntimeIdConflict b) =>
           a.runtimeId.compareTo(b.runtimeId),
     );
-    return conflicts;
+    return List<WorkspaceRuntimeIdConflict>.unmodifiable(conflicts);
   }
 
   WorkspaceDoc? byId(String? id) {
@@ -438,8 +506,57 @@ class Workspace extends ChangeNotifier {
       );
 
   Future<void> load() {
-    _ready = _load();
+    _ready = _load().then((void _) => _takeRescue());
     return _ready;
+  }
+
+  /// Where [rescueOnExit] keeps the open document.
+  String get _rescueKey => '$key.unsaved';
+
+  /// Called as the page goes away. A browser storage write still on its way
+  /// when the page unloads may never finish, so the open document is also
+  /// written to localStorage at once; the next load takes it back.
+  void rescueOnExit() {
+    if (!hasUnsavedChanges && !hasPendingWrites) return;
+    final WorkspaceDoc? doc = active;
+    if (doc == null || !canWrite) return;
+    write(
+      _rescueKey,
+      jsonEncode(<String, Object?>{
+        'documentId': doc.id,
+        'runtimeId': doc.runtimeId,
+        'json': doc.json,
+      }),
+    );
+  }
+
+  /// Puts back a document [rescueOnExit] kept when the stored copy did not
+  /// get the last write.
+  void _takeRescue() {
+    final String? raw = read(_rescueKey);
+    if (raw == null || raw.isEmpty) return;
+    write(_rescueKey, '');
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final Object? documentId = decoded['documentId'];
+      final Object? json = decoded['json'];
+      final Object? runtimeId = decoded['runtimeId'];
+      if (documentId is! String || json is! String || !_isJson(json)) return;
+      final WorkspaceDoc? doc = byId(documentId);
+      if (doc == null || doc.json == json || !canWrite) return;
+      updateDocuments(<WorkspaceDocumentUpdate>[
+        WorkspaceDocumentUpdate(
+          documentId: documentId,
+          json: json,
+          runtimeId: runtimeId is String && runtimeId != doc.runtimeId
+              ? runtimeId
+              : null,
+        ),
+      ]);
+    } catch (_) {
+      // A damaged rescue record is dropped; the stored workspace stands.
+    }
   }
 
   WorkspaceDoc create({
@@ -542,6 +659,93 @@ class Workspace extends ChangeNotifier {
     return stored;
   }
 
+  /// Adds [folders] and [documents] (fresh ids, each folder existing or
+  /// added here), applies [updates] and deletes [removals], all in one
+  /// save. The live documents change in place, so an edit saved while the
+  /// caller waited is never undone. False when the batch is invalid or the
+  /// workspace cannot write.
+  bool applyBatch({
+    List<WorkspaceFolder> folders = const <WorkspaceFolder>[],
+    List<WorkspaceDoc> documents = const <WorkspaceDoc>[],
+    List<WorkspaceDocumentUpdate> updates = const <WorkspaceDocumentUpdate>[],
+    Set<String> removals = const <String>{},
+  }) {
+    if (!canWrite) return false;
+    if (folders.isEmpty &&
+        documents.isEmpty &&
+        updates.isEmpty &&
+        removals.isEmpty) {
+      return true;
+    }
+    final Set<String> used = <String>{
+      for (final WorkspaceDoc doc in _docs) doc.id,
+      for (final WorkspaceFolder folder in _folders) folder.id,
+    };
+    final Set<String> folderIds = <String>{
+      for (final WorkspaceFolder folder in _folders) folder.id,
+    };
+    for (final WorkspaceFolder folder in folders) {
+      if (!isWorkspaceUuid(folder.id) || !used.add(folder.id)) return false;
+      if (folder.parentId != null && !folderIds.contains(folder.parentId)) {
+        return false;
+      }
+      folderIds.add(folder.id);
+    }
+    for (final WorkspaceDoc doc in documents) {
+      if (!isWorkspaceUuid(doc.id) || !used.add(doc.id) || !_isJson(doc.json)) {
+        return false;
+      }
+      if (doc.folderId != null && !folderIds.contains(doc.folderId)) {
+        return false;
+      }
+    }
+    final Set<String> updated = <String>{};
+    for (final WorkspaceDocumentUpdate update in updates) {
+      if (!updated.add(update.documentId) ||
+          removals.contains(update.documentId)) {
+        return false;
+      }
+      final WorkspaceDoc? document = byId(update.documentId);
+      if (document == null) return false;
+      if (update.runtimeId != null && !document.kind.hasRuntimeId) return false;
+      if (update.json != null && !_isJson(update.json!)) return false;
+    }
+
+    for (final WorkspaceFolder folder in folders) {
+      folder.updatedAt = _stamp();
+      _folders.add(folder);
+    }
+    for (final WorkspaceDoc doc in documents) {
+      doc.updatedAt = _stamp();
+      _docs.add(doc);
+    }
+    for (final WorkspaceDocumentUpdate update in updates) {
+      final WorkspaceDoc document = byId(update.documentId)!;
+      bool documentChanged = false;
+      if (update.runtimeId != null) {
+        final String canonical = sanitizeMenuId(update.runtimeId!);
+        if (canonical != document.runtimeId) {
+          document.runtimeId = canonical;
+          documentChanged = true;
+        }
+      }
+      if (update.json != null && update.json != document.json) {
+        document.json = update.json!;
+        documentChanged = true;
+      }
+      if (documentChanged) document.updatedAt = _stamp();
+    }
+    if (removals.isNotEmpty) {
+      _docs.removeWhere((WorkspaceDoc doc) => removals.contains(doc.id));
+    }
+    if (_activeId == null || byId(_activeId) == null) {
+      _activeId = _docs.isEmpty ? null : recent.first.id;
+    }
+    final bool stored = save();
+    notifyListeners();
+    return stored;
+  }
+
   bool replaceDocument({
     required String id,
     required String title,
@@ -585,6 +789,15 @@ class Workspace extends ChangeNotifier {
     if (_activeId == id) {
       _activeId = _docs.isEmpty ? null : recent.first.id;
     }
+    save();
+    notifyListeners();
+    return true;
+  }
+
+  /// Leaves no document open.
+  bool close() {
+    if (_activeId == null) return false;
+    _activeId = null;
     save();
     notifyListeners();
     return true;
@@ -735,14 +948,22 @@ class Workspace extends ChangeNotifier {
   }
 
   bool save() {
-    if (!_isReady || _loadProtected || _requiresReload) return false;
-    final String payload = jsonEncode(_snapshot().toJson());
+    if (!_isReady || _loadProtected || _requiresReload || _writesPaused) {
+      return false;
+    }
     final int revision = ++_saveRevision;
+    final WorkspaceRepository source = repository;
+    // A layered store works out what changed when the write runs, so a
+    // queued save writes against what the earlier ones stored.
+    final FutureOr<bool> Function() write =
+        source is IncrementalWorkspaceRepository
+        ? () => _writeChanges(source as IncrementalWorkspaceRepository)
+        : _wholeWrite();
     final Future<void>? tail = _writeTail;
     if (tail != null) {
       final Future<void> queued = tail.then((_) async {
         try {
-          final bool stored = await repository.write(storageKey, payload);
+          final bool stored = await write();
           _finishWrite(revision, stored);
         } catch (_) {
           _finishWrite(revision, false);
@@ -754,7 +975,7 @@ class Workspace extends ChangeNotifier {
 
     final FutureOr<bool> result;
     try {
-      result = repository.write(storageKey, payload);
+      result = write();
     } catch (_) {
       _finishWrite(revision, false);
       return false;
@@ -768,6 +989,93 @@ class Workspace extends ChangeNotifier {
     return true;
   }
 
+  /// The revision of the workspace in storage, as this tab last wrote or
+  /// read it.
+  int get storedRevision => _storedRevision;
+
+  /// The whole workspace as one record, encoded now.
+  FutureOr<bool> Function() _wholeWrite() {
+    final int stored = ++_issuedRevision;
+    final String payload = _payload(_snapshot(), stored);
+    return () => _afterWrite(repository.write(key, payload), stored);
+  }
+
+  String _payload(_WorkspaceState state, int stored) =>
+      jsonEncode(<String, dynamic>{...state.toJson(), 'revision': stored});
+
+  FutureOr<bool> _afterWrite(
+    FutureOr<bool> result,
+    int stored, [
+    void Function()? landed,
+  ]) {
+    void take(bool ok) {
+      if (!ok) return;
+      if (stored > _storedRevision) _storedRevision = stored;
+      landed?.call();
+    }
+
+    if (result is bool) {
+      take(result);
+      return result;
+    }
+    return result.then((bool ok) {
+      take(ok);
+      return ok;
+    });
+  }
+
+  /// Writes what changed since the layered store last matched this tab: the
+  /// changed documents, the layout when it moved, and the header. Without a
+  /// known match, or when the store refuses the changes, the whole workspace
+  /// goes instead.
+  Future<bool> _writeChanges(IncrementalWorkspaceRepository source) async {
+    final _StoredLayout? stored = _stored;
+    if (stored != null) {
+      final int next = _issuedRevision + 1;
+      final (WorkspaceDelta? delta, _StoredLayout now) = _StoredLayout.changes(
+        stored,
+        this,
+        next,
+      );
+      if (delta == null) return true;
+      _issuedRevision = next;
+      final bool ok = await _afterWrite(
+        source.writeDelta(key, delta),
+        next,
+        () => _stored = now,
+      );
+      if (ok || _repositoryNeedsReload) return ok;
+      _stored = null;
+    }
+    final int next = ++_issuedRevision;
+    final _StoredLayout now = _StoredLayout.of(this);
+    return _afterWrite(
+      repository.write(key, _payload(_snapshot(), next)),
+      next,
+      () => _stored = now,
+    );
+  }
+
+  bool get _repositoryNeedsReload {
+    final WorkspaceRepository source = repository;
+    return source is ObservableWorkspaceRepository &&
+        (source as ObservableWorkspaceRepository).requiresReload;
+  }
+
+  /// Storage now holds [state] at [revision]: a layered store's next save
+  /// writes only what differs from it.
+  void _matchStored(
+    _WorkspaceState state,
+    int revision, {
+    bool layered = true,
+  }) {
+    _storedRevision = revision;
+    if (revision > _issuedRevision) _issuedRevision = revision;
+    _stored = layered && repository is IncrementalWorkspaceRepository
+        ? _StoredLayout.ofState(state)
+        : null;
+  }
+
   Future<bool> retrySave() async {
     if (!canWrite) return false;
     save();
@@ -777,7 +1085,7 @@ class Workspace extends ChangeNotifier {
 
   int estimateBytes() {
     final String payload = jsonEncode(_snapshot().toJson());
-    return (storageKey.length + payload.length) * 2;
+    return (key.length + payload.length) * 2;
   }
 
   Map<String, dynamic> exportPortableState() => _snapshot().toJson();
@@ -839,17 +1147,18 @@ class Workspace extends ChangeNotifier {
     }
     final Future<void>? pending = _writeTail;
     if (pending != null) await pending;
-    final String payload = jsonEncode(decoded.state.toJson());
+    final int storedRevision = ++_issuedRevision;
+    final String payload = _payload(decoded.state, storedRevision);
     final int revision = _saveRevision + 1;
     final bool stored;
     try {
       final WorkspaceRepository source = repository;
       stored = _loadProtected && source is RecoverableWorkspaceRepository
           ? await (source as RecoverableWorkspaceRepository).restore(
-              storageKey,
+              key,
               payload,
             )
-          : await source.write(storageKey, payload);
+          : await source.write(key, payload);
     } catch (_) {
       _syncRepositoryConflict();
       _lastError = _repositoryFailure();
@@ -874,6 +1183,7 @@ class Workspace extends ChangeNotifier {
     _persistedRevision = revision;
     _loadProtected = false;
     _requiresReload = false;
+    _matchStored(decoded.state, storedRevision);
     _applyState(decoded.state, warning: decoded.warning);
     return true;
   }
@@ -917,6 +1227,8 @@ class Workspace extends ChangeNotifier {
     _saveRevision = 0;
     _persistedRevision = 0;
     _requiresReload = false;
+    _stored = null;
+    _storedRevision = 0;
     _resetToEmpty();
     _lastError = null;
     _isReady = true;
@@ -927,9 +1239,11 @@ class Workspace extends ChangeNotifier {
   Future<void> _load() {
     _isReady = false;
     _lastError = null;
+    _stored = null;
+    _storedRevision = 0;
     final FutureOr<String?> result;
     try {
-      result = repository.read(storageKey);
+      result = repository.read(key);
     } on WorkspaceRepositoryCorruption {
       return _loadBackup(
         fallbackError:
@@ -963,10 +1277,18 @@ class Workspace extends ChangeNotifier {
       try {
         final _DecodedWorkspace decoded = _decodeV2(raw);
         _syncRepositoryConflict();
-        _applyState(
-          decoded.state,
-          warning: _mergeWarnings(decoded.warning, _repositoryFailure()),
+        final _WorkspaceMessage? warning = _mergeWarnings(
+          decoded.warning,
+          _repositoryFailure(),
         );
+        // A repaired read left entries in storage that the workspace
+        // dropped; the next save writes it whole.
+        _matchStored(
+          decoded.state,
+          decoded.state.revision,
+          layered: warning == null,
+        );
+        _applyState(decoded.state, warning: warning);
         return Future<void>.value();
       } on _FutureWorkspaceVersion catch (error) {
         _completeEmpty(_workspaceText(error.message), protectStoredData: true);
@@ -991,7 +1313,7 @@ class Workspace extends ChangeNotifier {
         source as RecoverableWorkspaceRepository;
     String? backup;
     try {
-      backup = await recoverable.readBackup(storageKey);
+      backup = await recoverable.readBackup(key);
     } catch (_) {
       backup = null;
     }
@@ -999,7 +1321,7 @@ class Workspace extends ChangeNotifier {
 
     final String? retained;
     try {
-      retained = await recoverable.readRetainedCopy(storageKey);
+      retained = await recoverable.readRetainedCopy(key);
     } catch (_) {
       await _loadLegacy(fallbackError: fallbackError);
       return;
@@ -1024,7 +1346,7 @@ class Workspace extends ChangeNotifier {
     }
     final bool stored;
     try {
-      stored = await recoverable.restore(storageKey, raw);
+      stored = await recoverable.restore(key, raw);
     } catch (_) {
       _applyRecoveredBackup(recovered, false);
       return true;
@@ -1035,6 +1357,9 @@ class Workspace extends ChangeNotifier {
 
   void _applyRecoveredBackup(_DecodedWorkspace recovered, bool stored) {
     if (!stored) _syncRepositoryConflict();
+    if (stored) {
+      _matchStored(recovered.state, recovered.state.revision, layered: false);
+    }
     _applyState(
       recovered.state,
       warning: stored
@@ -1053,6 +1378,14 @@ class Workspace extends ChangeNotifier {
   }
 
   Future<void> _loadLegacy({String? fallbackError}) {
+    // Only the browser workspace has a pre-v2 record to migrate.
+    if (key != storageKey) {
+      _completeEmpty(
+        fallbackError == null ? null : _workspaceText(fallbackError),
+        protectStoredData: fallbackError != null,
+      );
+      return Future<void>.value();
+    }
     final FutureOr<String?> result;
     try {
       result = repository.read(legacyStorageKey);
@@ -1109,10 +1442,10 @@ class Workspace extends ChangeNotifier {
       final WorkspaceRepository source = repository;
       result = fallbackError != null && source is RecoverableWorkspaceRepository
           ? (source as RecoverableWorkspaceRepository).restore(
-              storageKey,
+              key,
               payload,
             )
-          : source.write(storageKey, payload);
+          : source.write(key, payload);
     } catch (_) {
       _applyState(
         migrated.state,
@@ -1230,11 +1563,15 @@ class Workspace extends ChangeNotifier {
       activeId = _newest(docs).id;
       if (rawActive != null) repaired++;
     }
+    final Object? rawRevision = decoded['revision'];
     final _WorkspaceState state = _WorkspaceState(
       workspaceId: workspaceId,
       folders: folders,
       docs: docs,
       activeId: activeId,
+      revision: rawRevision is num && rawRevision >= 0
+          ? rawRevision.toInt()
+          : 0,
     );
     return _DecodedWorkspace(
       state,
@@ -1507,9 +1844,11 @@ class Workspace extends ChangeNotifier {
 
   void _handleRepositoryNotice(WorkspaceRepositoryNotice notice) {
     if (notice.kind == WorkspaceRepositoryNoticeKind.changed &&
-        notice.key != storageKey) {
+        notice.key != key) {
       return;
     }
+    // The tab holding this workspace writes it while this one waits.
+    if (_writesPaused) return;
     _requiresReload = true;
     _quotaExceeded = false;
     _lastError = notice.kind == WorkspaceRepositoryNoticeKind.cleared
@@ -1592,12 +1931,16 @@ class _WorkspaceState {
     required this.folders,
     required this.docs,
     required this.activeId,
+    this.revision = 0,
   });
 
   final String workspaceId;
   final List<WorkspaceFolder> folders;
   final List<WorkspaceDoc> docs;
   final String? activeId;
+
+  /// The revision storage held it at; 0 for state that never was stored.
+  final int revision;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'schemaVersion': Workspace.schemaVersion,
@@ -1660,5 +2003,145 @@ bool _isJson(String raw) {
     return true;
   } catch (_) {
     return false;
+  }
+}
+
+/// One document's fields as a layered store last took them.
+final class _StoredDoc {
+  _StoredDoc(WorkspaceDoc doc)
+    : title = doc.title,
+      runtimeId = doc.runtimeId,
+      json = doc.json,
+      kind = doc.kind,
+      folderId = doc.folderId,
+      updatedAt = doc.updatedAt,
+      presetContext = doc.presetContext;
+
+  final String title;
+  final String? runtimeId;
+  final String json;
+  final WorkspaceDocKind kind;
+  final String? folderId;
+  final int updatedAt;
+  final String? presetContext;
+
+  bool matches(WorkspaceDoc doc) =>
+      (identical(json, doc.json) || json == doc.json) &&
+      updatedAt == doc.updatedAt &&
+      title == doc.title &&
+      runtimeId == doc.runtimeId &&
+      kind == doc.kind &&
+      folderId == doc.folderId &&
+      presetContext == doc.presetContext;
+}
+
+typedef _StoredFolder = (String, String, String?, int);
+
+/// The workspace as a layered store holds it.
+final class _StoredLayout {
+  _StoredLayout({
+    required this.workspaceId,
+    required this.activeId,
+    required this.order,
+    required this.folders,
+    required this.documents,
+  });
+
+  factory _StoredLayout.ofState(_WorkspaceState state) => _StoredLayout(
+    workspaceId: state.workspaceId,
+    activeId: state.activeId,
+    order: <String>[for (final WorkspaceDoc doc in state.docs) doc.id],
+    folders: _foldersOf(state.folders),
+    documents: <String, _StoredDoc>{
+      for (final WorkspaceDoc doc in state.docs) doc.id: _StoredDoc(doc),
+    },
+  );
+
+  factory _StoredLayout.of(Workspace workspace) =>
+      _StoredLayout.ofState(workspace._snapshot());
+
+  final String workspaceId;
+  final String? activeId;
+  final List<String> order;
+  final List<_StoredFolder> folders;
+  final Map<String, _StoredDoc> documents;
+
+  static List<_StoredFolder> _foldersOf(List<WorkspaceFolder> folders) =>
+      <_StoredFolder>[
+        for (final WorkspaceFolder folder in folders)
+          (folder.id, folder.title, folder.parentId, folder.updatedAt),
+      ];
+
+  /// What [workspace] writes over [before] at [revision], and the layout it
+  /// leaves; a null delta when nothing changed.
+  static (WorkspaceDelta?, _StoredLayout) changes(
+    _StoredLayout before,
+    Workspace workspace,
+    int revision,
+  ) {
+    final Map<String, String> written = <String, String>{};
+    final Map<String, _StoredDoc> documents = <String, _StoredDoc>{};
+    final List<String> order = <String>[];
+    for (final WorkspaceDoc doc in workspace._docs) {
+      order.add(doc.id);
+      final _StoredDoc? stored = before.documents[doc.id];
+      if (stored != null && stored.matches(doc)) {
+        documents[doc.id] = stored;
+        continue;
+      }
+      documents[doc.id] = _StoredDoc(doc);
+      written[doc.id] = jsonEncode(doc.toJson());
+    }
+    final Set<String> removed = <String>{
+      for (final String id in before.documents.keys)
+        if (!documents.containsKey(id)) id,
+    };
+    final List<_StoredFolder> folders = _foldersOf(workspace._folders);
+    final bool moved =
+        !_sameList(order, before.order) || !_sameList(folders, before.folders);
+    final _StoredLayout after = _StoredLayout(
+      workspaceId: workspace._workspaceId,
+      activeId: workspace._activeId,
+      order: moved ? order : before.order,
+      folders: moved ? folders : before.folders,
+      documents: documents,
+    );
+    if (written.isEmpty &&
+        removed.isEmpty &&
+        !moved &&
+        after.activeId == before.activeId &&
+        after.workspaceId == before.workspaceId) {
+      return (null, after);
+    }
+    return (
+      WorkspaceDelta(
+        header: jsonEncode(<String, Object?>{
+          'schemaVersion': layeredWorkspaceSchema,
+          'workspaceId': after.workspaceId,
+          'revision': revision,
+          'activeDocumentId': after.activeId,
+        }),
+        layout: moved
+            ? jsonEncode(<String, Object?>{
+                'folders': <Map<String, dynamic>>[
+                  for (final WorkspaceFolder folder in workspace._folders)
+                    folder.toJson(),
+                ],
+                'documents': order,
+              })
+            : null,
+        documents: written,
+        removed: removed,
+      ),
+      after,
+    );
+  }
+
+  static bool _sameList<T>(List<T> a, List<T> b) {
+    if (a.length != b.length) return false;
+    for (int index = 0; index < a.length; index++) {
+      if (a[index] != b[index]) return false;
+    }
+    return true;
   }
 }

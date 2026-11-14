@@ -1,46 +1,36 @@
-/// The application frame.
+/// The application frame: the one-row top bar, then the library rail, the
+/// centre (`<main id="gloss-main" data-view>`) and the inspector, then the
+/// save bar slot and the status bar. The frame never scrolls; each pane
+/// scrolls on its own. At 1024 px and below the rail and the inspector are
+/// drawers (kit [Sheet]s) opened from the top bar.
 ///
-/// A fixed-height grid: bar / (rail, centre, inspector) / status. The shell
-/// itself never scrolls — each pane owns `min-height: 0; overflow-y: auto`, so
-/// there is never a scrollbar inside a scrollbar.
-///
-/// Panels built by other modules arrive as slots, so this file depends on none
-/// of them. The centre pane takes two maps keyed by [DocumentSurface] — the
-/// editing surfaces and their in-game renderings — plus the two surfaces the
-/// shell keeps mounted in every view:
-///
-/// ```dart
-/// EditorScope(
-///   store: store,
-///   child: EditorShell(
-///     rail: const ComponentsRail(),
-///     canvas: const CanvasViewport(),
-///     previewCard: const PreviewCardViewport(),
-///     surfaces: <DocumentSurface, Widget>{
-///       DocumentSurface.scoreboard: const ScoreboardView(),
-///     },
-///     previews: <DocumentSurface, Widget>{
-///       DocumentSurface.canvas: const PreviewView(),
-///       DocumentSurface.scoreboard: const ScoreboardView(gameContext: true),
-///     },
-///     inspector: const InspectorPane(),
-///     codeEditor: const CodeEditorView(),
-///     overlays: <Widget>[ExportDialog(...), HelpDialog(...)],
-///   ),
-/// );
-/// ```
+/// Panels built by other modules arrive as slots, so this file depends on
+/// none of them. The centre takes two maps keyed by [DocumentSurface] (the
+/// editing surfaces and their in-game renderings) plus the two surfaces it
+/// keeps mounted in every view.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
+import '../../config/kind_groups.dart';
 import '../../doctype/doctype.dart';
+import '../../logic/advanced_notice.dart'
+    show hiddenDocumentsText, hiddenLanding;
+import '../../services/editor_sync.dart' show EditorSyncStatus;
 import '../../services/file_transfer.dart';
 import '../../services/image_library.dart';
 import '../../state/editor_scope.dart';
 import '../../state/editor_store.dart';
+import '../../state/workspace.dart';
+import '../../ui/density.dart';
+import '../../ui/editor_mode.dart';
+import '../../ui/empty_state.dart';
+import '../../ui/mode.dart';
+import '../../ui/sheet.dart';
+import '../../ui/skeleton.dart';
 import 'command_palette.dart';
-import 'editor_sync_bar.dart';
 import 'key_listener.dart';
 import 'keyboard_shortcuts.dart';
 import 'pane_dom.dart';
@@ -48,14 +38,23 @@ import 'pane_layout.dart';
 import 'pane_splitter.dart';
 import 'shell_actions.dart';
 import 'shell_intents.dart';
-import 'shell_keys.dart';
-import 'shell_status.dart';
 import 'shortcut_sheet.dart';
 import 'status_bar.dart';
+import 'shell_status.dart';
 import 'store_selector.dart';
 import 'top_bar.dart';
 import 'tour.dart';
+import 'view_rules.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+
+import '../../ui/toast.dart';
+
+/// The one compact rule: drawers at this width and below.
+const String compactQuery = '(max-width: 1024px)';
+
+/// The one phone rule.
+const String phoneQuery = '(max-width: 760px)';
 
 class EditorShell extends StatefulWidget {
   const EditorShell({
@@ -67,26 +66,30 @@ class EditorShell extends StatefulWidget {
     required this.inspector,
     required this.codeEditor,
     required this.overlays,
-    required this.activeLocale,
-    required this.localeLoading,
-    required this.onLocaleChanged,
     this.store,
     this.status,
+    this.onNewDocument,
+    this.onOpenTemplates,
     this.onOpenImport,
     this.onOpenExport,
     this.onOpenImages,
-    this.onOpenTemplates,
     this.onOpenHelp,
     this.onOpenSettings,
     this.onOpenValidation,
-    this.onOpenProblems,
-    this.onOpenHistory,
-    this.serverProblemCount = 0,
-    this.serverHistoryCount = 0,
-    this.syncControls,
+    this.onImportBundle,
+    this.onExportBundle,
+    this.onEraseData,
+    this.onOpenServer,
+    this.onPairServer,
+    this.serverStatus,
+    this.onHome,
+    this.readOnly = false,
+    this.loading,
+    this.saveBar,
     this.onCloseOverlay,
     this.onToggleTheme,
     this.darkMode = true,
+    this.tourBlocked = false,
     super.key,
   });
 
@@ -96,18 +99,15 @@ class EditorShell extends StatefulWidget {
   /// [_CenterArea].
   final Widget canvas;
 
-  /// The pixel-space container-preview surface. Mounted in every view and
-  /// hidden by CSS, exactly like [canvas]; see [_CenterArea].
+  /// The container-preview card. Mounted in every view and hidden by CSS,
+  /// exactly like [canvas].
   final Widget previewCard;
 
-  /// The editing surface for every kind whose surface is neither [canvas] nor
-  /// [previewCard]. Mounted only while its kind is open and the visual or
-  /// split mode is active: each of these owns a playback clock.
+  /// The editing surface for every other kind. Mounted only while its kind
+  /// is open in the edit or split view: each of these owns a playback clock.
   final Map<DocumentSurface, Widget> surfaces;
 
-  /// The in-game rendering behind the preview mode, per surface. The menu's is
-  /// the 3D stage; every other kind's is its own surface asked to draw in game
-  /// context. Absent for kinds with nothing to render.
+  /// The in-game rendering behind Preview, per surface.
   final Map<DocumentSurface, Widget> previews;
 
   final Widget inspector;
@@ -115,39 +115,56 @@ class EditorShell extends StatefulWidget {
 
   /// Dialogs and sheets owned by other modules, mounted above the frame.
   final List<Widget> overlays;
-  final String activeLocale;
-  final bool localeLoading;
-  final ValueChanged<String> onLocaleChanged;
 
   /// Falls back to the ambient [EditorScope] when omitted.
   final EditorStore? store;
 
-  /// Canvas-owned pointer, zoom and hint readouts for the status bar.
+  /// Canvas-owned pointer and zoom readouts for the status bar.
   final ShellStatus? status;
 
+  final void Function()? onNewDocument;
+  final void Function()? onOpenTemplates;
   final void Function()? onOpenImport;
   final void Function()? onOpenExport;
   final void Function()? onOpenImages;
-  final void Function()? onOpenTemplates;
   final void Function()? onOpenHelp;
   final void Function()? onOpenSettings;
   final void Function()? onOpenValidation;
+  final void Function()? onImportBundle;
+  final void Function()? onExportBundle;
+  final void Function()? onEraseData;
 
-  /// Opens the server's own findings. Null while no sync session is connected,
-  /// which is what keeps the chip off a purely local workspace.
-  final void Function()? onOpenProblems;
+  /// The top bar's Server button (`#gloss-server-button`).
+  final void Function()? onOpenServer;
 
-  /// Opens the stored versions the server keeps. Null while disconnected.
-  final void Function()? onOpenHistory;
+  /// Pair a server, from the File menu and the command palette.
+  final void Function()? onPairServer;
 
-  final int serverProblemCount;
-  final int serverHistoryCount;
-  final EditorSyncControls? syncControls;
+  /// The server status the Server button shows; null in the browser
+  /// workspace.
+  final EditorSyncStatus? serverStatus;
+
+  /// The top bar's brand: back to the start page.
+  final void Function()? onHome;
+
+  /// Another tab holds this workspace: the panes and the centre take no
+  /// input (the save bar offers Take over).
+  final bool readOnly;
+
+  /// The open document's name while its body is on its way from the
+  /// server: the centre says so and the panes take no input.
+  final String? loading;
+
+  /// The bottom slot above the status bar (the save bar).
+  final Widget? saveBar;
 
   /// Escape handler for whichever dialog or sheet the owner has open.
   final void Function()? onCloseOverlay;
   final void Function()? onToggleTheme;
   final bool darkMode;
+
+  /// A pairing or sync dialog is up: the tour waits until it is gone.
+  final bool tourBlocked;
 
   @override
   State<EditorShell> createState() => _EditorShellState();
@@ -157,31 +174,44 @@ class _EditorShellState extends State<EditorShell> {
   EditorStore? _store;
   ShellIntents? _intents;
   void Function()? _uninstallDrop;
+  void Function()? _unwatchCompact;
+  void Function()? _unwatchPhone;
   bool _apple = false;
+  bool _compact = false;
+  bool _phone = false;
   bool _paletteOpen = false;
+  int _paletteOpens = 0;
   bool _dropActive = false;
-  bool _confirmDelete = false;
-  int _confirmSeq = 0;
-  bool _tourOpen = false;
-  bool _tourLeaving = false;
+  bool _tourWanted = false;
   bool _tourChecked = false;
   bool _shortcutsOpen = false;
-  bool _shortcutsLeaving = false;
-  bool _mobileRailOpen = false;
-  bool _mobileInspectorOpen = false;
-
-  /// Bumped on every open and close so a dismissal already in flight cannot
-  /// unmount a surface the user has since re-opened.
-  int _dismissSeq = 0;
+  bool _libraryOpen = false;
+  bool _inspectorOpen = false;
+  String? _lastActiveId;
+  EditorView? _lastView;
   PaneLayout _panes = PaneLayout.defaults;
+
+  bool get _tourOpen => _tourWanted && !component.tourBlocked;
 
   @override
   void initState() {
     super.initState();
     _apple = isApplePlatform();
+    _compact = mediaMatches(compactQuery);
+    _phone = mediaMatches(phoneQuery);
+    _unwatchCompact = watchMedia(compactQuery, (bool matches) {
+      if (!mounted || matches == _compact) return;
+      setState(() {
+        _compact = matches;
+        _libraryOpen = false;
+        _inspectorOpen = false;
+      });
+    });
+    _unwatchPhone = watchMedia(phoneQuery, (bool matches) {
+      if (mounted && matches != _phone) setState(() => _phone = matches);
+    });
     // Restored before the first paint: the custom properties live on the
-    // document root, which exists long before this tree mounts, so a stored
-    // layout never flashes through the defaults.
+    // document root, so a stored layout never flashes through the defaults.
     _panes = PaneLayout.load();
     _paintPanes();
   }
@@ -213,9 +243,13 @@ class _EditorShellState extends State<EditorShell> {
     }
     _detach();
     _store = resolved;
+    _lastActiveId = resolved.workspace.activeId;
+    _lastView = resolved.view;
+    resolved.workspace.addListener(_onWorkspace);
+    resolved.addListener(_onView);
     _intents = _buildIntents(resolved);
-    resolved.onError = ArcaneSonner.error;
-    resolved.onInfo = ArcaneSonner.info;
+    resolved.onError = toastError;
+    resolved.onInfo = toastInfo;
     _uninstallDrop = installDropHandler(
       onJson: resolved.importJsonAsNewDocument,
       onImages: _acceptImages,
@@ -236,6 +270,8 @@ class _EditorShellState extends State<EditorShell> {
   @override
   void dispose() {
     _detach();
+    _unwatchCompact?.call();
+    _unwatchPhone?.call();
     super.dispose();
   }
 
@@ -244,15 +280,40 @@ class _EditorShellState extends State<EditorShell> {
     _uninstallDrop = null;
     final EditorStore? store = _store;
     if (store != null) {
+      store.workspace.removeListener(_onWorkspace);
+      store.removeListener(_onView);
       store.onError = null;
       store.onInfo = null;
     }
   }
 
+  /// Opening a document from the library drawer closes the drawer.
+  void _onWorkspace() {
+    final String? active = _store?.workspace.activeId;
+    if (active == _lastActiveId) return;
+    _lastActiveId = active;
+    if (mounted && _libraryOpen) setState(() => _libraryOpen = false);
+    _inspectorToTop();
+  }
+
+  /// Another view can show another inspector: it starts at its header too.
+  void _onView() {
+    final EditorView? view = _store?.view;
+    if (view == _lastView) return;
+    _lastView = view;
+    _inspectorToTop();
+  }
+
+  /// Another document starts at its header, not where the last one was.
+  void _inspectorToTop() {
+    if (!mounted) return;
+    context.binding.addPostFrameCallback(() => scrollPaneToTop('inspector'));
+  }
+
   ShellIntents _buildIntents(EditorStore store) => ShellIntents(
     store: store,
-    requestDeleteSelected: _armDelete,
     openPalette: _openPalette,
+    onNewDocument: component.onNewDocument,
     onOpenImport: component.onOpenImport,
     onOpenExport: component.onOpenExport,
     onOpenImages: component.onOpenImages,
@@ -261,30 +322,27 @@ class _EditorShellState extends State<EditorShell> {
     onOpenSettings: component.onOpenSettings,
     onOpenValidation: component.onOpenValidation,
     onToggleTheme: component.onToggleTheme,
+    onImportBundle: component.onImportBundle,
+    onExportBundle: component.onExportBundle,
+    onEraseData: component.onEraseData,
+    onOpenServer: component.onOpenServer,
+    onPairServer: component.onPairServer,
   );
 
   void _openPalette() {
     if (_paletteOpen) return;
-    setState(() => _paletteOpen = true);
+    setState(() {
+      _paletteOpen = true;
+      _paletteOpens++;
+    });
   }
 
-  void _togglePalette() => setState(() => _paletteOpen = !_paletteOpen);
-
-  /// The injected arcane_jaspr runtime claims `(meta|ctrl)+K` on the document
-  /// and `stopPropagation`s it before the shell's binder ever sees it
-  /// (`command_palette_scripts.dart:239-250`), then clicks
-  /// `[data-command-trigger]`. This app rendered no such node, so ⌘K did
-  /// nothing at all while the top bar advertised it. Rather than fight the
-  /// script, give it the node it is looking for — the same shape of fix as
-  /// `data-arcane-interactive` for the accordion binder. The shell's own table
-  /// row still runs if the script is ever gone; the two cannot both fire,
-  /// because the script consumes the event when it is present.
+  /// The arcane runtime claims mod+K and clicks `[data-command-trigger]`,
+  /// and the shell's own key table also binds it; both only open, so the
+  /// one keydown reaching both never toggles the palette shut again.
   void _triggerPalette() {
-    // The binder stands all three of these down; the script knows about none of
-    // them. Measured before this guard: with `hui-settings-dialog` open, one
-    // Meta+K put the palette on top of it.
     if (_tourOpen || _shortcutsOpen || huiArcaneOverlayOpen()) return;
-    _togglePalette();
+    _openPalette();
   }
 
   void _closePalette() {
@@ -292,129 +350,77 @@ class _EditorShellState extends State<EditorShell> {
     setState(() => _paletteOpen = false);
   }
 
-  void _armDelete() {
-    setState(() {
-      _confirmDelete = true;
-      _confirmSeq++;
-    });
-  }
-
-  /// Escape while any Arcane surface is open.
-  ///
-  /// The delete confirm is the one dialog `app.dart` cannot close: its flag
-  /// lives here, so `onCloseOverlay` cleared the other overlays, reported the
-  /// key as handled and left the confirm on screen with Escape swallowed —
-  /// the only dialog in the app that ignored it. Measured before this fix.
+  /// Escape while an arcane surface is open: the shell's own first.
   void _escapeOverlay() {
-    switch (huiOverlayEscapeTarget(confirmDeleteOpen: _confirmDelete)) {
-      case HuiOverlayEscape.confirmDelete:
-        setState(() => _confirmDelete = false);
-      case HuiOverlayEscape.appOverlay:
-        component.onCloseOverlay?.call();
-    }
+    if (_paletteOpen) return _closePalette();
+    if (_shortcutsOpen) return setState(() => _shortcutsOpen = false);
+    if (_libraryOpen || _inspectorOpen) return _closeDrawers();
+    component.onCloseOverlay?.call();
   }
 
-  // --- tour and shortcut sheet ----------------------------------------------
+  // --- tour and shortcuts ---------------------------------------------------
 
   /// Runs once per shell, before the first build, so an unseen tour is up in
-  /// the first frame rather than arriving after the user has already started
-  /// clicking. The flag is browser state, not document state: it lives in the
-  /// workspace's storage under `gloss.tour.v1` and never touches the store.
+  /// the first frame. The flag is browser state under `gloss.tour.v1`.
   void _maybeStartTour(EditorStore store) {
     if (_tourChecked) return;
     _tourChecked = true;
     final String? seen = store.workspace.read(huiTourSeenKey);
-    if (seen == null || seen.isEmpty) _tourOpen = true;
+    if (seen == null || seen.isEmpty) _tourWanted = true;
   }
 
-  void _replayTour() {
-    setState(() {
-      _tourOpen = true;
-      _tourLeaving = false;
-      _dismissSeq++;
-    });
-  }
+  void _replayTour() => setState(() {
+    _tourWanted = true;
+    _libraryOpen = false;
+    _inspectorOpen = false;
+  });
 
   void _endTour({required bool remember}) {
     if (remember) _store?.workspace.write(huiTourSeenKey, 'seen');
-    _dismiss(() => _tourLeaving = true, () {
-      _tourOpen = false;
-      _tourLeaving = false;
-    });
+    setState(() => _tourWanted = false);
   }
 
-  void _toggleShortcuts() {
-    if (_shortcutsOpen && !_shortcutsLeaving) {
-      _dismiss(() => _shortcutsLeaving = true, () {
-        _shortcutsOpen = false;
-        _shortcutsLeaving = false;
-      });
-      return;
-    }
+  void _toggleShortcuts() => setState(() => _shortcutsOpen = !_shortcutsOpen);
+
+  void _toggleLibrary() => setState(() {
+    _libraryOpen = !_libraryOpen;
+    if (_libraryOpen) _inspectorOpen = false;
+  });
+
+  void _toggleInspector() {
     setState(() {
-      _shortcutsOpen = true;
-      _shortcutsLeaving = false;
-      _dismissSeq++;
+      _inspectorOpen = !_inspectorOpen;
+      if (_inspectorOpen) _libraryOpen = false;
     });
+    if (_inspectorOpen) _inspectorToTop();
   }
 
-  void _toggleMobileRail() {
+  void _closeDrawers() {
+    if (!_libraryOpen && !_inspectorOpen) return;
     setState(() {
-      _mobileRailOpen = !_mobileRailOpen;
-      if (_mobileRailOpen) _mobileInspectorOpen = false;
-    });
-  }
-
-  void _toggleMobileInspector() {
-    setState(() {
-      _mobileInspectorOpen = !_mobileInspectorOpen;
-      if (_mobileInspectorOpen) _mobileRailOpen = false;
-    });
-  }
-
-  void _closeMobilePanes() {
-    if (!_mobileRailOpen && !_mobileInspectorOpen) return;
-    setState(() {
-      _mobileRailOpen = false;
-      _mobileInspectorOpen = false;
-    });
-  }
-
-  /// Exit animations are impossible for an Arcane surface — the runtime writes
-  /// `hidden` with `display:none!important` in the same batch as the state flip
-  /// (06-motion.css, foot of file). These two are ours to unmount, so the class
-  /// runs first and the node drops after it. The wait is deliberately shorter
-  /// than the entrance: a dismissal must never feel held up.
-  void _dismiss(void Function() start, void Function() finish) {
-    setState(start);
-    final int seq = ++_dismissSeq;
-    Future<void>.delayed(const Duration(milliseconds: 150), () {
-      if (!mounted || seq != _dismissSeq) return;
-      setState(finish);
+      _libraryOpen = false;
+      _inspectorOpen = false;
     });
   }
 
   Future<void> _acceptImages(List<Object> files) async {
     final ImageLibrary? library = _store?.images;
     if (library == null) {
-      ArcaneSonner.error(
-        huiText('The image library is not available in this build.'),
-      );
+      toastError(huiText('The image library is not available in this build.'));
       return;
     }
     final ImageAddOutcome outcome = await library.addFromFiles(files);
     for (final String error in outcome.errors) {
-      ArcaneSonner.error(error);
+      toastError(error);
     }
     for (final String warning in outcome.warnings) {
-      ArcaneSonner.warning(warning);
+      toastWarning(warning);
     }
     if (outcome.added.isNotEmpty) {
-      final int count = outcome.added.length;
-      ArcaneSonner.success(
+      toastSuccess(
         huiPlural(
           'images.added_count',
-          count,
+          outcome.added.length,
           oneEnglish: 'Added {count} image.',
           otherEnglish: 'Added {count} images.',
         ),
@@ -434,211 +440,201 @@ class _EditorShellState extends State<EditorShell> {
       paletteOpen: _paletteOpen,
       tourOpen: _tourOpen,
       shortcutsOpen: _shortcutsOpen,
-      mobilePaneOpen: _mobileRailOpen || _mobileInspectorOpen,
-      onTogglePalette: _togglePalette,
+      mobilePaneOpen: _libraryOpen || _inspectorOpen,
+      onTogglePalette: _openPalette,
       onToggleShortcuts: _toggleShortcuts,
       onSkipTour: () => _endTour(remember: false),
       onCloseOverlay: _escapeOverlay,
-      onCloseMobilePane: _closeMobilePanes,
-      child: dom.div(
-        id: 'hui-shell',
-        classes: component.syncControls == null
-            ? 'hui-shell'
-            : 'hui-shell has-sync',
-        <Widget>[
-          TopBar(
-            intents: intents,
-            activeLocale: component.activeLocale,
-            localeLoading: component.localeLoading,
-            onLocaleChanged: component.onLocaleChanged,
-            syncControls: component.syncControls,
-            apple: _apple,
-            darkMode: component.darkMode,
-            mobileRailOpen: _mobileRailOpen,
-            mobileInspectorOpen: _mobileInspectorOpen,
-            onToggleMobileRail: _toggleMobileRail,
-            onToggleMobileInspector: _toggleMobileInspector,
-          ),
-          if (component.syncControls != null)
-            EditorSyncBar(controls: component.syncControls!),
-          dom.div(classes: 'hui-shell-body', <Widget>[
-            dom.aside(
-              classes:
-                  'hui-pane hui-rail${_mobileRailOpen ? ' is-mobile-open' : ''}',
-              attributes: <String, String>{
-                'aria-label': huiText('Library and document contents'),
-              },
-              <Widget>[component.rail],
-            ),
-            PaneSplitter(
-              side: PaneSide.rail,
-              layout: _panes,
-              onCommit: _commitPanes,
-            ),
+      onCloseMobilePane: _closeDrawers,
+      child: StoreSelector<WorkspaceDocKind>(
+        listenable: store,
+        selector: () => store.docKind,
+        builder: (BuildContext context, WorkspaceDocKind kind) =>
+            _frame(store, intents, kindHasInspector(kind)),
+      ),
+    );
+  }
+
+  Widget _frame(EditorStore store, ShellIntents intents, bool hasInspector) {
+    final bool compact = _compact;
+    return dom.div(
+      id: 'hui-shell',
+      classes:
+          'hui-shell${compact ? ' is-compact' : ''}'
+          '${hasInspector ? '' : ' no-inspector'}',
+      <Widget>[
+        TopBar(
+          intents: intents,
+          compact: compact,
+          phone: _phone,
+          hasInspector: hasInspector,
+          libraryOpen: _libraryOpen,
+          inspectorOpen: _inspectorOpen,
+          onToggleLibrary: _toggleLibrary,
+          onToggleInspector: _toggleInspector,
+          onOpenPalette: _openPalette,
+          onShowShortcuts: _toggleShortcuts,
+          onReplayTour: _replayTour,
+          serverStatus: component.serverStatus,
+          onHome: component.onHome,
+          darkMode: component.darkMode,
+        ),
+        // Menus opened in the panes stay below the top bar.
+        dom.div(
+          classes: 'hui-shell-body',
+          attributes: <String, String>{
+            'data-arcane-anchor-top': '.hui-shell-body',
+            if (component.readOnly || component.loading != null) 'inert': '',
+            if (component.loading != null) 'aria-busy': 'true',
+          },
+          <Widget>[
+            if (!compact) ...<Widget>[
+              _pane('library', huiText('Library'), component.rail),
+              PaneSplitter(
+                side: PaneSide.rail,
+                layout: _panes,
+                onCommit: _commitPanes,
+              ),
+            ],
             _CenterArea(
               store: store,
+              intents: intents,
+              compact: compact,
+              loading: component.loading,
               canvas: component.canvas,
               previewCard: component.previewCard,
               surfaces: component.surfaces,
               previews: component.previews,
               codeEditor: component.codeEditor,
             ),
-            PaneSplitter(
-              side: PaneSide.inspector,
-              layout: _panes,
-              onCommit: _commitPanes,
-            ),
-            if (_mobileRailOpen || _mobileInspectorOpen)
-              dom.button(
-                classes: 'hui-pane-scrim',
-                attributes: <String, String>{
-                  'type': 'button',
-                  'aria-label': huiText('Close side panel'),
-                },
-                events: dom.events<Null>(onClick: _closeMobilePanes),
-                const <Widget>[],
+            if (!compact && hasInspector) ...<Widget>[
+              PaneSplitter(
+                side: PaneSide.inspector,
+                layout: _panes,
+                onCommit: _commitPanes,
               ),
-            dom.aside(
-              classes:
-                  'hui-pane hui-inspector${_mobileInspectorOpen ? ' is-mobile-open' : ''}',
-              attributes: <String, String>{'aria-label': huiText('Inspector')},
-              <Widget>[component.inspector],
+              _pane('inspector', huiText('Inspector'), component.inspector),
+            ],
+          ],
+        ),
+        ?component.saveBar,
+        StatusBar(
+          store: store,
+          status: component.status,
+          onOpenValidation: component.onOpenValidation,
+        ),
+        // The runtime's mod+K handler clicks this; never focusable or shown.
+        dom.span(
+          attributes: const <String, String>{
+            'hidden': '',
+            'aria-hidden': 'true',
+            'data-command-trigger': '',
+          },
+          events: dom.events<Null>(onClick: _triggerPalette),
+          const <Widget>[],
+        ),
+        if (compact) ...<Widget>[
+          Sheet(
+            id: 'hui-library-drawer',
+            open: _libraryOpen,
+            title: huiText('Library'),
+            side: SheetSide.start,
+            dense: true,
+            onClose: _closeDrawers,
+            child: _paneBody('library', component.rail),
+          ),
+          if (hasInspector)
+            Sheet(
+              id: 'hui-inspector-drawer',
+              open: _inspectorOpen,
+              title: huiText('Inspector'),
+              side: SheetSide.end,
+              dense: true,
+              onClose: _closeDrawers,
+              child: _paneBody('inspector', component.inspector),
             ),
-          ]),
-          StatusBar(
-            store: store,
-            status: component.status,
-            onOpenValidation: component.onOpenValidation,
-            onOpenProblems: component.onOpenProblems,
-            onOpenHistory: component.onOpenHistory,
-            serverProblemCount: component.serverProblemCount,
-            serverHistoryCount: component.serverHistoryCount,
-          ),
-          // Never reachable by pointer or Tab (see `.hui-cmd-trigger`); it
-          // exists only so the runtime's ⌘K handler has something to click.
-          dom.button(
-            classes: 'hui-cmd-trigger',
-            attributes: const <String, String>{
-              'type': 'button',
-              'tabindex': '-1',
-              'aria-hidden': 'true',
-              'data-command-trigger': '',
-            },
-            events: dom.events<Null>(onClick: _triggerPalette),
-            const <Widget>[],
-          ),
-          ...component.overlays,
-          if (_paletteOpen)
-            ShellCommandPalette(
-              actions: buildShellActions(
+        ],
+        ...component.overlays,
+        if (_paletteOpen)
+          ShellCommandPalette(
+            key: ValueKey<int>(_paletteOpens),
+            actions: <ShellAction>[
+              ...buildShellActions(
                 intents,
                 onShowShortcuts: _toggleShortcuts,
                 onReplayTour: _replayTour,
+                advanced: ModeScope.advanced(context),
+                compact: compact,
               ),
-              onClose: _closePalette,
-              apple: _apple,
-            ),
-          if (_confirmDelete) _deleteDialog(store, intents),
-          if (_shortcutsOpen)
-            ShortcutSheet(
-              onClose: _toggleShortcuts,
-              apple: _apple,
-              leaving: _shortcutsLeaving,
-            ),
-          // Last of the overlays and above them all: a spotlight over a region
-          // a dialog was covering would be teaching the wrong thing.
-          if (_tourOpen)
-            HuiTour(
-              onFinish: () => _endTour(remember: true),
-              onSkip: () => _endTour(remember: false),
-              onNever: () => _endTour(remember: true),
-              leaving: _tourLeaving,
-            ),
-          if (_dropActive) const _DropOverlay(),
-          // Bottom-left, not bottom-right: the right edge is the inspector, the
-          // one surface the user is typing into while toasts fire. Bottom-centre
-          // is out too — the canvas keyboard-hint row spans the full width of
-          // the canvas column at its bottom edge. The rail's tail is the only
-          // bottom strip whose controls all live at the top, and the stylesheet
-          // caps the toaster width so it can never reach the inspector. The
-          // offset lifts the stack clear of the status bar.
-          // Top centre: the only region no pane owns. Bottom-right buries the
-          // inspector, bottom-left buries the rail, and bottom-centre lands on
-          // the canvas hint line. Toasts are transient, so briefly covering the
-          // top of the artboard costs nothing.
-          const ArcaneSonner(position: ToastPosition.topCenter, offset: 16),
-        ],
-      ),
+            ],
+            onClose: _closePalette,
+            apple: _apple,
+          ),
+        ShortcutSheet(
+          open: _shortcutsOpen,
+          onClose: () => setState(() => _shortcutsOpen = false),
+          apple: _apple,
+        ),
+        // Above the other overlays: a spotlight over a region a dialog
+        // covers would teach the wrong thing.
+        if (_tourOpen)
+          HuiTour(
+            compact: compact,
+            onFinish: () => _endTour(remember: true),
+            onSkip: () => _endTour(remember: false),
+            onNever: () => _endTour(remember: true),
+          ),
+        if (_dropActive) const _DropOverlay(),
+        // Over the top bar, clear of the inspector, footers, the save bar
+        // and previews at every width.
+        const AppToaster(),
+      ],
     );
   }
 
-  /// Keyed per arming: the dialog surface is closed by the injected JS runtime,
-  /// so reusing the element would re-open a node the runtime already hid.
-  ///
-  /// Counted, not named: the confirm deletes the whole selection, so naming the
-  /// primary while removing three was a dialog that lied about its own effect.
-  Widget _deleteDialog(EditorStore store, ShellIntents intents) {
-    final int count = store.selectionIds.length;
-    final bool many = count > 1;
-    return ArcaneConfirmDialog(
-      key: ValueKey<int>(_confirmSeq),
-      title: many
-          ? huiPlural(
-              'shell.delete_components.question',
-              count,
-              oneEnglish: 'Delete {count} component?',
-              otherEnglish: 'Delete {count} components?',
-            )
-          : huiText('Delete {id}?', <String, Object?>{
-              'id': store.selectedId ?? huiText('this component'),
-            }),
-      message: huiPlural(
-        'shell.delete_components.message',
-        count,
-        oneEnglish:
-            'The component is removed from the menu. Undo brings it back.',
-        otherEnglish:
-            'The components are removed from the menu. Undo brings them back.',
-      ),
-      confirmText: huiText('Delete'),
-      cancelText: huiText('Keep'),
-      destructive: true,
-      onCancel: () => setState(() => _confirmDelete = false),
-      onConfirm: () {
-        setState(() => _confirmDelete = false);
-        intents.deleteSelectedNow();
-      },
-    );
-  }
+  Widget _pane(String name, String label, Widget child) => dom.aside(
+    classes: 'hui-pane hui-$name',
+    attributes: <String, String>{'data-pane': name, 'aria-label': label},
+    <Widget>[
+      DenseBox(children: <Widget>[child]),
+    ],
+  );
+
+  Widget _paneBody(String name, Widget child) => dom.div(
+    classes: 'hui-$name',
+    attributes: <String, String>{'data-pane': name},
+    <Widget>[child],
+  );
 }
 
-/// Visual / preview / code / split for a menu, card / code for a container
-/// preview. Rebuilds only when the view actually changes, not on every store
-/// notification.
+/// The centre: the view the bar shows for the open document. Rebuilds only
+/// when the view or kind changes, not on every store notification.
 ///
-/// The canvas cell is child 0 in every arm and the card cell child 1, and both
-/// are only ever hidden by CSS, never unmounted. Anything else destroys their
-/// state on a view switch — Jaspr replaces a child whose runtimeType changed —
-/// which resets zoom and pan and throws away the font calibration and every
-/// decoded bitmap. Both surfaces gate their clocks on having a box to draw
-/// into, so a hidden one costs nothing.
-///
-/// The code and preview cells ARE genuinely unmounted when inactive, for
-/// opposite reasons that land in the same place: a live [CodeEditorView]
-/// re-serializes the whole document on every store notification, and a live 3D
-/// preview keeps a rAF loop and a 50 ms simulation timer running with no
-/// equivalent gate.
+/// The canvas cell is child 0 in every arm and the card cell child 1, and
+/// both are only ever hidden by CSS, never unmounted: Jaspr replaces a child
+/// whose type changed, which would reset zoom and pan and drop every decoded
+/// bitmap. The code and preview cells ARE unmounted when inactive: a live
+/// code editor re-serializes the document on every change and a live 3D
+/// preview keeps a frame loop running.
 class _CenterArea extends StatelessWidget {
   const _CenterArea({
     required this.store,
+    required this.intents,
+    required this.compact,
     required this.canvas,
     required this.previewCard,
     required this.surfaces,
     required this.previews,
     required this.codeEditor,
+    this.loading,
   });
 
   final EditorStore store;
+  final ShellIntents intents;
+  final bool compact;
+
+  /// The open document's name while its body is on its way.
+  final String? loading;
   final Widget canvas;
   final Widget previewCard;
   final Map<DocumentSurface, Widget> surfaces;
@@ -646,59 +642,133 @@ class _CenterArea extends StatelessWidget {
   final Widget codeEditor;
 
   @override
-  Widget build(BuildContext context) =>
-      StoreSelector<({bool active, EditorView view, DocumentSurface surface})>(
-        listenable: store,
-        selector: () => (
-          active: store.hasActiveDocument,
-          view: store.view,
-          surface: store.docType.surface,
+  Widget build(BuildContext context) {
+    final String? loading = this.loading;
+    if (loading != null) {
+      return _main(
+        const <String, String>{'data-view': 'loading'},
+        <Widget>[
+          Skeleton(
+            rows: 6,
+            label: huiText('Loading {name}', <String, Object?>{
+              'name': loading,
+            }),
+          ),
+        ],
+      );
+    }
+    final bool advanced = ModeScope.advanced(context);
+    return StoreSelector<
+      ({bool active, EditorView view, DocumentSurface surface, int hidden})
+    >(
+      listenable: store,
+      selector: () => (
+        active: store.hasActiveDocument,
+        view: shownView(
+          store.view,
+          store.docKind,
+          advanced: advanced,
+          compact: compact,
         ),
-        builder:
-            (
-              BuildContext context,
-              ({bool active, EditorView view, DocumentSurface surface}) state,
-            ) => state.active
-            ? _active(state.view, state.surface)
-            : dom.section(
-                classes: 'hui-pane hui-center is-empty-workspace',
-                <Widget>[
-                  ArcaneEmptyState(
-                    title: huiText('Workspace is empty'),
-                    description: huiText(
-                      'Create a document in the Library or start from a '
-                      'template.',
-                    ),
-                    icon: ArcaneIcon.filePlus(size: IconSize.lg),
+        surface: store.docType.surface,
+        hidden: advanced || store.hasActiveDocument
+            ? 0
+            : _onlyHidden(store.workspace.docs),
+      ),
+      builder:
+          (
+            BuildContext context,
+            ({
+              bool active,
+              EditorView view,
+              DocumentSurface surface,
+              int hidden,
+            })
+            state,
+          ) => state.active
+          ? _active(state.view, state.surface)
+          : state.hidden > 0
+          ? _main(
+              <String, String>{
+                'data-view': 'empty',
+                'data-advanced-documents': '${state.hidden}',
+              },
+              <Widget>[
+                EmptyState(
+                  message: hiddenDocumentsText(state.hidden),
+                  icon: ArcaneIcon.eyeOff(),
+                  action: Button(
+                    label: huiText('Switch to Advanced'),
+                    variant: ButtonVariant.primary,
+                    attributes: const <String, String>{
+                      'data-action-slot': 'primary',
+                    },
+                    onPressed: () => _showInAdvanced(context),
                   ),
-                ],
-              ),
+                ),
+              ],
+            )
+          : _main(
+              const <String, String>{
+                'data-view': 'empty',
+                'data-empty-workspace': '',
+              },
+              <Widget>[
+                EmptyState(
+                  message: huiText('Workspace is empty'),
+                  icon: ArcaneIcon.filePlus(),
+                  action: Button(
+                    label: huiText('New document'),
+                    variant: ButtonVariant.primary,
+                    attributes: const <String, String>{
+                      'data-action-slot': 'primary',
+                    },
+                    onPressed: intents.newDocument,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  /// How many documents a Simple workspace holds when Simple lists none of
+  /// them; 0 when it lists one or holds none.
+  static int _onlyHidden(List<WorkspaceDoc> docs) =>
+      docs.any((WorkspaceDoc doc) => listedInMode(doc, advanced: false))
+      ? 0
+      : docs.length;
+
+  /// Advanced lists every kind; the newest hidden document opens.
+  void _showInAdvanced(BuildContext context) {
+    ModeScope.maybeOf(context)?.onChanged(EditorMode.advanced);
+    final String? landing = hiddenLanding(store.workspace.docs);
+    if (landing != null) store.openDocument(landing);
+  }
+
+  /// `<main id="gloss-main" data-view>`, the centre the checks read.
+  static Widget _main(Map<String, String> attributes, List<Widget> children) =>
+      Component.element(
+        tag: 'main',
+        id: 'gloss-main',
+        attributes: attributes,
+        children: children,
       );
 
-  Widget _active(EditorView view, DocumentSurface surface) => dom.section(
-    classes: switch (view) {
-      EditorView.visual => 'hui-pane hui-center is-visual',
-      EditorView.preview => 'hui-pane hui-center is-preview',
-      EditorView.code => 'hui-pane hui-center is-code',
-      EditorView.split => 'hui-pane hui-center is-split',
-    },
-    // Which of the two always-mounted cells is on screen is decided here, in
-    // CSS, because neither may be unmounted to hide it.
-    attributes: <String, String>{'data-surface': surface.name},
+  Widget _active(EditorView view, DocumentSurface surface) => _main(
+    <String, String>{'data-view': view.name, 'data-surface': surface.name},
     <Widget>[
       dom.div(classes: 'hui-split-cell is-canvas', <Widget>[canvas]),
       dom.div(classes: 'hui-split-cell is-preview-card', <Widget>[previewCard]),
       if (_mountsSurfaceCell(view, surface))
         dom.div(
           key: ValueKey<String>('surface-${surface.name}'),
-          classes: 'hui-split-cell ${_surfaceCellClass(surface)}',
+          classes: 'hui-split-cell is-surface',
           <Widget>[surfaces[surface] ?? _missing(surface)],
         ),
       if (view == EditorView.preview)
         dom.div(
           key: ValueKey<String>('preview-${surface.name}'),
           classes: 'hui-split-cell is-preview',
-          attributes: <String, String>{'data-surface': surface.name},
           <Widget>[previews[surface] ?? _missing(surface)],
         ),
       if (view == EditorView.code || view == EditorView.split)
@@ -717,45 +787,10 @@ class _CenterArea extends StatelessWidget {
       surface != DocumentSurface.canvas &&
       surface != DocumentSurface.previewCard;
 
-  /// The world panel kept its pre-Gloss cell name; the rest are their own.
-  static String _surfaceCellClass(DocumentSurface surface) => switch (surface) {
-    DocumentSurface.names => 'is-names',
-    DocumentSurface.strings => 'is-strings',
-    DocumentSurface.presets => 'is-presets',
-    DocumentSurface.waypoint => 'is-waypoint',
-    DocumentSurface.glyph => 'is-glyph',
-      DocumentSurface.behavior => 'is-behavior',
-    DocumentSurface.canvas => 'is-canvas',
-    DocumentSurface.previewCard => 'is-preview-card',
-    DocumentSurface.panel => 'is-board',
-    DocumentSurface.hologram => 'is-hologram',
-    DocumentSurface.animation => 'is-animation',
-    DocumentSurface.scoreboard => 'is-scoreboard',
-    DocumentSurface.hud => 'is-hud',
-    DocumentSurface.motd => 'is-motd',
-    DocumentSurface.connections => 'is-connections',
-    DocumentSurface.channel => 'is-connections',
-    DocumentSurface.emoji => 'is-emoji',
-    DocumentSurface.bubble => 'is-bubble',
-    DocumentSurface.damageIndicators => 'is-damage-indicators',
-    DocumentSurface.entityOverlays => 'is-entity-overlays',
-    DocumentSurface.tablist => 'is-tablist',
-    DocumentSurface.realDrops => 'is-real-drops',
-    DocumentSurface.inventory => 'is-inventory',
-    DocumentSurface.nameplate => 'is-nameplate',
-    DocumentSurface.nametag => 'is-nametag',
-    DocumentSurface.marker => 'is-marker',
-  };
-
-  /// A slot the owner did not supply. Reachable only from a wiring mistake, so
-  /// it names the missing surface instead of rendering an empty pane.
-  static Widget _missing(DocumentSurface surface) => ArcaneEmptyState(
-    title: huiText('That surface is not in this build'),
-    description: huiText(
-      "No widget is wired for the {name} surface.",
-      <String, Object?>{'name': surface.name},
-    ),
-    icon: ArcaneIcon.triangleAlert(size: IconSize.lg),
+  /// A slot the owner did not supply: a wiring mistake, named.
+  static Widget _missing(DocumentSurface surface) => EmptyState(
+    message: huiText('That surface is not in this build'),
+    icon: ArcaneIcon.triangleAlert(),
   );
 }
 
@@ -767,10 +802,10 @@ class _DropOverlay extends StatelessWidget {
     classes: 'hui-dropzone',
     attributes: const <String, String>{'aria-hidden': 'true'},
     <Widget>[
-      dom.div(classes: 'hui-dropzone-card', <Widget>[
-        ArcaneIcon.upload(size: IconSize.lg),
-        dom.p(<Widget>[Text(huiText('Drop a menu .json or PNG images'))]),
-      ]),
+      EmptyState(
+        icon: ArcaneIcon.upload(),
+        message: huiText('Drop a menu .json or PNG images'),
+      ),
     ],
   );
 }

@@ -10,7 +10,6 @@ import org.junit.rules.TemporaryFolder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -38,8 +37,6 @@ public class EditorSyncConnectionsKindTest {
         EditorSyncDocumentKind.CONNECTIONS.layout());
     assertEquals(ConnectionsDoc.KIND, EditorSyncDocumentKind.CONNECTIONS.singletonId());
     assertEquals(EditorSyncDocumentKind.CONNECTIONS,
-        EditorSyncDocumentKind.forSubject(EditorSyncKind.CONNECTIONS));
-    assertEquals(EditorSyncDocumentKind.CONNECTIONS,
         EditorSyncDocumentKind.byStorageCollection("connections.json"));
     assertTrue(EditorSyncDocumentKind.ORDERED_WIRE_NAMES.contains("connections"));
   }
@@ -61,10 +58,9 @@ public class EditorSyncConnectionsKindTest {
     Files.writeString(data.resolve("connections.json"), BASE, StandardCharsets.UTF_8);
     EditorSyncContentSnapshotBuilder builder = new EditorSyncContentSnapshotBuilder(data);
 
-    EditorSyncProject workspace = builder.open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024);
+    EditorSyncProject workspace = builder.open(1024 * 1024);
     List<EditorSyncDocuments.Entry> documents = EditorSyncDocuments.parse(workspace.json());
 
-    assertEquals(List.of("connections"), builder.subjectIds(EditorSyncKind.CONNECTIONS));
     assertEquals(1, documents.size());
     assertEquals("connections", documents.getFirst().kind());
     assertEquals("connections", documents.getFirst().id());
@@ -77,11 +73,11 @@ public class EditorSyncConnectionsKindTest {
     Path data = temp.newFolder("connections-publish").toPath();
     Files.writeString(data.resolve("connections.json"), BASE, StandardCharsets.UTF_8);
     JsonObject base = connectionsProject(BASE);
-    EditorSyncStoredSession session = session(base);
+    EditorSyncPublicationValidator.Base session = session(base);
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), connectionsProject(EDITED)),
+            new EditorSyncPublication(session.baseRevision(), connectionsProject(EDITED)),
             1024 * 1024, base);
 
     EditorSyncPublicationValidator.ParsedEntry applied = validated.appliedDocuments()
@@ -99,18 +95,18 @@ public class EditorSyncConnectionsKindTest {
     assertEquals(2L, written.revision());
     assertEquals(applied.entry().json(), EditorSyncDocuments.parse(
         new EditorSyncContentSnapshotBuilder(data)
-            .open(EditorSyncKind.CONNECTIONS, "connections", 1024 * 1024).json())
+            .open(1024 * 1024).json())
         .getFirst().json());
   }
 
   @Test
   public void anUnknownAudienceIsRefusedWithTheDocumentParserMessage() {
     JsonObject base = connectionsProject(BASE);
-    EditorSyncStoredSession session = session(base);
+    EditorSyncPublicationValidator.Base session = session(base);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(),
+            new EditorSyncPublication(session.baseRevision(),
                 connectionsProject(UNKNOWN_AUDIENCE)),
             1024 * 1024, base));
 
@@ -119,34 +115,13 @@ public class EditorSyncConnectionsKindTest {
   }
 
   private static JsonObject connectionsProject(String source) {
-    JsonObject project = new JsonObject();
-    project.addProperty("format", EditorSyncJson.PROJECT_FORMAT);
-    project.addProperty("version", EditorSyncJson.PROTOCOL_VERSION);
-    project.addProperty("kind", "connections");
-    project.addProperty("subjectId", "connections");
     JsonObject document = EditorSyncTestProjects.document("connections", "connections", source);
     document.addProperty("revision", 1L);
     document.addProperty("baseRevision", EditorSyncDocuments.contentRevision(BASE));
-    JsonArray documents = new JsonArray();
-    documents.add(document);
-    project.add("documents", documents);
-    project.add("images", new JsonArray());
-    JsonObject constraints = new JsonObject();
-    constraints.addProperty("subjectId", "connections");
-    JsonArray documentKinds = new JsonArray();
-    documentKinds.add("connections");
-    constraints.add("documentKinds", documentKinds);
-    constraints.add("createDocumentKinds", new JsonArray());
-    constraints.addProperty("allowDeletes", false);
-    project.add("constraints", constraints);
-    project.add("warnings", new JsonArray());
-    return EditorSyncTestProjects.sign(project);
+    return EditorSyncTestProjects.workspaceProject(document);
   }
 
-  private static EditorSyncStoredSession session(JsonObject project) {
-    return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
-        new EditorSyncStoredSession.Subject(EditorSyncKind.CONNECTIONS, "connections"),
-        Instant.now().plusSeconds(3600L), 0L, project, null);
+  private static EditorSyncPublicationValidator.Base session(JsonObject project) {
+    return new EditorSyncPublicationValidator.Base(project);
   }
 }

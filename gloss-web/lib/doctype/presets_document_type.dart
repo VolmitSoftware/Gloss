@@ -17,8 +17,6 @@ final class PresetsDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('preset catalog');
   @override
-  String get createLabel => huiText('New preset catalog');
-  @override
   String get pluralLabel => huiText('Presets');
   @override
   int get tabOrder => 200;

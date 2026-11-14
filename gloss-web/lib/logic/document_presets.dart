@@ -94,6 +94,7 @@ final class DocumentPresets {
     'surface' => 'surfaces', 'channel' => 'channels', 'bubble-style' => 'bubbles',
     'inventory' => 'inventories', 'nameplate' => 'nameplates', 'nametag' => 'nametags',
     'marker' => 'markers', 'waypoint' => 'waypoints', 'glyph' => 'glyphs', 'behavior' => 'behaviors',
+    'leaderboard' => 'leaderboards',
     _ => kinds.contains(wireKind) ? wireKind : null,
   };
 
@@ -164,40 +165,6 @@ final class DocumentPresets {
   }
 }
 
-final class InheritedDocumentSource {
-  InheritedDocumentSource(this.source, String canonical)
-      : _authored = _object(jsonDecode(source), 'document'),
-        _baseline = _object(jsonDecode(canonical), 'document');
-
-  final String source;
-  final Map<String, Object?> _authored;
-  final Map<String, Object?> _baseline;
-
-  String encode(String canonical) {
-    final Map<String, Object?> current = _object(jsonDecode(canonical), 'document');
-    if (_equal(current, _baseline)) return source;
-    return const JsonEncoder.withIndent('  ').convert(_edit(_authored, _baseline, current));
-  }
-
-  static Map<String, Object?> _edit(Map<String, Object?> authored,
-      Map<String, Object?> before, Map<String, Object?> after) {
-    final Map<String, Object?> result = _copy(authored);
-    for (final String key in <String>{...before.keys, ...after.keys}) {
-      if (before.containsKey(key) == after.containsKey(key) && _equal(before[key], after[key])) continue;
-      if (!after.containsKey(key)) {
-        result[key] = null;
-      } else if (before[key] is Map<String, Object?> && after[key] is Map<String, Object?>) {
-        result[key] = _edit(authored[key] is Map<String, Object?>
-            ? authored[key]! as Map<String, Object?> : <String, Object?>{},
-            before[key]! as Map<String, Object?>, after[key]! as Map<String, Object?>);
-      } else {
-        result[key] = after[key];
-      }
-    }
-    return result;
-  }
-}
-
 Map<String, Object?> _object(Object? value, String path) {
   if (value is! Map<String, Object?>) throw FormatException('$path must be an object.');
   return value;
@@ -217,20 +184,4 @@ Map<String, Object?> _merge(Map<String, Object?> base, Map<String, Object?> over
         ? _merge(previous, entry.value! as Map<String, Object?>) : entry.value;
   }
   return result;
-}
-
-bool _equal(Object? left, Object? right) {
-  if (identical(left, right)) return true;
-  if (left is Map<String, Object?> && right is Map<String, Object?>) {
-    return left.length == right.length && left.entries.every((MapEntry<String, Object?> entry) =>
-        right.containsKey(entry.key) && _equal(entry.value, right[entry.key]));
-  }
-  if (left is List<Object?> && right is List<Object?>) {
-    if (left.length != right.length) return false;
-    for (int index = 0; index < left.length; index++) {
-      if (!_equal(left[index], right[index])) return false;
-    }
-    return true;
-  }
-  return left == right;
 }

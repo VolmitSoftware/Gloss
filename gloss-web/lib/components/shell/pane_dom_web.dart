@@ -163,3 +163,34 @@ void Function() installPaneSplitter({
     } catch (_) {}
   };
 }
+
+/// Whether the viewport matches the CSS media [query] now.
+bool mediaMatches(String query) {
+  try {
+    return web.window.matchMedia(query).matches;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Calls [onChange] whenever [query] starts or stops matching; returns the
+/// uninstaller.
+void Function() watchMedia(String query, void Function(bool matches) onChange) {
+  final web.MediaQueryList list = web.window.matchMedia(query);
+  final JSFunction listener = ((web.MediaQueryListEvent event) => onChange(
+    event.matches,
+  )).toJS;
+  list.addEventListener('change', listener);
+  return () => list.removeEventListener('change', listener);
+}
+
+/// Scrolls the [pane] (`[data-pane]`) back to its top, and every scrolling
+/// box around it up to its drawer, so a new document starts at its header.
+void scrollPaneToTop(String pane) {
+  web.Element? box = web.document.querySelector('[data-pane="$pane"]');
+  while (box != null && box != web.document.body) {
+    if (box.scrollTop != 0) box.scrollTop = 0;
+    if (box.getAttribute('role') == 'dialog') break;
+    box = box.parentElement;
+  }
+}

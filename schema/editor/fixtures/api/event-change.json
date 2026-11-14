@@ -1,0 +1,42 @@
+{
+  "type": "change",
+  "result": {
+    "changeId": "chg_422a211ea0c14b2c",
+    "idempotencyKey": "pub_4kB2f0Qx9w1mZr8c",
+    "status": "applied",
+    "message": "Published 2 changes; 1 kept the server copy: spawn.",
+    "conflicts": [
+      {
+        "kind": "hologram",
+        "id": "spawn",
+        "name": "spawn",
+        "reason": "changed"
+      }
+    ],
+    "documents": [
+      {
+        "kind": "hologram",
+        "id": "welcome",
+        "path": "holograms/welcome.json",
+        "hash": "sha256:6cfad8f8d35c34f9415d02631645cfb5af6896a75784f611dcb4cc7905703e23",
+        "size": 477,
+        "revision": 2,
+        "summary": {
+          "name": "welcome"
+        }
+      }
+    ],
+    "deleted": [],
+    "images": [
+      {
+        "path": "shop/new.png",
+        "hash": "sha256:5c85e71fe5a69e87ef57ce24e3b1fdfe0a4f4457e17c1132f7feefa843ce1e59",
+        "size": 79,
+        "mediaType": "image/png",
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "removedImages": []
+  }
+}

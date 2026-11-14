@@ -1,166 +1,125 @@
-/// Bottom sheet listing the versions the server keeps of each synced document.
-///
-/// The index rides along with the sync project; the bytes of one version are
-/// asked for only when somebody opens it, which is why a row is a button rather
-/// than a preview. A loaded version can be dropped into the workspace as one
-/// undoable edit, which is what makes this a recovery tool rather than a log.
+/// The copies the server kept of each document, as a section of the Server
+/// sheet: pick a version to read it, then restore it into the open document.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 
+import '../../l10n/hui_localizations.dart';
 import '../../logic/sync_history.dart';
-import '../common/class_names.dart';
-import 'package:gloss_editor/l10n/hui_localizations.dart';
+import '../../services/editor_sync.dart';
+import '../../ui/action_row.dart';
+import '../../ui/alert.dart';
+import '../../ui/empty_state.dart';
 
-class HistoryPanel extends StatelessWidget {
-  const HistoryPanel({
+class ServerHistoryList extends StatefulWidget {
+  const ServerHistoryList({
     required this.history,
-    required this.isOpen,
-    required this.onClose,
-    this.loadedVersion,
-    this.loadedJson,
-    this.loadingVersion,
-    this.failure,
-    this.onLoadVersion,
-    this.onRestoreVersion,
+    required this.load,
+    required this.restore,
     super.key,
   });
 
   final SyncHistory history;
-  final bool isOpen;
-  final VoidCallback onClose;
 
-  /// The version whose bytes are on screen, or null while none is open.
-  final SyncHistoryVersion? loadedVersion;
-  final String? loadedJson;
+  /// Fetches one version's JSON; null when the server no longer keeps it.
+  final Future<String?> Function(SyncHistoryVersion version) load;
 
-  /// The version currently being fetched, so its row can say so.
-  final SyncHistoryVersion? loadingVersion;
-
-  final String? failure;
-  final void Function(SyncHistoryVersion version)? onLoadVersion;
-  final void Function(SyncHistoryVersion version, String json)?
-  onRestoreVersion;
+  /// Restores a loaded version; returns why it could not, or null.
+  final String? Function(SyncHistoryVersion version, String json) restore;
 
   @override
-  Widget build(BuildContext context) => ArcaneSheet.bottom(
-    id: 'hui-history-sheet',
-    isOpen: isOpen,
-    onClose: onClose,
-    size: SheetSize.md,
-    title: huiText('Version history'),
-    description: huiText(
-      'Copies the server kept when a document changed on disk, through the editor, or through a pack.',
-    ),
-    showCloseButton: false,
-    footer: dom.div(classes: 'hui-validation-footer', <Widget>[
-      Button.outline(label: huiText('Close'), onPressed: onClose),
-    ]),
-    child: _body(),
-  );
+  State<ServerHistoryList> createState() => _ServerHistoryListState();
+}
 
-  Widget _body() {
-    final List<SyncHistoryDocument> documents = history.documents;
-    if (documents.isEmpty) {
-      return dom.div(classes: 'hui-validation hui-validation-clean', <Widget>[
-        ArcaneEmptyState(
-          title: huiText('No stored versions'),
-          description: huiText(
-            'The server keeps a copy each time a document changes. Nothing has changed yet.',
-          ),
-          icon: ArcaneIcon.history(size: IconSize.lg),
-        ),
-      ]);
+class _ServerHistoryListState extends State<ServerHistoryList> {
+  SyncHistoryVersion? _loading;
+  SyncHistoryVersion? _loaded;
+  String? _json;
+  String? _failure;
+
+  bool _same(SyncHistoryVersion? a, SyncHistoryVersion b) =>
+      a != null && a.kind == b.kind && a.id == b.id && a.version == b.version;
+
+  Future<void> _view(SyncHistoryVersion version) async {
+    setState(() {
+      _loading = version;
+      _failure = null;
+    });
+    try {
+      final String? json = await component.load(version);
+      if (!mounted) return;
+      setState(() {
+        _loading = null;
+        _loaded = json == null ? null : version;
+        _json = json;
+        _failure = json == null
+            ? huiText('The server no longer keeps that version.')
+            : null;
+      });
+    } on EditorSyncFailure catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = null;
+        _failure = error.message;
+      });
     }
-    return dom.div(classes: 'hui-validation', <Widget>[
-      if (failure != null)
-        dom.p(classes: 'hui-validation-fix', <Widget>[Text(failure!)]),
-      // The version somebody just opened goes first: it is the thing they
-      // asked for, and the list they picked it from is still below it.
-      if (loadedVersion != null && loadedJson != null) _loaded(),
-      for (final SyncHistoryDocument document in documents) _document(document),
-    ]);
   }
 
-  Widget _document(SyncHistoryDocument document) => dom.div(
-    classes: 'hui-validation-group',
-    <Widget>[
-      dom.div(classes: 'hui-validation-group-head', <Widget>[
-        ArcaneIcon.fileText(size: IconSize.sm),
-        dom.span(classes: 'hui-eyebrow', <Widget>[
-          Text(
-            huiText("{severityLabel} ({length})", <String, Object?>{
-              'severityLabel': '${document.kind} ${document.id}',
-              'length': document.versions.length,
-            }),
-          ),
-        ]),
-      ]),
-      dom.ul(classes: 'hui-validation-list', <Widget>[
-        for (final SyncHistoryVersion version in document.versions)
-          _row(version),
-      ]),
-    ],
-  );
+  void _restore() {
+    final SyncHistoryVersion? version = _loaded;
+    final String? json = _json;
+    if (version == null || json == null) return;
+    final String? problem = component.restore(version, json);
+    setState(() => _failure = problem);
+  }
 
-  Widget _row(SyncHistoryVersion version) {
-    final bool loading =
-        loadingVersion != null &&
-        loadingVersion!.version == version.version &&
-        loadingVersion!.kind == version.kind &&
-        loadingVersion!.id == version.id;
-    return dom.li(
-      classes: classNames(<String?>[
-        'hui-validation-row',
-        loading ? 'is-info' : null,
-      ]),
+  @override
+  Widget build(BuildContext context) {
+    final List<SyncHistoryDocument> documents = component.history.documents;
+    if (documents.isEmpty) {
+      return EmptyState(
+        message: huiText('No stored versions yet.'),
+        icon: ArcaneIcon.history(),
+      );
+    }
+    return dom.div(
+      attributes: const <String, String>{'data-server-history': ''},
       <Widget>[
-        dom.div(classes: 'hui-validation-body', <Widget>[
-          dom.p(classes: 'hui-validation-message', <Widget>[
-            Text(version.sourceLabel),
-          ]),
-          dom.code(classes: 'hui-validation-path', <Widget>[
-            Text(
-              huiText("{value} bytes", <String, Object?>{
-                'value': version.bytes,
-              }),
+        if (_failure != null)
+          AppAlert(message: _failure!, tone: AlertTone.warning, live: true),
+        if (_loaded != null && _json != null) ...<Widget>[
+          ActionRow(
+            dense: true,
+            leading: <Widget>[
+              dom.strong(<Widget>[Text('${_loaded!.kind} ${_loaded!.id}')]),
+            ],
+            primary: RowAction(huiText('Restore'), _restore),
+          ),
+          dom.pre(<Widget>[Text(_json!)]),
+        ],
+        for (final SyncHistoryDocument document in documents)
+          for (final SyncHistoryVersion version in document.versions)
+            ActionRow(
+              dense: true,
+              leading: <Widget>[
+                dom.span(<Widget>[
+                  Text(
+                    '${document.kind} ${document.id}: ${version.sourceLabel}',
+                  ),
+                ]),
+              ],
+              secondary: <RowAction>[
+                RowAction(
+                  _same(_loading, version)
+                      ? huiText('Loading')
+                      : huiText('View'),
+                  _loading == null ? () => _view(version) : null,
+                  loading: _same(_loading, version),
+                ),
+              ],
             ),
-          ]),
-        ]),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.small,
-          onPressed: onLoadVersion == null || loading
-              ? null
-              : () => onLoadVersion!(version),
-          icon: ArcaneIcon.eye(size: IconSize.sm),
-          label: loading ? huiText('Loading') : huiText('View'),
-        ),
       ],
     );
   }
-
-  Widget _loaded() => dom.div(classes: 'hui-validation-group', <Widget>[
-    dom.div(classes: 'hui-validation-group-head', <Widget>[
-      ArcaneIcon.eye(size: IconSize.sm),
-      dom.span(classes: 'hui-eyebrow', <Widget>[
-        Text(
-          huiText("{severityLabel} ({length})", <String, Object?>{
-            'severityLabel': '${loadedVersion!.kind} ${loadedVersion!.id}',
-            'length': loadedJson!.split('\n').length,
-          }),
-        ),
-      ]),
-      if (onRestoreVersion != null)
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.small,
-          onPressed: () => onRestoreVersion!(loadedVersion!, loadedJson!),
-          icon: ArcaneIcon.history(size: IconSize.sm),
-          label: huiText('Restore into workspace'),
-        ),
-    ]),
-    dom.pre(classes: 'hui-history-source', <Widget>[Text(loadedJson!)]),
-  ]);
 }

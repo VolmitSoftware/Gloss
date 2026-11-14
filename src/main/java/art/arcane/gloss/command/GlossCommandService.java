@@ -1,6 +1,7 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.editor.EditorPermissions;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
@@ -94,11 +95,8 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             "gloss.previews.dump",
             "gloss.items",
             "gloss.items.export",
-            "gloss.web",
-            "gloss.web.open",
-            "gloss.web.edit",
-            "gloss.web.workspace",
-            "gloss.web.sessions",
+            "gloss.editor",
+            "gloss.editor.pair",
             "gloss.import",
             "gloss.import.apply",
             "gloss.markers",
@@ -236,7 +234,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         if (!canCompleteRoute(sender, normalized)) {
             return List.of();
         }
-        List<String> suggestions = filterWebCompletions(
+        List<String> suggestions = filterEditorCompletions(
                 sender, routed, runDirectorTab(sender, commandName, normalized));
         return scoped ? restorePositionalSuggestions(routed, suggestions) : suggestions;
     }
@@ -463,52 +461,19 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     private static boolean canCompleteRoute(CommandSender sender, String[] args) {
-        if (args.length < 2 || !args[0].equalsIgnoreCase("web")) {
-            return true;
-        }
-        String permission = webChildPermission(args[1]);
-        return permission == null || sender.hasPermission(permission);
+        return args.length < 2 || !args[0].equalsIgnoreCase("editor")
+                || sender.hasPermission(EditorPermissions.PAIR);
     }
 
-    private static List<String> filterWebCompletions(CommandSender sender, String[] args,
-                                                     List<String> suggestions) {
-        if (args.length <= 1) {
-            if (hasAnyWebPermission(sender)) {
-                return suggestions;
-            }
-            return suggestions.stream()
-                    .filter(suggestion -> !suggestion.equalsIgnoreCase("web"))
-                    .toList();
-        }
-        if (!args[0].equalsIgnoreCase("web") || args.length != 2) {
+    /** {@code editor} is offered only to senders who may pair. */
+    private static List<String> filterEditorCompletions(CommandSender sender, String[] args,
+                                                        List<String> suggestions) {
+        if (args.length > 1 || sender.hasPermission(EditorPermissions.PAIR)) {
             return suggestions;
         }
         return suggestions.stream()
-                .filter(suggestion -> {
-                    String permission = webChildPermission(suggestion);
-                    return permission == null || sender.hasPermission(permission);
-                })
+                .filter(suggestion -> !suggestion.equalsIgnoreCase("editor"))
                 .toList();
-    }
-
-    private static boolean hasAnyWebPermission(CommandSender sender) {
-        return sender.hasPermission(CommandGlossWeb.OPEN_PERMISSION)
-                || sender.hasPermission(CommandGlossWeb.EDIT_PERMISSION)
-                || sender.hasPermission(CommandGlossWeb.WORKSPACE_PERMISSION)
-                || sender.hasPermission(CommandGlossWebSessions.PERMISSION);
-    }
-
-    private static String webChildPermission(String child) {
-        if (child == null) {
-            return null;
-        }
-        return switch (child.toLowerCase(Locale.ROOT)) {
-            case "open" -> CommandGlossWeb.OPEN_PERMISSION;
-            case "edit" -> CommandGlossWeb.EDIT_PERMISSION;
-            case "workspace" -> CommandGlossWeb.WORKSPACE_PERMISSION;
-            case "sessions" -> CommandGlossWebSessions.PERMISSION;
-            default -> null;
-        };
     }
 
     static List<String> restorePositionalSuggestions(String[] args, List<String> suggestions) {

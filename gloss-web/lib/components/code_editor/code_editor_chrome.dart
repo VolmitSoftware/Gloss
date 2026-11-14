@@ -1,112 +1,94 @@
 /// Everything the code pane paints that has no state of its own.
 ///
-/// Split off [CodeEditorView] so the pane's file stays about the buffer — sync,
-/// commit, keyboard, hover hit-testing — rather than about markup. Each widget
-/// here takes the values it draws and hands its interactions straight back; not
-/// one of them reads the store or the buffer.
+/// Split off [CodeEditorView] so the pane's file stays about the buffer: sync,
+/// commit, keyboard, hover hit-testing. Each widget here takes the values it
+/// draws and hands its interactions straight back; none reads the store or the
+/// buffer. The toolbar, notices and issue rows are kit pieces; the completion
+/// list and the key card float at measured points, which no library surface
+/// does, so they are drawn here on popover tokens.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:arcane_jaspr/core/dom_value.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show EventCallback;
+import 'package:jaspr/jaspr.dart' show Component, EventCallback;
 
 import '../../logic/validation.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/alert.dart';
+import '../../ui/badge.dart';
+import '../../ui/field.dart' show issueNote;
+import '../../ui/mode.dart';
+import '../../ui/tone.dart';
 import 'code_completion.dart';
 import 'code_hover.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// The one place the pane says, in words, whether the document has the text.
-class HuiCodeStateChip extends StatelessWidget {
-  const HuiCodeStateChip({required this.dirty, required this.saved, super.key});
+///
+/// [saved] is true only just after a save, so "Saved" confirms something that
+/// happened rather than labelling every clean buffer.
+StatusBadge huiJsonStateBadge({required bool dirty, required bool saved}) =>
+    StatusBadge(
+      dirty
+          ? huiText('Unsaved changes')
+          : saved
+          ? huiText('Saved')
+          : huiText('Matches the document'),
+      tone: dirty
+          ? BadgeTone.warning
+          : saved
+          ? BadgeTone.ok
+          : BadgeTone.neutral,
+      attributes: const <String, String>{'aria-live': 'polite'},
+    );
 
-  final bool dirty;
-
-  /// True only just after a save, so "Saved" is a confirmation of something
-  /// that happened rather than a permanent label on a clean buffer.
-  final bool saved;
-
-  @override
-  Widget build(BuildContext context) => dom.span(
-    classes: classNames(<String?>[
-      'hui-code-state',
-      dirty ? 'is-dirty' : 'is-clean',
-    ]),
-    attributes: const <String, String>{'aria-live': 'polite'},
-    <Widget>[
-      if (dirty)
-        ArcaneIcon.circleDot(size: IconSize.xs)
-      else
-        ArcaneIcon.circleCheck(size: IconSize.xs),
-      dom.span(<Widget>[
-        Text(
-          dirty
-              ? huiText('Unsaved changes')
-              : saved
-              ? huiText('Saved')
-              : huiText('Matches the document'),
-        ),
-      ]),
-    ],
-  );
-}
-
-/// Loud, and only ever raised by something the user did: a refused save, or a
-/// format that could not parse.
-class HuiCodeErrorStrip extends StatelessWidget {
-  const HuiCodeErrorStrip(this.message, {super.key});
+/// A refused save or a format that could not parse. Raised only by something
+/// the user did; the text stays as typed.
+class HuiJsonErrorAlert extends StatelessWidget {
+  const HuiJsonErrorAlert(this.message, {super.key});
 
   final String message;
 
   @override
-  Widget build(BuildContext context) => dom.div(
-    classes: 'hui-code-error',
-    attributes: const <String, String>{'role': 'alert'},
-    <Widget>[
-      ArcaneIcon.circleAlert(size: IconSize.sm),
-      dom.span(classes: 'hui-code-error-text', <Widget>[
-        Text(
-          huiText(
-            "{message} — nothing was committed, your text is untouched.",
-            <String, Object?>{'message': message},
-          ),
-        ),
-      ]),
-    ],
+  Widget build(BuildContext context) => AppAlert(
+    tone: AlertTone.error,
+    live: true,
+    message: huiText('{message} Your text is untouched.', <String, Object?>{
+      'message': message,
+    }),
   );
 }
 
 /// A standing statement about the buffer, with the choices that answer it.
-class HuiCodeNotice extends StatelessWidget {
-  const HuiCodeNotice({
+class HuiJsonNotice extends StatelessWidget {
+  const HuiJsonNotice({
     required this.message,
-    required this.actions,
+    this.secondary = const <RowAction>[],
+    this.cancel,
+    this.primary,
     this.warning = false,
     super.key,
   });
 
   final String message;
-  final List<Widget> actions;
-
-  /// Warnings carry the triangle; everything else carries the info circle.
+  final List<RowAction> secondary;
+  final RowAction? cancel;
+  final RowAction? primary;
   final bool warning;
 
   @override
-  Widget build(BuildContext context) => dom.div(
-    classes: classNames(<String?>[
-      'hui-code-notice',
-      warning ? 'is-warning' : null,
-    ]),
-    attributes: const <String, String>{'role': 'status'},
-    <Widget>[
-      if (warning)
-        ArcaneIcon.triangleAlert(size: IconSize.sm)
-      else
-        ArcaneIcon.circleAlert(size: IconSize.sm),
-      dom.span(classes: 'hui-code-notice-text', <Widget>[Text(message)]),
-      dom.div(classes: 'hui-code-notice-tools', actions),
-    ],
+  Widget build(BuildContext context) => AppAlert(
+    tone: warning ? AlertTone.warning : AlertTone.info,
+    live: true,
+    message: message,
+    action: ActionRow(
+      dense: true,
+      secondary: secondary,
+      cancel: cancel,
+      primary: primary,
+    ),
   );
 }
 
@@ -115,8 +97,8 @@ class HuiCodeNotice extends StatelessWidget {
 /// Rows accept on `mousedown` rather than `click`: a click would move focus off
 /// the textarea first, and the caret the insertion is measured against would be
 /// gone by the time the handler ran.
-class HuiCodeCompletionPopup extends StatelessWidget {
-  const HuiCodeCompletionPopup({
+class HuiJsonCompletionPopup extends StatelessWidget {
+  const HuiJsonCompletionPopup({
     required this.items,
     required this.index,
     required this.x,
@@ -138,7 +120,7 @@ class HuiCodeCompletionPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => dom.div(
-    classes: 'hui-code-complete',
+    classes: 'hui-json-complete',
     attributes: <String, String>{
       'role': 'listbox',
       'aria-label': huiText('JSON completion'),
@@ -153,11 +135,11 @@ class HuiCodeCompletionPopup extends StatelessWidget {
   );
 
   Widget _row(HuiCompletion item, int at) => dom.div(
-    classes: classNames(<String?>[
-      'hui-code-complete-row',
-      at == index ? 'is-active' : null,
-      item.isDefault ? 'is-default' : null,
-    ]),
+    classes: <String>[
+      'hui-json-complete-row',
+      if (at == index) 'is-active',
+      if (item.isDefault) 'is-default',
+    ].join(' '),
     attributes: <String, String>{
       'role': 'option',
       'aria-selected': at == index ? 'true' : 'false',
@@ -170,30 +152,29 @@ class HuiCodeCompletionPopup extends StatelessWidget {
       'mousemove': (Object? event) => onHover(at),
     },
     <Widget>[
-      dom.div(classes: 'hui-code-complete-head', <Widget>[
-        dom.code(classes: 'hui-code-complete-label', <Widget>[
+      dom.div(classes: 'hui-json-complete-head', <Widget>[
+        dom.code(classes: 'hui-json-complete-label', <Widget>[
           Text(item.label),
         ]),
-        dom.span(classes: 'hui-code-complete-detail', <Widget>[
+        dom.span(classes: 'hui-json-complete-detail', <Widget>[
           Text(item.detail),
         ]),
       ]),
       if (item.description.isNotEmpty)
-        dom.span(classes: 'hui-code-complete-desc', <Widget>[
+        dom.span(classes: 'hui-json-complete-desc', <Widget>[
           Text(item.description),
         ]),
     ],
   );
 }
 
-/// The key explanation, on the app's own tooltip surface.
+/// The key explanation, floated under the hovered key.
 ///
-/// The classes are `11-tooltip-overlay.css`'s, not a second look invented here:
-/// the shared overlay script cannot drive this card, because it triggers on
-/// `mouseover`, which fires once as the pointer enters the textarea and never
-/// again as it crosses from one key to the next.
-class HuiCodeHoverCard extends StatelessWidget {
-  const HuiCodeHoverCard({
+/// Not the library tooltip: that one opens from a trigger element, and the
+/// keys here are spans under a transparent textarea that never receive a
+/// pointer event. The view hit-tests them and places this card itself.
+class HuiJsonHoverCard extends StatelessWidget {
+  const HuiJsonHoverCard({
     required this.doc,
     required this.x,
     required this.y,
@@ -206,9 +187,7 @@ class HuiCodeHoverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => dom.div(
-    classes:
-        'gloss-tooltip-overlay-content gloss-tooltip-overlay-rich is-visible '
-        'hui-code-hovercard',
+    classes: 'hui-json-hovercard',
     attributes: const <String, String>{'role': 'tooltip'},
     styles: dom.Styles(
       raw: <String, String>{
@@ -217,72 +196,84 @@ class HuiCodeHoverCard extends StatelessWidget {
       },
     ),
     <Widget>[
-      dom.strong(classes: 'hui-code-hovercard-title', <Widget>[
+      dom.strong(classes: 'hui-json-hovercard-title', <Widget>[
         Text(doc.title),
       ]),
-      dom.code(classes: 'hui-code-hovercard-path', <Widget>[Text(doc.path)]),
-      dom.span(classes: 'hui-code-hovercard-body', <Widget>[Text(doc.body)]),
+      dom.code(
+        classes: 'hui-json-hovercard-path',
+        attributes: const <String, String>{'dir': 'ltr'},
+        <Widget>[Text(doc.path)],
+      ),
+      dom.span(<Widget>[Text(doc.body)]),
       if (doc.detail.isNotEmpty)
-        dom.span(classes: 'hui-code-hovercard-detail', <Widget>[
+        dom.span(classes: 'hui-json-hovercard-detail', <Widget>[
           Text(doc.detail),
         ]),
       if (doc.citation != null)
-        dom.code(classes: 'hui-code-hovercard-citation', <Widget>[
-          Text(doc.citation!),
-        ]),
+        AdvancedOnly(
+          child: dom.code(
+            classes: 'hui-json-hovercard-path',
+            attributes: const <String, String>{'dir': 'ltr'},
+            <Widget>[Text(doc.citation!)],
+          ),
+        ),
     ],
   );
 }
 
-/// The validation strip under the editor. Reports the document's issues, not
-/// the buffer's: nothing here moves until a save lands.
-class HuiCodeIssueList extends StatelessWidget {
-  const HuiCodeIssueList(this.issues, {super.key});
+/// The heading of an issue group, as the validation panel words it.
+String huiJsonSeverityLabel(HuiSeverity severity) => switch (severity) {
+  HuiSeverity.error => huiText('Errors'),
+  HuiSeverity.warning => huiText('Warnings'),
+  HuiSeverity.info => huiText('Notes'),
+};
+
+/// The validation strip under the editor: the document's issues, not the
+/// buffer's, so nothing here moves until a save lands. Grouped by severity
+/// under plain headings, one kit problem line per issue.
+class HuiJsonIssueList extends StatelessWidget {
+  const HuiJsonIssueList(this.issues, {super.key});
 
   final List<HuiIssue> issues;
 
   @override
-  Widget build(BuildContext context) => dom.div(
-    classes: 'hui-code-issues',
+  Widget build(BuildContext context) => dom.section(
+    classes: 'hui-json-issues',
+    attributes: <String, String>{'aria-label': huiText('Validation')},
     <Widget>[
-      dom.div(classes: 'hui-code-issues-head', <Widget>[
-        HuiEyebrow(
-          issues.isEmpty
-              ? huiText('no issues')
-              : huiPlural(
-                  'code.issue-count',
-                  issues.length,
-                  oneEnglish: '{count} issue',
-                  otherEnglish: '{count} issues',
-                ),
-        ),
-      ]),
       if (issues.isEmpty)
-        dom.p(classes: 'hui-code-issues-empty', <Widget>[
-          Text(huiText('This document matches everything the plugin expects.')),
-        ])
+        ArcaneFieldDescription(huiText('No issues'))
       else
-        dom.ul(classes: 'hui-code-issues-list', <Widget>[
-          for (final HuiIssue issue in issues)
-            dom.li(
-              classes: classNames(<String?>[
-                'hui-code-issue',
-                switch (issue.severity) {
-                  HuiSeverity.error => 'is-error',
-                  HuiSeverity.warning => 'is-warning',
-                  HuiSeverity.info => 'is-info',
-                },
-              ]),
-              <Widget>[
-                dom.code(classes: 'hui-code-issue-path', <Widget>[
-                  Text(issue.path),
-                ]),
-                dom.span(classes: 'hui-code-issue-message', <Widget>[
-                  Text(issue.message),
-                ]),
-              ],
-            ),
-        ]),
+        for (final HuiSeverity severity in HuiSeverity.values)
+          ..._group(severity, <HuiIssue>[
+            for (final HuiIssue issue in issues)
+              if (issue.severity == severity) issue,
+          ]),
     ],
   );
+
+  List<Widget> _group(HuiSeverity severity, List<HuiIssue> group) {
+    if (group.isEmpty) return const <Widget>[];
+    return <Widget>[
+      dom.h3(classes: 'ui-section-title', <Widget>[
+        Text(
+          huiText('{severityLabel} ({length})', <String, Object?>{
+            'severityLabel': huiJsonSeverityLabel(severity),
+            'length': group.length,
+          }),
+        ),
+      ]),
+      for (final HuiIssue issue in group)
+        issueNote(
+          issue,
+          child: Component.fragment(<Widget>[
+            dom.code(
+              attributes: const <String, String>{'dir': 'ltr'},
+              <Widget>[Text(issue.path)],
+            ),
+            Text(' ${issue.message}'),
+          ]),
+        ),
+    ];
+  }
 }

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "rate-limited",
+    "message": "Too many requests for this token.",
+    "retryAfterMillis": 44
+  }
+}

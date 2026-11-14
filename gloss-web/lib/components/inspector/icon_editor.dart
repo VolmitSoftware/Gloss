@@ -1,7 +1,7 @@
-/// The shared icon editor: a Text | Image | Animated | Item segmented control
-/// over one icon slot, plus the per-type body.
+/// The shared icon editor: one icon slot as a plain group, its type first and
+/// then the fields of that type.
 ///
-/// Switching type never destroys work — the outgoing icon is parked in the
+/// Switching type never destroys work: the outgoing icon is parked in the
 /// session cache and handed back on the way home (see `inspector_session.dart`).
 library;
 
@@ -9,6 +9,7 @@ import 'dart:async';
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../config/defaults.dart';
 import '../../logic/hui_geometry.dart';
@@ -18,7 +19,18 @@ import '../../model/model.dart';
 import '../../services/catalogs.dart';
 import '../../services/image_library.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/duration_field.dart';
+import '../../ui/duration_value.dart';
+import '../../ui/empty_state.dart';
+import '../../ui/field.dart';
+import '../../ui/field_group.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/menu.dart';
+import '../../ui/mode.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/technical_input.dart';
 import 'block_picker.dart';
 import 'custom_item_picker.dart';
 import 'entity_picker.dart';
@@ -26,15 +38,14 @@ import 'extras_editor.dart';
 import 'display_style_editor.dart';
 import 'hologram_box_editor.dart';
 import '../../model/gloss_hologram_box.dart';
-import 'field_help.dart';
 import 'image_picker_grid.dart';
 import 'inspector_session.dart';
-import 'inspector_widgets.dart';
 import 'item_picker.dart';
 import 'player_head_picker.dart';
-import 'reorder_list.dart';
 import 'text_icon_editor.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+import '../../ui/toast.dart';
 
 /// Which icon field of a component data object is being edited.
 enum IconSlot { icon, trueIcon, falseIcon }
@@ -83,33 +94,53 @@ void writeIconSlot(HuiComponentData data, IconSlot slot, HuiIcon? icon) {
   }
 }
 
-/// Doc keys for the fields of one icon type, in the order the editor shows
-/// them. Text, item and custom item are edited by widgets this file only
-/// mounts, so their help rides in a [HuiHelpCluster] under the type switch.
-const Map<String, List<String>> huiIconTypeDocKeys = <String, List<String>>{
-  'text': <String>['icon.text.text', 'icon.text.refreshTicks'],
-  'textImage': <String>['icon.textImage.path'],
-  'animatedTextImage': <String>['icon.animated.source', 'icon.animated.speed'],
-  'item': <String>[
-    'icon.item.item',
-    'icon.item.count',
-    'icon.item.customModelValue',
-  ],
-  'block': <String>['icon.block.block'],
-  'customItem': <String>[
-    'icon.customItem.provider',
-    'icon.customItem.item',
-    'icon.customItem.count',
-  ],
-  'entity': <String>[
-    'icon.entity.entity',
-    'icon.entity.width',
-    'icon.entity.height',
-  ],
-  'playerHead': <String>[
-    'icon.playerHead.player',
-    'icon.playerHead.refreshTicks',
-  ],
+/// The name of an icon type in the type select and the Add menu.
+String huiIconTypeLabel(String type) => switch (type) {
+  'text' => huiText('Text'),
+  'textImage' => huiText('Image'),
+  'animatedTextImage' => huiText('Animated'),
+  'item' => huiText('Item'),
+  'block' => huiText('Block'),
+  'customItem' => huiText('Custom item'),
+  'entity' => huiText('Entity'),
+  'playerHead' => huiText('Player head'),
+  _ => type,
+};
+
+/// The tip beside the type select: how Gloss draws that type.
+String huiIconTypeTip(String type) => switch (type) {
+  'textImage' => huiText(
+    'Gloss draws one character per source pixel. Imports are resized '
+    'to at most 16x16 because the text renderer is for compact pixel '
+    'art and larger glyph walls cause poor client performance.',
+  ),
+  'item' => huiText(
+    'Items render at roughly 0.75 blocks square and are the only '
+    'icon type with a fixed size: uiScale is the only thing that '
+    'changes it.',
+  ),
+  'block' => huiText(
+    'The runtime uses the material\'s default block state in a packet-only '
+    'block display. Directional state properties are not authored here.',
+  ),
+  'customItem' => huiText(
+    'The server asks the provider plugin for the item when the '
+    'menu opens and renders whatever stack it hands back, textures '
+    'and model data included.',
+  ),
+  'entity' => huiText(
+    'The component anchor is the entity\'s feet. Gloss keeps body, pitch and '
+    'head yaw aligned with the menu and disables player pushing. Width and '
+    'height define the editor silhouette and a button or toggle\'s click '
+    'plane, not the client model; decorations have no click plane.',
+  ),
+  'playerHead' => huiText(
+    'The canvas draws the generic head for every name: a skin comes from '
+    'a Mojang profile the server looks up and caches, and this editor has '
+    'no server. Geometry is exact, because a head is drawn on the same '
+    'item display an item icon uses.',
+  ),
+  _ => huiText(huiIconTypeDescriptions[type] ?? ''),
 };
 
 class IconEditor extends StatelessWidget {
@@ -134,9 +165,8 @@ class IconEditor extends StatelessWidget {
   final IconSlot slot;
   final HuiIcon? icon;
 
-  /// True until `assets/catalog/*.json` resolves; the item pickers show a
-  /// skeleton for the browse row rather than letting it appear under the
-  /// pointer a moment later.
+  /// True until `assets/catalog/*.json` resolves; the catalog pickers say
+  /// "Loading" instead of "No matches" until then.
   final bool catalogsLoading;
 
   /// Issues for this component, already filtered by the caller.
@@ -157,6 +187,9 @@ class IconEditor extends StatelessWidget {
   List<HuiIssue> _issuesEndingWith(String suffix) => _slotIssues
       .where((HuiIssue issue) => issue.path.endsWith(suffix))
       .toList();
+
+  List<HuiIssue> _issuesContaining(String part) =>
+      _slotIssues.where((HuiIssue issue) => issue.path.contains(part)).toList();
 
   void _write(String label, HuiIcon? next) {
     store.editComponent(componentId, label, (HuiComponent component) {
@@ -188,300 +221,275 @@ class IconEditor extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) =>
-      dom.div(classes: 'hui-icon-editor', <Widget>[
-        InspectorSection(
-          title: slot.label,
-          trailing: icon == null
-              ? null
-              : HuiArmedButton(
-                  label: huiText('Remove icon'),
-                  armedLabel: huiText('Remove'),
-                  icon: ArcaneIcon.trash2(size: IconSize.sm),
-                  iconOnly: true,
-                  onConfirm: () {
-                    session.rememberIcon(_sessionKey, icon);
-                    _write('clear ${slot.label.toLowerCase()}', null);
-                  },
-                ),
-          children: <Widget>[if (icon == null) _emptyState() else ..._body()],
-        ),
-      ]);
+  void _add(String type) => _write(
+    'add ${slot.label.toLowerCase()}',
+    session.recallIcon(_sessionKey, type) ?? createDefaultIcon(type),
+  );
 
-  List<Widget> _body() => <Widget>[
-    HuiSegmented(
-      value: icon!.type,
-      onChanged: _switchType,
-      segments: <HuiSegment>[
-        HuiSegment(
-          value: 'text',
-          label: huiText('Text'),
-          icon: ArcaneIcon.baseline(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['text']!),
+  /// Acts at once: the session keeps the icon for this type and Undo puts
+  /// it back.
+  void _remove() {
+    final HuiIcon? current = icon;
+    if (current == null) return;
+    session.rememberIcon(_sessionKey, current);
+    _write('clear ${slot.label.toLowerCase()}', null);
+    toastInfo(
+      huiText('Deleted {name}.', <String, Object?>{'name': slot.label}),
+      action: ToastAction(
+        label: huiText('Undo'),
+        onPressed: () => store.performUndo(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => FieldGroup(
+    title: slot.label,
+    tip: icon == null
+        ? huiText(
+            'Gloss draws its magenta checker here, and a button keeps '
+            'its hitbox. Pick a type to start one.',
+          )
+        : null,
+    actions: <Widget>[
+      if (icon != null)
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
+          label: huiText('Remove icon'),
+          tipAtEnd: true,
+          onPressed: _remove,
         ),
-        HuiSegment(
-          value: 'textImage',
-          label: huiText('Image'),
-          icon: ArcaneIcon.image(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['textImage']!),
-        ),
-        HuiSegment(
-          value: 'animatedTextImage',
-          label: huiText('Animated'),
-          icon: ArcaneIcon.film(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['animatedTextImage']!),
-        ),
-        HuiSegment(
-          value: 'item',
-          label: huiText('Item'),
-          icon: ArcaneIcon.package(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['item']!),
-        ),
-        HuiSegment(
-          value: 'block',
-          label: huiText('Block'),
-          icon: ArcaneIcon.package(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['block']!),
-        ),
-        HuiSegment(
-          value: 'customItem',
-          label: huiText('Custom'),
-          icon: ArcaneIcon.boxes(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['customItem']!),
-        ),
-        HuiSegment(
-          value: 'entity',
-          label: huiText('Entity'),
-          icon: ArcaneIcon.user(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['entity']!),
-        ),
-        HuiSegment(
-          value: 'playerHead',
-          label: huiText('Head'),
-          icon: ArcaneIcon.circleUser(size: IconSize.sm),
-          hint: huiText(huiIconTypeDescriptions['playerHead']!),
-        ),
+    ],
+    children: icon == null ? <Widget>[_empty()] : _body(context),
+  );
+
+  Widget _empty() => EmptyState(
+    message: huiText('No icon'),
+    icon: ArcaneIcon.imageOff(),
+    action: AppMenu(
+      label: huiText('Add'),
+      icon: ArcaneIcon.plus(),
+      outline: true,
+      entries: <AppMenuEntry>[
+        for (final String type in huiIconTypes)
+          AppMenuEntry(
+            huiIconTypeLabel(type),
+            () => _add(type),
+            description: huiText(huiIconTypeDescriptions[type] ?? ''),
+          ),
       ],
     ),
-    HuiHelpCluster(
-      huiIconTypeDocKeys[icon!.type] ?? const <String>[],
-      label: huiText('Fields'),
-    ),
-    switch (icon!) {
-      final HuiTextIcon text => dom.div(<Widget>[
-        TextIconEditor(
-          // Keyed by field id so flipping a toggle from the true slot to
-          // the false slot remounts the textarea. Without it the state is
-          // reused, the user-dirty DOM field keeps the previous slot's text
-          // and the next keystroke writes it into the other slot.
-          key: ValueKey<String>(_fieldId),
-          fieldId: _fieldId,
-          text: text.text,
-          emoji: store.workspaceEmoji,
-          issues: _issuesEndingWith('.text'),
-          label: huiText('Text'),
-          onChanged: (String label, String value) => _write(
-            label,
-            HuiTextIcon(value, text.style?.copy(), text.refreshTicks)
-              ..box = text.box?.copy()
-              ..extras = huiDeepCopyMap(text.extras),
-          ),
+  );
+
+  List<Widget> _body(BuildContext context) {
+    final HuiIcon current = icon!;
+    return <Widget>[
+      Field(
+        label: huiText('Type'),
+        forId: '$_fieldId-type',
+        tip: huiIconTypeTip(current.type),
+        child: ArcaneSelect(
+          id: '$_fieldId-type',
+          value: current.type,
+          size: controlSize(DensityScope.of(context)),
+          fullWidth: true,
+          options: <ArcaneSelectOption>[
+            for (final String type in huiIconTypes)
+              ArcaneSelectOption(label: huiIconTypeLabel(type), value: type),
+          ],
+          onChanged: _switchType,
         ),
-        HuiField(
-          label: huiText('Dynamic text refresh'),
-          help: huiText(
-            'Ticks between live function, expression and PAPI updates; '
-            '0 freezes text.',
-          ),
-          trailing: const HuiFieldHelp('icon.text.refreshTicks'),
-          defaultValue: huiPlural(
-            'duration.tick_count',
-            glossTextRequiresFastRefresh(text.text)
-                ? 1
-                : huiRuntimeDefaultTextRefreshTicks,
-            oneEnglish: '{count} tick',
-            otherEnglish: '{count} ticks',
-          ),
-          onReset: text.refreshTicks == null
-              ? null
-              : () => _write(
-                  'dynamic text refresh',
-                  HuiTextIcon(text.text, text.style?.copy(), null)
-                    ..box = text.box?.copy()
-                    ..extras = huiDeepCopyMap(text.extras),
-                ),
-          control: dom.div(<Widget>[
-            HuiDurationField(
-              value:
-                  (text.refreshTicks ??
-                          (glossTextRequiresFastRefresh(text.text)
-                              ? 1
-                              : huiRuntimeDefaultTextRefreshTicks))
-                      .toDouble(),
-              unit: HuiDurationUnit.ticks,
-              min: 0,
-              max: 1200,
-              onChanged: (double value) => _write(
-                'dynamic text refresh',
-                HuiTextIcon(text.text, text.style?.copy(), value.round())
-                  ..box = text.box?.copy()
-                  ..extras = huiDeepCopyMap(text.extras),
-              ),
-            ),
-            HuiInlineIssues(_issuesEndingWith('.refreshTicks')),
-          ]),
+      ),
+      ..._typeFields(current),
+      if (current case final HuiTextIcon text)
+        HologramBoxEditor(
+          box: text.box ?? GlossHologramBox(),
+          issues: _issuesContaining('.box'),
+          mutate: (String label, void Function(GlossHologramBox) edit) {
+            final HuiTextIcon next = text.copy();
+            next.box ??= GlossHologramBox();
+            edit(next.box!);
+            _write(label, next);
+          },
         ),
-      ]),
-      final HuiTextImageIcon image => _ImageIconEditor(
+      if (current is! HuiEntityIcon)
+        DisplayStyleEditor(
+          style: current.style,
+          issues: _issuesContaining('.style'),
+          onChanged: _writeStyle,
+        ),
+      if (current is HuiItemIcon ||
+          current is HuiCustomItemIcon ||
+          current is HuiPlayerHeadIcon ||
+          current is HuiBlockIcon)
+        ExtrasEditor(
+          title: huiText('Presentation'),
+          extensionKeys: false,
+          extras: <String, Object?>{
+            'name': current.extras['name'] ?? '',
+            'lore': current.extras['lore'] ?? <String>[],
+            if (current is HuiItemIcon || current is HuiCustomItemIcon)
+              'countFormat': current.extras['countFormat'] ?? '&f&l{count}',
+          },
+          onChanged: (String label, Map<String, dynamic> next) {
+            final HuiIcon edited = current.copy();
+            for (final String key in <String>['name', 'lore', 'countFormat']) {
+              if (next.containsKey(key)) {
+                edited.extras[key] = huiDeepCopy(next[key]);
+              }
+            }
+            _write(label, edited);
+          },
+        ),
+      AdvancedOnly(
+        child: ExtrasEditor(
+          title: huiText('Icon'),
+          extras: current.extras,
+          knownKeys: const <String>{'name', 'lore', 'countFormat'},
+          onChanged: _writeExtras,
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _typeFields(HuiIcon current) => switch (current) {
+    final HuiTextIcon text => <Widget>[
+      TextIconEditor(
+        // Keyed by field id so flipping a toggle from the true slot to
+        // the false slot remounts the textarea. Without it the state is
+        // reused, the user-dirty DOM field keeps the previous slot's text
+        // and the next keystroke writes it into the other slot.
+        key: ValueKey<String>(_fieldId),
+        fieldId: _fieldId,
+        text: text.text,
+        emoji: store.workspaceEmoji,
+        issues: _issuesEndingWith('.text'),
+        label: huiText('Text'),
+        onChanged: (String label, String value) => _write(
+          label,
+          HuiTextIcon(value, text.style?.copy(), text.refreshTicks)
+            ..box = text.box?.copy()
+            ..extras = huiDeepCopyMap(text.extras),
+        ),
+      ),
+      _textRefresh(text),
+    ],
+    final HuiTextImageIcon image => <Widget>[
+      _ImageIconEditor(
         icon: image,
         images: images,
-        inputId: '$_fieldId-upload',
+        idPrefix: _fieldId,
         issues: _issuesEndingWith('.path'),
         onChanged: _write,
       ),
-      final HuiAnimatedImageIcon animated => _AnimatedIconEditor(
+    ],
+    final HuiAnimatedImageIcon animated => <Widget>[
+      _AnimatedIconEditor(
         icon: animated,
         images: images,
-        inputId: '$_fieldId-upload',
+        idPrefix: _fieldId,
         issues: _slotIssues,
         onChanged: _write,
+        onUndo: () => store.performUndo(),
       ),
-      final HuiItemIcon item => dom.div(classes: 'hui-icon-item', <Widget>[
-        if (catalogsLoading) const HuiSkeletonRows(rows: 2),
-        ItemIconEditor(
-          icon: item,
-          catalogs: catalogs,
-          issues: _slotIssues,
-          onChanged: (String label, HuiItemIcon next) => _write(label, next),
-        ),
-      ]),
-      final HuiBlockIcon block => dom.div(classes: 'hui-icon-block', <Widget>[
-        if (catalogsLoading) const HuiSkeletonRows(rows: 2),
-        BlockIconEditor(
-          icon: block,
-          catalogs: catalogs,
-          issues: _slotIssues,
-          onChanged: (String label, HuiBlockIcon next) => _write(label, next),
-        ),
-      ]),
-      final HuiCustomItemIcon custom =>
-        dom.div(classes: 'hui-icon-custom', <Widget>[
-          if (catalogsLoading) const HuiSkeletonRows(rows: 2),
-          CustomItemIconEditor(
-            icon: custom,
-            catalogs: catalogs,
-            issues: _slotIssues,
-            onChanged: (String label, HuiCustomItemIcon next) =>
-                _write(label, next),
-          ),
-        ]),
-      final HuiEntityIcon entity => EntityIconEditor(
+    ],
+    final HuiItemIcon item => <Widget>[
+      ItemIconEditor(
+        icon: item,
+        catalogs: catalogs,
+        issues: _slotIssues,
+        loading: catalogsLoading,
+        idPrefix: _fieldId,
+        onChanged: (String label, HuiItemIcon next) => _write(label, next),
+      ),
+    ],
+    final HuiBlockIcon block => <Widget>[
+      BlockIconEditor(
+        icon: block,
+        catalogs: catalogs,
+        issues: _slotIssues,
+        loading: catalogsLoading,
+        idPrefix: _fieldId,
+        onChanged: (String label, HuiBlockIcon next) => _write(label, next),
+      ),
+    ],
+    final HuiCustomItemIcon custom => <Widget>[
+      CustomItemIconEditor(
+        icon: custom,
+        catalogs: catalogs,
+        issues: _slotIssues,
+        loading: catalogsLoading,
+        idPrefix: _fieldId,
+        onChanged: (String label, HuiCustomItemIcon next) =>
+            _write(label, next),
+      ),
+    ],
+    final HuiEntityIcon entity => <Widget>[
+      EntityIconEditor(
         icon: entity,
         issues: _slotIssues,
+        idPrefix: _fieldId,
         onChanged: (String label, HuiEntityIcon next) => _write(label, next),
       ),
-      final HuiPlayerHeadIcon head => PlayerHeadIconEditor(
+    ],
+    final HuiPlayerHeadIcon head => <Widget>[
+      PlayerHeadIconEditor(
         icon: head,
         issues: _slotIssues,
+        idPrefix: _fieldId,
         onChanged: (String label, HuiPlayerHeadIcon next) =>
             _write(label, next),
       ),
-    },
-    if (icon case final HuiTextIcon text)
-      HologramBoxEditor(
-        box: text.box ?? GlossHologramBox(),
-        issues: _slotIssues
-            .where((HuiIssue issue) => issue.path.contains('.box'))
-            .toList(),
-        mutate: (String label, void Function(GlossHologramBox) edit) {
-          final HuiTextIcon next = text.copy();
-          next.box ??= GlossHologramBox();
-          edit(next.box!);
-          _write(label, next);
-        },
-      ),
-    if (icon is! HuiEntityIcon)
-      DisplayStyleEditor(
-        style: icon!.style,
-        issues: _slotIssues
-            .where((HuiIssue issue) => issue.path.contains('.style'))
-            .toList(),
-        onChanged: _writeStyle,
-      ),
-    if (icon is HuiItemIcon || icon is HuiCustomItemIcon || icon is HuiPlayerHeadIcon || icon is HuiBlockIcon)
-      ExtrasEditor(
-        title: huiText('Presentation'), extensionKeys: false,
-        extras: <String, Object?>{
-          'name': icon!.extras['name'] ?? '',
-          'lore': icon!.extras['lore'] ?? <String>[],
-          if (icon is HuiItemIcon || icon is HuiCustomItemIcon) 'countFormat': icon!.extras['countFormat'] ?? '&f&l{count}',
-        },
-        onChanged: (String label, Map<String, dynamic> next) {
-          final HuiIcon edited = icon!.copy();
-          for (final String key in <String>['name', 'lore', 'countFormat']) {
-            if (next.containsKey(key)) { edited.extras[key] = huiDeepCopy(next[key]); }
-          }
-          _write(label, edited);
-        },
-      ),
-    ExtrasEditor(
-      title: huiText('Icon'),
-      extras: icon!.extras,
-      knownKeys: const <String>{'name', 'lore', 'countFormat'},
-      onChanged: _writeExtras,
-    ),
-  ];
-
-  Widget _emptyState() => dom.div(classes: 'hui-icon-empty', <Widget>[
-    HuiEmptyState(
-      icon: ArcaneIcon.imageOff(size: IconSize.md),
-      title: huiText('No icon'),
-      body: huiText(
-        'Gloss draws its magenta checker here, and a button keeps '
-        'its hitbox. Pick a type to start one.',
-      ),
-      tone: HuiNoteTone.warning,
-      actions: <Widget>[
-        for (final String type in huiIconTypes)
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.sm,
-            onPressed: () => _write(
-              'add ${slot.label.toLowerCase()}',
-              session.recallIcon(_sessionKey, type) ?? createDefaultIcon(type),
-            ),
-            label: _typeLabel(type),
-          ),
-      ],
-    ),
-  ]);
-
-  static String _typeLabel(String type) => switch (type) {
-    'text' => huiText('Text'),
-    'textImage' => huiText('Image'),
-    'animatedTextImage' => huiText('Animated'),
-    'item' => huiText('Item'),
-    'block' => huiText('Block'),
-    'customItem' => huiText('Custom item'),
-    'entity' => huiText('Entity'),
-    'playerHead' => huiText('Player head'),
-    _ => type,
+    ],
   };
+
+  Widget _textRefresh(HuiTextIcon text) {
+    final int fallback = glossTextRequiresFastRefresh(text.text)
+        ? 1
+        : huiRuntimeDefaultTextRefreshTicks;
+    HuiTextIcon withTicks(int? ticks) =>
+        HuiTextIcon(text.text, text.style?.copy(), ticks)
+          ..box = text.box?.copy()
+          ..extras = huiDeepCopyMap(text.extras);
+    return Field(
+      label: huiText('Dynamic text refresh'),
+      forId: '$_fieldId-refresh',
+      docKey: 'icon.text.refreshTicks',
+      problems: _issuesEndingWith('.refreshTicks'),
+      defaultValue: huiPlural(
+        'duration.tick_count',
+        fallback,
+        oneEnglish: '{count} tick',
+        otherEnglish: '{count} ticks',
+      ),
+      onReset: text.refreshTicks == null
+          ? null
+          : () => _write('dynamic text refresh', withTicks(null)),
+      child: DurationField(
+        id: '$_fieldId-refresh',
+        value: (text.refreshTicks ?? fallback).toDouble(),
+        unit: HuiDurationUnit.ticks,
+        min: 0,
+        max: 1200,
+        onChanged: (double value) =>
+            _write('dynamic text refresh', withTicks(value.round())),
+      ),
+    );
+  }
 }
 
 class _ImageIconEditor extends StatelessWidget {
   const _ImageIconEditor({
     required this.icon,
     required this.images,
-    required this.inputId,
+    required this.idPrefix,
     required this.onChanged,
     required this.issues,
   });
 
   final HuiTextImageIcon icon;
   final ImageLibrary images;
-  final String inputId;
+  final String idPrefix;
   final void Function(String label, HuiIcon icon) onChanged;
   final List<HuiIssue> issues;
 
@@ -495,107 +503,92 @@ class _ImageIconEditor extends StatelessWidget {
   static String _blocks(int pixels) =>
       (pixels * huiCharCell).toStringAsFixed(2);
 
-  Widget _imagePreview(StoredImage stored) =>
-      dom.div(classes: 'hui-image-preview', <Widget>[
-        dom.img(
-          src: stored.dataUri,
-          alt: stored.path,
-          styles: const dom.Styles(
-            raw: <String, String>{'image-rendering': 'pixelated'},
-          ),
-        ),
-      ]);
-
   @override
   Widget build(BuildContext context) {
     final StoredImage? stored = images.byPath(icon.path);
-    return dom.div(classes: 'hui-icon-image', <Widget>[
-      HuiField(
+    return Component.fragment(<Widget>[
+      Field(
         label: huiText('Path'),
         required: true,
-        trailing: const HuiFieldHelp('icon.textImage.path'),
-        help: huiText('Relative to plugins/Gloss/images/.'),
-        control: dom.div(<Widget>[
-          TextInput(
-            value: icon.path,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            placeholder: huiText('logo.png'),
-            onChanged: _setPath,
-            attributes: const <String, String>{
-              'autocomplete': 'off',
-              'spellcheck': 'false',
-              'dir': 'ltr',
-            },
-          ),
-          HuiInlineIssues(issues),
-        ]),
+        forId: '$idPrefix-path',
+        docKey: 'icon.textImage.path',
+        problems: issues,
+        child: TextInput(
+          id: '$idPrefix-path',
+          value: icon.path,
+          size: controlSize(DensityScope.of(context)),
+          fullWidth: true,
+          placeholder: huiText('logo.png'),
+          onChanged: _setPath,
+          attributes: technicalInputAttributes,
+          styles: technicalInputStyles,
+        ),
       ),
       if (stored != null) ...<Widget>[
-        _imagePreview(stored),
-        HuiDetailRow(
-          huiText('Source size'),
-          huiText(
-            '{width}x{height} px ({characterWidth}, {lineHeight})',
-            <String, Object?>{
-              'width': stored.width,
-              'height': stored.height,
-              'characterWidth': huiPlural(
-                'image.width_characters.count',
-                stored.width,
-                oneEnglish: '{count} character wide',
-                otherEnglish: '{count} characters wide',
-              ),
-              'lineHeight': huiPlural(
-                'image.height_lines.count',
-                stored.height,
-                oneEnglish: '{count} line tall',
-                otherEnglish: '{count} lines tall',
-              ),
-            },
-          ),
+        Field(
+          label: huiText('Preview'),
+          child: dom.div(<Widget>[
+            huiPixelImage(stored, box: 96, alt: stored.path),
+          ]),
         ),
-        HuiDetailRow(
-          huiText('In-game size'),
-          huiText('{width} x {height} blocks at uiScale 1', <String, Object?>{
-            'width': _blocks(stored.width),
-            'height': _blocks(stored.height),
-          }),
+        Field(
+          label: huiText('Source size'),
+          child: dom.span(<Widget>[
+            Text(
+              huiText(
+                '{width}x{height} px ({characterWidth}, {lineHeight})',
+                <String, Object?>{
+                  'width': stored.width,
+                  'height': stored.height,
+                  'characterWidth': huiPlural(
+                    'image.width_characters.count',
+                    stored.width,
+                    oneEnglish: '{count} character wide',
+                    otherEnglish: '{count} characters wide',
+                  ),
+                  'lineHeight': huiPlural(
+                    'image.height_lines.count',
+                    stored.height,
+                    oneEnglish: '{count} line tall',
+                    otherEnglish: '{count} lines tall',
+                  ),
+                },
+              ),
+            ),
+          ]),
+        ),
+        Field(
+          label: huiText('In-game size'),
+          child: dom.span(<Widget>[
+            Text(
+              huiText(
+                '{width} x {height} blocks at uiScale 1',
+                <String, Object?>{
+                  'width': _blocks(stored.width),
+                  'height': _blocks(stored.height),
+                },
+              ),
+            ),
+          ]),
         ),
       ],
-      dom.div(classes: 'hui-icon-image-library', <Widget>[
-        HuiEyebrow(huiText('Image library')),
-        ImagePickerGrid(
-          images: images,
-          selected: icon.path,
-          onPicked: _setPath,
-        ),
-        ImageUploadButton(
-          images: images,
-          inputId: inputId,
-          label: huiText('Upload PNG, WebP or GIF'),
-          onAdded: (List<String> paths) {
-            if (paths.isNotEmpty) _setPath(paths.first);
-          },
-        ),
-      ]),
-      HuiMore(
-        summary: huiText('Path rules and image cost'),
-        children: <Widget>[
-          HuiNote(
-            huiText(
-              'No leading slash, no "..", no drive letters - the path is read '
-              'inside plugins/Gloss/images/ and nowhere else.',
-            ),
+      Field(
+        label: huiText('Image library'),
+        child: Component.fragment(<Widget>[
+          ImagePickerGrid(
+            images: images,
+            selected: icon.path,
+            onPicked: _setPath,
           ),
-          HuiNote(
-            huiText(
-              'Gloss draws one character per source pixel. Imports are resized '
-              'to at most 16x16 because the text renderer is for compact pixel '
-              'art and larger glyph walls cause poor client performance.',
-            ),
+          ImageUploadButton(
+            images: images,
+            inputId: '$idPrefix-upload',
+            label: huiText('Upload PNG, WebP or GIF'),
+            onAdded: (List<String> paths) {
+              if (paths.isNotEmpty) _setPath(paths.first);
+            },
           ),
-        ],
+        ]),
       ),
     ]);
   }
@@ -605,15 +598,19 @@ class _AnimatedIconEditor extends StatefulWidget {
   const _AnimatedIconEditor({
     required this.icon,
     required this.images,
-    required this.inputId,
+    required this.idPrefix,
     required this.onChanged,
+    required this.onUndo,
     required this.issues,
   });
 
   final HuiAnimatedImageIcon icon;
   final ImageLibrary images;
-  final String inputId;
+  final String idPrefix;
   final void Function(String label, HuiIcon icon) onChanged;
+
+  /// Takes back the last document edit (the toast after a removed frame).
+  final void Function() onUndo;
   final List<HuiIssue> issues;
 
   @override
@@ -621,9 +618,10 @@ class _AnimatedIconEditor extends StatefulWidget {
 }
 
 class _AnimatedIconEditorState extends State<_AnimatedIconEditor> {
-  /// Library paths picked but not yet added, in the order they were picked —
-  /// which is the order they land in as frames. Staging is what makes the grid
-  /// a multi-select: one click per frame, then one edit, then one undo step.
+  /// Library paths picked but not yet added, in the order they were picked,
+  /// which is the order they land in as frames. Staging is what makes the
+  /// grid a multi-select: one click per frame, then one edit, then one undo
+  /// step.
   final List<String> _staged = <String>[];
 
   HuiAnimatedImageIcon get _icon => component.icon;
@@ -653,8 +651,18 @@ class _AnimatedIconEditorState extends State<_AnimatedIconEditor> {
     _emit('frames.add:${paths.length}', <String>[..._source, ...paths]);
   }
 
-  void _removeFrame(int index) =>
-      _emit('remove frame', <String>[..._source]..removeAt(index));
+  /// Acts at once; Undo brings the frame back.
+  void _removeFrame(int index) {
+    final String name = _frameName(index);
+    _emit('remove frame', <String>[..._source]..removeAt(index));
+    toastInfo(
+      huiText('Deleted {name}.', <String, Object?>{'name': name}),
+      action: ToastAction(
+        label: huiText('Undo'),
+        onPressed: () => component.onUndo(),
+      ),
+    );
+  }
 
   void _duplicateFrame(int index) => _emit(
     'duplicate frame',
@@ -664,16 +672,10 @@ class _AnimatedIconEditorState extends State<_AnimatedIconEditor> {
   void _reverse() =>
       _emit('reverse frames', _source.reversed.toList(growable: false));
 
-  void _moveFrame(int index, int delta) {
-    final int target = index + delta;
-    if (target < 0 || target >= _source.length) return;
-    _reorder(index, target);
-  }
-
-  /// The two indices are exactly `removeAt(from)` then `insert(to, moved)`,
-  /// which is what [HuiReorderList] promises and what keeps a drop to a single
-  /// document edit.
+  /// `removeAt(from)` then `insert(to, moved)`, which is what [ReorderList]
+  /// promises and what keeps a drop to a single document edit.
   void _reorder(int from, int to) {
+    if (from == to || to < 0 || to >= _source.length) return;
     final List<String> next = <String>[..._source];
     final String moved = next.removeAt(from);
     next.insert(to, moved);
@@ -686,66 +688,98 @@ class _AnimatedIconEditorState extends State<_AnimatedIconEditor> {
     _emit('frame path', next);
   }
 
+  String _frameName(int index) => huiText(
+    "frame {value} of {length}",
+    <String, Object?>{'value': index + 1, 'length': _source.length},
+  );
+
+  List<HuiIssue> _issuesWhere(bool Function(String path) test) =>
+      component.issues.where((HuiIssue issue) => test(issue.path)).toList();
+
   @override
   Widget build(BuildContext context) {
     final int speed = _icon.speed;
-    return dom.div(classes: 'hui-icon-animated', <Widget>[
-      InspectorSection(
-        title: huiText('Frames'),
-        description: huiText('Played in this order and looped.'),
-        trailing: dom.div(classes: 'hui-frame-tools', <Widget>[
-          HuiIconButton(
-            icon: ArcaneIcon.arrowUpDown(size: IconSize.sm),
-            label: huiText('Reverse frame order'),
-            disabled: _source.length < 2,
-            onPressed: _reverse,
-          ),
-          const HuiFieldHelp('icon.animated.source'),
-          dom.span(classes: 'hui-count-chip', <Widget>[
-            Text(
-              huiText("{length}", <String, Object?>{'length': _source.length}),
-            ),
-          ]),
-        ]),
-        children: <Widget>[
-          if (_source.isEmpty)
-            HuiEmptyState(
-              icon: ArcaneIcon.triangleAlert(size: IconSize.md),
-              title: huiText('No frames'),
-              body: huiText(
-                'An animated icon with an empty source list falls back to '
-                'the missing-icon placeholder in game. Add at least one '
-                'frame.',
+    return Component.fragment(<Widget>[
+      Field(
+        label: huiText('Frames'),
+        docKey: 'icon.animated.source',
+        problems: _issuesWhere((String path) => path.contains('.source')),
+        trailing: AppIconButton(
+          icon: ArcaneIcon.arrowUpDown(),
+          label: huiText('Reverse frame order'),
+          tipAtEnd: true,
+          onPressed: _source.length < 2 ? null : _reverse,
+        ),
+        child: _source.isEmpty
+            ? EmptyState(
+                message: huiText('No frames'),
+                icon: ArcaneIcon.imageOff(),
+              )
+            : ReorderList(
+                label: huiText('Frames'),
+                itemCount: _source.length,
+                tools: false,
+                onReorder: _reorder,
+                itemBuilder: _frameRow,
               ),
-              tone: HuiNoteTone.danger,
-            )
-          else
-            HuiReorderList(
-              itemCount: _source.length,
-              handleLabel: huiText('Drag to reorder frames'),
-              classes: 'hui-frame-list',
-              onReorder: _reorder,
-              itemBuilder: _frameRow,
-            ),
-          HuiInlineIssues(
-            component.issues
-                .where((HuiIssue issue) => issue.path.contains('.source'))
-                .toList(),
-          ),
-        ],
       ),
       if (_source.isNotEmpty)
-        AnimatedIconPreview(
-          images: component.images,
-          frames: _source,
-          speed: speed,
+        Field(
+          label: huiText('Preview'),
+          tip: huiText(
+            'Every frame is padded to the tallest frame with blank rows.',
+          ),
+          child: AnimatedIconPreview(
+            images: component.images,
+            frames: _source,
+            speed: speed,
+          ),
         ),
-      _library(),
-      HuiField(
+      Field(
+        label: huiText('Add from library'),
+        tip: huiText(
+          'Click images to line them up, then add them in one go. The same '
+          'image can be used in more than one frame.',
+        ),
+        child: Component.fragment(<Widget>[
+          ImagePickerGrid(
+            images: component.images,
+            staged: _staged,
+            onPicked: _toggleStaged,
+            label: huiText('Add from library'),
+          ),
+          if (_staged.isNotEmpty)
+            ActionRow(
+              dense: true,
+              cancel: RowAction(
+                huiText('Clear'),
+                () => setState(_staged.clear),
+              ),
+              primary: RowAction(
+                huiPlural(
+                  'icon.frames_add.count',
+                  _staged.length,
+                  oneEnglish: 'Add {count} frame',
+                  otherEnglish: 'Add {count} frames',
+                ),
+                _addStaged,
+                icon: ArcaneIcon.plus(),
+              ),
+            ),
+          ImageUploadButton(
+            images: component.images,
+            inputId: '${component.idPrefix}-upload',
+            label: huiText('Upload image or GIF frames'),
+            onAdded: _addFrames,
+          ),
+        ]),
+      ),
+      Field(
         label: huiText('Speed'),
         required: true,
-        help: huiText('Ticks per frame, at 20 ticks per second.'),
-        trailing: const HuiFieldHelp('icon.animated.speed'),
+        forId: '${component.idPrefix}-speed',
+        docKey: 'icon.animated.speed',
+        problems: _issuesWhere((String path) => path.endsWith('.speed')),
         defaultValue: huiPlural(
           'duration.tick_count',
           huiDefaultAnimationSpeed,
@@ -757,159 +791,81 @@ class _AnimatedIconEditorState extends State<_AnimatedIconEditor> {
             : () => _emit('animation speed', <String>[
                 ..._source,
               ], huiDefaultAnimationSpeed),
-        control: dom.div(<Widget>[
-          HuiDurationField(
-            value: speed.toDouble(),
-            unit: HuiDurationUnit.ticks,
-            min: 2,
-            perLabel: huiText('per frame'),
-            onChanged: (double value) =>
-                _emit('animation speed', <String>[..._source], value.round()),
-          ),
-          HuiInlineIssues(
-            component.issues
-                .where((HuiIssue issue) => issue.path.endsWith('.speed'))
-                .toList(),
-          ),
-        ]),
-      ),
-      HuiMore(
-        summary: huiText('Frame padding and tick limits'),
-        children: <Widget>[
-          HuiNote(
-            huiText(
-              'Every frame is padded to the tallest frame with blank rows.',
-            ),
-          ),
-          HuiNote(
-            huiText(
-              '1 tick is the fastest the plugin can go; 0 or less also advances '
-              'every tick.',
-            ),
-          ),
-        ],
+        child: DurationField(
+          id: '${component.idPrefix}-speed',
+          value: speed.toDouble(),
+          unit: HuiDurationUnit.ticks,
+          min: 2,
+          perLabel: huiText('per frame'),
+          onChanged: (double value) =>
+              _emit('animation speed', <String>[..._source], value.round()),
+        ),
       ),
     ]);
   }
 
-  Widget _library() => dom.div(classes: 'hui-icon-animated-library', <Widget>[
-    HuiEyebrow(huiText('Add from library')),
-    HuiNote(
-      huiText(
-        'Click images to line them up, then add them in one go. The same '
-        'image can be used in more than one frame.',
-      ),
-    ),
-    ImagePickerGrid(
-      images: component.images,
-      selected: _staged.isEmpty ? null : _staged.last,
-      onPicked: _toggleStaged,
-    ),
-    if (_staged.isNotEmpty) _stagedTray(),
-    ImageUploadButton(
-      images: component.images,
-      inputId: component.inputId,
-      label: huiText('Upload image or GIF frames'),
-      onAdded: _addFrames,
-    ),
-  ]);
-
-  Widget _stagedTray() => dom.div(classes: 'hui-frame-staged', <Widget>[
-    dom.div(classes: 'hui-frame-staged-chips', <Widget>[
-      for (int i = 0; i < _staged.length; i++)
-        dom.button(
-          classes: 'hui-frame-staged-chip',
-          attributes: <String, String>{
-            'type': 'button',
-            'aria-label': huiText(
-              "Remove {value} from the queue",
-              <String, Object?>{'value': _staged[i]},
-            ),
-          },
-          events: dom.events<Null>(onClick: () => _toggleStaged(_staged[i])),
-          <Widget>[
-            Text(
-              huiText("{value}. {value2}", <String, Object?>{
-                'value': i + 1,
-                'value2': _staged[i],
-              }),
-            ),
-            ArcaneIcon.x(size: IconSize.sm),
-          ],
-        ),
-    ]),
-    dom.div(classes: 'hui-frame-staged-actions', <Widget>[
-      Button(
-        variant: ButtonVariant.primary,
-        size: ButtonSize.sm,
-        icon: ArcaneIcon.plus(size: IconSize.sm),
-        onPressed: _addStaged,
-        label: huiPlural(
-          'icon.frames_add.count',
-          _staged.length,
-          oneEnglish: 'Add {count} frame',
-          otherEnglish: 'Add {count} frames',
-        ),
-      ),
-      Button(
-        variant: ButtonVariant.ghost,
-        size: ButtonSize.sm,
-        onPressed: () => setState(_staged.clear),
-        label: huiText('Clear'),
-      ),
-    ]),
-  ]);
-
   Widget _frameRow(int index) {
     final String path = _source[index];
     final StoredImage? stored = component.images.byPath(path);
-    return dom.div(classes: 'hui-frame-row', <Widget>[
-      dom.span(classes: 'hui-frame-index', <Widget>[
-        Text(huiText("{value}", <String, Object?>{'value': index + 1})),
-      ]),
-      dom.span(classes: 'hui-frame-thumb', <Widget>[
+    final String name = _frameName(index);
+    final List<AppMenuEntry> entries = <AppMenuEntry>[
+      AppMenuEntry(
+        huiText('Duplicate'),
+        () => _duplicateFrame(index),
+        icon: ArcaneIcon.copy(),
+      ),
+      AppMenuEntry(
+        huiText('Move up'),
+        index == 0 ? null : () => _reorder(index, index - 1),
+        icon: ArcaneIcon.arrowUp(),
+      ),
+      AppMenuEntry(
+        huiText('Move down'),
+        index >= _source.length - 1 ? null : () => _reorder(index, index + 1),
+        icon: ArcaneIcon.arrowDown(),
+      ),
+      const AppMenuEntry.separator(),
+      AppMenuEntry(
+        huiText('Remove'),
+        () => _removeFrame(index),
+        icon: ArcaneIcon.trash2(),
+        destructive: true,
+      ),
+    ];
+    return dom.div(
+      attributes: const <String, String>{'data-frame-row': ''},
+      <Widget>[
         if (stored != null)
-          dom.img(
-            src: stored.dataUri,
-            alt: '',
-            styles: const dom.Styles(
-              raw: <String, String>{'image-rendering': 'pixelated'},
-            ),
-          )
+          huiPixelImage(stored, box: 24)
         else
-          const dom.span(classes: 'hui-frame-thumb-missing', <Widget>[]),
-      ]),
-      dom.div(classes: 'hui-frame-path', <Widget>[
-        TextInput(
-          value: path,
-          size: ComponentSize.sm,
-          fullWidth: true,
-          onChanged: (String value) => _setFrame(index, value),
-          attributes: const <String, String>{
-            'autocomplete': 'off',
-            'spellcheck': 'false',
-            'dir': 'ltr',
-          },
+          ArcaneIcon.imageOff(),
+        dom.div(
+          attributes: const <String, String>{'data-frame-path': ''},
+          <Widget>[
+            TextInput(
+              value: path,
+              size: controlSize(DensityScope.of(context)),
+              fullWidth: true,
+              onChanged: (String value) => _setFrame(index, value),
+              attributes: <String, String>{
+                ...technicalInputAttributes,
+                'aria-label': name,
+              },
+              styles: technicalInputStyles,
+            ),
+          ],
         ),
-      ]),
-      HuiIconButton(
-        icon: ArcaneIcon.copy(size: IconSize.sm),
-        label: huiText("Duplicate frame {value}", <String, Object?>{
-          'value': index + 1,
-        }),
-        onPressed: () => _duplicateFrame(index),
-      ),
-      HuiRowTools(
-        onMoveUp: index == 0 ? null : () => _moveFrame(index, -1),
-        onMoveDown: index == _source.length - 1
-            ? null
-            : () => _moveFrame(index, 1),
-        onRemove: () => _removeFrame(index),
-        removeLabel: huiText('Remove frame {number}', <String, Object?>{
-          'number': index + 1,
-        }),
-      ),
-    ]);
+        AppMenu(
+          id: '${component.idPrefix}-frame-$index',
+          icon: ArcaneIcon.ellipsis(),
+          iconLabel: huiText('Actions for {label}', <String, Object?>{
+            'label': name,
+          }),
+          alignEnd: true,
+          entries: entries,
+        ),
+      ],
+    );
   }
 }
 
@@ -984,28 +940,14 @@ class _AnimatedIconPreviewState extends State<AnimatedIconPreview> {
     final StoredImage? stored = component.frames.isEmpty
         ? null
         : component.images.byPath(component.frames[index]);
-    return dom.div(classes: 'hui-animated-preview', <Widget>[
-      dom.div(classes: 'hui-animated-preview-frame', <Widget>[
+    return ActionRow(
+      dense: true,
+      leading: <Widget>[
         if (stored != null)
-          dom.img(
-            src: stored.dataUri,
-            alt: stored.path,
-            styles: const dom.Styles(
-              raw: <String, String>{'image-rendering': 'pixelated'},
-            ),
-          )
+          huiPixelImage(stored, box: 48, alt: stored.path)
         else
-          const dom.span(classes: 'hui-frame-thumb-missing', <Widget>[]),
-      ]),
-      dom.div(classes: 'hui-animated-preview-meta', <Widget>[
-        HuiIconButton(
-          icon: _playing
-              ? ArcaneIcon.pause(size: IconSize.sm)
-              : ArcaneIcon.play(size: IconSize.sm),
-          label: _playing ? huiText('Pause preview') : huiText('Play preview'),
-          onPressed: _togglePlay,
-        ),
-        dom.span(classes: 'hui-animated-preview-count', <Widget>[
+          ArcaneIcon.imageOff(),
+        dom.span(<Widget>[
           Text(
             huiText("frame {value} of {length}", <String, Object?>{
               'value': index + 1,
@@ -1013,7 +955,16 @@ class _AnimatedIconPreviewState extends State<AnimatedIconPreview> {
             }),
           ),
         ]),
-      ]),
-    ]);
+      ],
+      secondary: <RowAction>[
+        RowAction(
+          _playing ? huiText('Pause preview') : huiText('Play preview'),
+          _togglePlay,
+          icon: _playing ? ArcaneIcon.pause() : ArcaneIcon.play(),
+          iconOnly: true,
+          pressed: _playing,
+        ),
+      ],
+    );
   }
 }

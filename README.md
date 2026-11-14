@@ -52,6 +52,16 @@ of Gradle and tests its format contracts against this repository's plugin source
 See its README for local development, relay tests, deployment credentials, and
 the initial Hosting cutover.
 
+Pair a browser with `/gloss editor pair`. The link it prints opens once, within 10 minutes, and the
+pairing then lasts 7 days after its last use. `/gloss editor status` shows the listener, the relay and the
+server fingerprint, `/gloss editor tokens` lists paired browsers, and `/gloss editor revoke <token|all>`
+ends them. The plugin serves the editor API itself, directly on `127.0.0.1:9799` or through the relay
+(`relayUrl`), which the server connects out to so no port has to be opened. Settings live under
+`[editor]` in `gloss.toml`. Links from earlier versions stop working: Gloss deletes the old `editor-sync/`
+link folder at start. [`gloss-web/sync-relay/README.md`](gloss-web/sync-relay/README.md) covers running
+the relay and, under [Editor API protocol](gloss-web/sync-relay/README.md#editor-api-protocol), the API,
+pairing and every setting.
+
 The [Hosting workflow](.github/workflows/gloss-web-firebase-hosting.yml) validates
 relevant pull requests and deploys after relevant pushes to `master`, including
 editor changes and plugin source, test-resource, or schema changes. Relay hosting
@@ -81,6 +91,8 @@ plugins/Gloss/
 ├── menus/<path>.json                additional authored menus
 ├── images/<path>                    when an operator drops an image in
 ├── panels/<path>.json               on the first panel
+├── editor/identity.json             editor key and fingerprint, while the editor is enabled
+├── editor/tokens.json               paired browsers (token hashes only), on the first pairing
 ├── editor-sync-transactions/        during an editor sync publication
 ├── editor-sync-backups/<id>/        on the first completed editor sync publication
 └── import-backups/<timestamp>/      on a legacy data import that has something to migrate

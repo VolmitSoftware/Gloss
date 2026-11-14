@@ -26,8 +26,6 @@ final class BubbleStyleDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('bubble style');
 
-  @override
-  String get createLabel => huiText('New bubble style');
 
   @override
   String get pluralLabel => huiText('Bubble styles');

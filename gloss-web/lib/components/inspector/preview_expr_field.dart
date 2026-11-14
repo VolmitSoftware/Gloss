@@ -1,21 +1,16 @@
 /// The one control every expression-capable preview field uses: a text input
-/// that stores a `num`/`bool` constant or an expression source string, shows a
-/// live syntax error with a position caret while the draft does not parse, and
-/// a simple hand-built autocomplete list sourced from the catalog, the
-/// document's own `vars` and the current element's repeat scope — see
-/// [previewSuggestExprTokens] for exactly when it fires.
+/// that stores a `num`/`bool` constant or an expression source string. A
+/// draft that does not parse stays local and its syntax error shows under the
+/// field; the browser's own suggestion list offers completions from the
+/// catalog, the document's `vars` and the element's repeat scope
+/// ([previewExprCompletions]).
 ///
-/// Mirrors [ExtrasEditor]'s commit rule: a draft that fails to parse is held
-/// locally and never written to the document (an editor keystroke should never
-/// leave a document mid-edit worse off), so [component.onChanged] only ever
-/// fires with a value [parsePreviewExpr] accepted. Variable-name problems
-/// (unknown, reserved-namespace typo, unresolved provider namespace) are NOT
-/// checked here — they are already computed centrally by
-/// [validatePreviewDoc] and handed in as [issues], so this widget does not
-/// duplicate that logic. The one thing only this widget can know is which
-/// simulated category is currently previewing, which is why the "not
-/// published by this category" nudge is computed locally from
-/// [categoryVariableNames].
+/// Only a value [parsePreviewExpr] accepts reaches [PreviewExprField.onChanged],
+/// so a keystroke never leaves the document worse off. Variable-name problems
+/// come in as [PreviewExprField.issues] from [validatePreviewDoc]; the one
+/// thing only this field knows is which simulated category is previewing, so
+/// the "not published by this category" note is computed here from
+/// [PreviewExprField.categoryVariableNames].
 library;
 
 import 'dart:convert';
@@ -24,23 +19,22 @@ import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 import 'package:jaspr/jaspr.dart' show Component;
 
+import '../../logic/gloss_show.dart';
 import '../../logic/preview_doc_validation.dart';
 import '../../logic/preview_expr.dart';
-import '../../logic/gloss_show.dart';
+import '../../logic/preview_field_text.dart';
 import '../../logic/validation.dart';
 import '../../model/preview_doc.dart';
-import '../common/common.dart';
-import 'inspector_widgets.dart';
-
-// previewSuggestExprTokens / previewTrailingExprToken live in
-// preview_doc_validation.dart — DOM-free autocomplete-source logic, tested
-// directly there rather than only through this widget's own rendering.
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/technical_input.dart';
+import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// Which JSON shapes a bare (non-expression) draft is allowed to commit as.
-/// The model pins this per field — `visible`/`framed` reject a JSON number on
-/// decode, `text`/`title`/`accent` reject anything but a string — so getting
-/// it wrong here does not just look untidy, it silently drops the value the
-/// next time the document round-trips through the codec.
+/// The model pins this per field (`visible`/`framed` reject a JSON number on
+/// decode, `text`/`title`/`accent` reject anything but a string), so getting
+/// it wrong silently drops the value the next time the document round-trips
+/// through the codec.
 enum PreviewExprKind {
   /// `x`, `y`, `z`, `width`, `height`, `size`, `color`, `wellColor`, `index`,
   /// `background`, `repeat.count`: a bare number commits as a JSON number,
@@ -52,8 +46,7 @@ enum PreviewExprKind {
   boolean,
 
   /// `text`, `card.title`, `card.accent`: always a string, exactly as typed
-  /// (or `null` for an empty draft). The format never accepts a JSON
-  /// constant here at all — even a literal color has to be written as the
+  /// (or `null` for an empty draft). Even a literal color is written as the
   /// expression `'#RRGGBB'`.
   string,
 }
@@ -67,6 +60,7 @@ class PreviewExprField extends StatefulWidget {
     this.required = false,
     this.showCondition = false,
     this.help,
+    this.docKey,
     this.placeholder,
     this.trailing,
     this.issues = const <HuiIssue>[],
@@ -88,8 +82,15 @@ class PreviewExprField extends StatefulWidget {
   final PreviewExprKind kind;
   final bool required;
   final bool showCondition;
+
+  /// The field's tip, behind its (i) button.
   final String? help;
+
+  /// A field-doc key whose body is the tip when [help] is null.
+  final String? docKey;
   final String? placeholder;
+
+  /// A small widget at the end of the label line (a colour swatch).
   final Widget? trailing;
 
   /// Pre-filtered issues for this exact field path, straight from
@@ -97,24 +98,26 @@ class PreviewExprField extends StatefulWidget {
   /// `card.*`/`match.*` filter at the document level).
   final List<HuiIssue> issues;
 
-  /// Names reachable as `vars.<name>` — offered by autocomplete, never
+  /// Names reachable as `vars.<name>`, offered as completions and never
   /// validated here (the store already flags an unknown one).
   final Set<String> declaredVars;
 
-  /// The active element's repeat variable, if any — offered by autocomplete
-  /// the same way.
+  /// The active element's repeat variable, if any, offered the same way.
   final Set<String> scope;
 
-  /// Every variable name the currently simulated category actually publishes.
-  /// Empty means "unknown" (no live preview open), which skips the nudge
-  /// entirely rather than flagging every cataloged name as unpublished.
+  /// Every variable name the currently simulated category publishes. Empty
+  /// means unknown (no live preview open), which skips the note entirely
+  /// rather than flagging every cataloged name as unpublished.
   final List<String> categoryVariableNames;
 
   @override
   State<PreviewExprField> createState() => _PreviewExprFieldState();
 }
 
+int _nextExprFieldId = 0;
+
 class _PreviewExprFieldState extends State<PreviewExprField> {
+  final String _id = 'hui-expr-${_nextExprFieldId++}';
   late String _text;
 
   /// The value this widget itself last committed, so an external change (undo,
@@ -123,9 +126,7 @@ class _PreviewExprFieldState extends State<PreviewExprField> {
   Object? _lastCommitted;
 
   String Function()? _syntaxError;
-  int _syntaxPosition = previewNoPosition;
   List<String> _categoryHints = const <String>[];
-  bool _showSuggestions = false;
 
   @override
   void initState() {
@@ -141,7 +142,6 @@ class _PreviewExprFieldState extends State<PreviewExprField> {
     _lastCommitted = component.raw;
     _text = _format(component.raw);
     _syntaxError = null;
-    _syntaxPosition = previewNoPosition;
     _categoryHints = const <String>[];
   }
 
@@ -170,16 +170,25 @@ class _PreviewExprFieldState extends State<PreviewExprField> {
   void _onInput(String raw) {
     setState(() {
       _text = raw;
-      _showSuggestions = true;
       _revalidate();
     });
   }
+
+  static String Function() _describe(PExprException error) =>
+      error.position == previewNoPosition
+      ? () => error.message
+      : () => huiText(
+          '{message} at position {position}',
+          <String, Object?>{
+            'message': error.message,
+            'position': error.position,
+          },
+        );
 
   void _revalidate() {
     final String trimmed = _text.trim();
     if (trimmed.isEmpty) {
       _syntaxError = null;
-      _syntaxPosition = previewNoPosition;
       _categoryHints = const <String>[];
       _commit(null);
       return;
@@ -194,21 +203,18 @@ class _PreviewExprFieldState extends State<PreviewExprField> {
     } on PExprException catch (e) {
       // Held locally, never committed: a broken draft must not overwrite the
       // last value the document actually builds from.
-      _syntaxError = () => e.message;
-      _syntaxPosition = e.position;
+      _syntaxError = _describe(e);
       return;
     }
     if (component.showCondition && isConstantExpr(expr)) {
       try {
         evalBool(expr, GlossShowScope());
       } on PExprException catch (error) {
-        _syntaxError = () => error.message;
-        _syntaxPosition = error.position;
+        _syntaxError = _describe(error);
         return;
       }
     }
     _syntaxError = null;
-    _syntaxPosition = previewNoPosition;
     _categoryHints = _computeCategoryHints(expr);
     _commit(_encode(trimmed));
   }
@@ -231,161 +237,56 @@ class _PreviewExprFieldState extends State<PreviewExprField> {
     component.onChanged(next);
   }
 
-  void _onBlur() {
-    // Delayed so a click on a suggestion (which blurs the input first) still
-    // lands before the list unmounts.
-    Future<void>.delayed(const Duration(milliseconds: 150), () {
-      if (mounted) setState(() => _showSuggestions = false);
-    });
-  }
-
-  RegExpMatch? get _tokenMatch => previewTrailingExprToken.firstMatch(_text);
-
-  List<String> _suggestions() => previewSuggestExprTokens(
-    _text,
-    declaredVars: component.declaredVars,
-    scope: component.scope,
-  );
-
-  void _selectSuggestion(String suggestion) {
-    final RegExpMatch? match = _tokenMatch;
-    final String next = match == null
-        ? '$_text$suggestion'
-        : _text.substring(0, match.start) + suggestion;
-    setState(() {
-      _text = next;
-      _showSuggestions = false;
-      _revalidate();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final List<String> suggestions = _showSuggestions
-        ? _suggestions()
-        : const <String>[];
-    final List<HuiIssue> combined = <HuiIssue>[
-      ...component.issues,
-      for (final String name in _categoryHints)
-        HuiIssue(
-          severity: HuiSeverity.info,
-          path: component.label,
-          message:
-              "{name} is not published while previewing this category; it reads as unresolved there.",
-          messageArguments: <String, Object?>{'name': name},
-        ),
-    ];
-    return HuiField(
+    final List<String> completions = previewExprCompletions(
+      _text,
+      declaredVars: component.declaredVars,
+      scope: component.scope,
+    );
+    final String listId = '$_id-completions';
+    final String? syntaxError = _syntaxError?.call();
+    return Field(
       label: component.label,
+      forId: _id,
       required: component.required,
-      help: component.help,
+      tip: component.help,
+      docKey: component.docKey,
       trailing: component.trailing,
-      control: dom.div(
-        styles: const dom.Styles(
-          raw: <String, String>{'position': 'relative', 'min-width': '0'},
-        ),
-        <Widget>[
-          TextInput(
-            value: _text,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            placeholder: component.placeholder,
-            error: _syntaxError?.call(),
-            onChanged: _onInput,
-            onBlur: _onBlur,
-            attributes: <String, String>{
-              'aria-label': component.label,
-              'autocomplete': 'off',
-              'spellcheck': 'false',
-              'dir': 'ltr',
-            },
+      error: syntaxError,
+      problems: <HuiIssue>[
+        ...component.issues,
+        for (final String name in _categoryHints)
+          HuiIssue(
+            severity: HuiSeverity.info,
+            path: component.label,
+            message:
+                "{name} is not published while previewing this category; it reads as unresolved there.",
+            messageArguments: <String, Object?>{'name': name},
           ),
-          if (suggestions.isNotEmpty) _suggestionList(suggestions),
-          if (_syntaxError != null) _errorBlock(),
-          HuiInlineIssues(combined),
-        ],
-      ),
+      ],
+      child: Component.fragment(<Widget>[
+        TextInput(
+          id: _id,
+          value: _text,
+          size: controlSize(DensityScope.of(context)),
+          fullWidth: true,
+          placeholder: component.placeholder,
+          onChanged: _onInput,
+          styles: technicalInputStyles,
+          attributes: <String, String>{
+            ...technicalInputAttributes,
+            if (component.required) 'aria-required': 'true',
+            if (syntaxError != null) 'aria-invalid': 'true',
+            if (completions.isNotEmpty) 'list': listId,
+          },
+        ),
+        if (completions.isNotEmpty)
+          dom.datalist(id: listId, <Widget>[
+            for (final String completion in completions)
+              dom.option(value: completion, const <Widget>[]),
+          ]),
+      ]),
     );
   }
-
-  Widget _errorBlock() => dom.div(
-    classes: 'hui-expr-error',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'margin-top': '4px',
-        'font-size': '0.72rem',
-        'color': 'var(--hui-danger, var(--destructive))',
-      },
-    ),
-    <Widget>[
-      Text(_syntaxError!()),
-      if (_syntaxPosition != previewNoPosition &&
-          _syntaxPosition <= _text.length)
-        dom.pre(
-          styles: const dom.Styles(
-            raw: <String, String>{
-              'margin': '2px 0 0',
-              'padding': '0',
-              'font-family': 'var(--font-mono, ui-monospace, monospace)',
-              'font-size': '0.7rem',
-              'line-height': '1.2',
-              'white-space': 'pre',
-              'overflow-x': 'auto',
-            },
-          ),
-          <Widget>[Component.text('${' ' * _syntaxPosition}^')],
-        ),
-    ],
-  );
-
-  Widget _suggestionList(List<String> suggestions) => dom.div(
-    classes: 'hui-expr-suggestions',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'position': 'absolute',
-        'z-index': '30',
-        'top': '100%',
-        'left': '0',
-        'right': '0',
-        'margin-top': '2px',
-        'display': 'flex',
-        'flex-direction': 'column',
-        'gap': '1px',
-        'padding': '4px',
-        'border': '1px solid var(--hui-border)',
-        'border-radius': 'var(--hui-radius)',
-        'background': 'var(--hui-surface-raised)',
-        'box-shadow': 'var(--hui-shadow-sm)',
-        'max-height': '160px',
-        'overflow-y': 'auto',
-      },
-    ),
-    attributes: const <String, String>{'role': 'listbox'},
-    <Widget>[
-      for (final String suggestion in suggestions)
-        dom.button(
-          styles: const dom.Styles(
-            raw: <String, String>{
-              'display': 'block',
-              'width': '100%',
-              'padding': '4px 6px',
-              'border': '0',
-              'border-radius': '0',
-              'background': 'transparent',
-              'color': 'var(--hui-text)',
-              'text-align': 'left',
-              'font': 'inherit',
-              'font-family': 'var(--font-mono, ui-monospace, monospace)',
-              'font-size': '0.74rem',
-              'cursor': 'pointer',
-            },
-          ),
-          attributes: const <String, String>{'type': 'button'},
-          events: <String, void Function(Object)>{
-            'click': (Object _) => _selectSuggestion(suggestion),
-          },
-          <Widget>[Text(suggestion)],
-        ),
-    ],
-  );
 }

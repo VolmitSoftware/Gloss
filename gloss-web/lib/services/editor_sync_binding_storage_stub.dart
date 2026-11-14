@@ -1,10 +1,7 @@
 library;
 
-typedef EditorSyncBindingWriter =
-    bool Function(String workspaceId, String value);
+String? readEditorSyncBinding(String name) => null;
 
-String? readEditorSyncBinding(String workspaceId) => null;
+bool writeEditorSyncBinding(String name, String value) => false;
 
-bool writeEditorSyncBinding(String workspaceId, String value) => false;
-
-void removeEditorSyncBinding(String workspaceId) {}
+void removeEditorSyncBinding(String name) {}

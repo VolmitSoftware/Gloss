@@ -51,6 +51,7 @@
 #   {expected}  Verwachte revisie bij het opslaan van een bewerking
 #   {experience}  Hoeveelheid verdiende ervaring
 #   {failed}  Aantal mislukte bewerkingen
+#   {folders}  Mappen die een editortoken mag wijzigen
 #   {from}  Bronwaarde of begin van een bereik
 #   {fuel}  Resterende brandstof in de container
 #   {group}  Categorie van de taaleditor
@@ -69,6 +70,7 @@
 #   {labels}  Aantal tekstlabels
 #   {legacy}  Identificatie van de importbron
 #   {level}  Weergegeven niveau
+#   {lifetime}  Ongebruikte tijd voordat een editortoken verloopt
 #   {limit}  Toegestane limiet
 #   {line}  Regelnummer binnen een bericht
 #   {locale}  Taalcode
@@ -79,6 +81,7 @@
 #   {message}  Feedback- of diagnosebericht
 #   {migrated}  Aantal geconverteerde vermeldingen
 #   {minimum}  Minimaal toegestane waarde
+#   {minutes}  Tijd in minuten
 #   {mode}  Geselecteerde bewerkings- of weergavemodus
 #   {name}  Objectnaam
 #   {oldBoard}  Identificatie van het vorige bord
@@ -108,9 +111,9 @@
 #   {roll}  Rolhoek in graden
 #   {rotation}  Rotatie van de weergave
 #   {scale}  Schaal van de weergave of het voorbeeld
+#   {scopes}  Acties die een editortoken toestaat
 #   {seconds}  Tijd in seconden
 #   {section}  Onderdeel van de taaleditor
-#   {session}  Identificatie van de editorsessie
 #   {severity}  Ernst van de diagnose
 #   {skipped}  Aantal overgeslagen vermeldingen
 #   {slots}  Aantal voorwerpslots
@@ -118,12 +121,12 @@
 #   {special}  Aantal speciale weergave-elementen
 #   {state}  Huidige toestand
 #   {style}  Weergavestijl
-#   {subject}  Onderwerp van de webeditorsessie
 #   {target}  Plugin waarop de taalkeuze wordt toegepast
 #   {temporary}  Aantal tijdelijke objecten
 #   {text}  Weergegeven tekst
 #   {title}  Weergegeven titel
 #   {to}  Doelwaarde of einde van een bereik
+#   {token}  ID van het editortoken
 #   {total}  Totaal aantal vermeldingen
 #   {type}  Verwacht waarde- of objecttype
 #   {updated}  Berichten gewijzigd door een taalupdate
@@ -295,16 +298,11 @@ preview = "Hulpmiddelen voor voorbeelddocumenten"
 "preview.dump" = "Een voorbeelddocument eenmalig bouwen en de elementaantallen tonen"
 "preview.list" = "Voorbeelddocumenten en hun matchregels weergeven"
 "preview.reset" = "Meegeleverde standaardvoorbeelden herstellen (verwijdert geen extra gebruikersdocumenten die ze kunnen overschaduwen)"
-web = "De Gloss-webeditor openen en beheren"
-"web.open" = "Een lege gehoste Gloss-editor openen"
-"web.edit" = "Eén live Gloss-document openen"
-"web.edit.document" = "Dit live document openen in de webeditor"
-"web.workspace" = "De volledige live Gloss-werkruimte openen"
-"web.sessions" = "Actieve webeditorsessies beheren"
-"web.sessions.list" = "Actieve webeditorsessies weergeven"
-"web.sessions.pull" = "Een webeditorsessie nu controleren"
-"web.sessions.revoke" = "Toegang via een webeditorlink intrekken"
-"web.sessions.status" = "Eén webeditorsessie tonen"
+editor = "De webeditor aan deze server koppelen"
+"editor.pair" = "Een eenmalige link maken die een browser koppelt"
+"editor.status" = "Listener, relay en vingerafdruk van de editor tonen"
+"editor.tokens" = "Gekoppelde browsers weergeven"
+"editor.revoke" = "Een koppeling beëindigen of een link annuleren"
 language = "Kies je taal of de standaardtaal van de server"
 
 "import.mode" = "preview of apply"
@@ -334,7 +332,6 @@ panel_y = "Absolute of ~relatieve Y"
 panel_yaw = "Absolute of ~relatieve yaw"
 panel_z = "Absolute of ~relatieve Z"
 content_menu = "ID van het geladen menu"
-web_subject = "ID van een live Gloss-document"
 hologram_id = "ID van het nieuwe hologram en hoofdmenu"
 hologram_text = "Optionele MiniMessage-tekst"
 image_path = "Bestand in de Gloss-afbeeldingenmap"
@@ -355,7 +352,11 @@ row_x = "Absolute of ~relatieve rij-X"
 row_y = "Absolute of ~relatieve rij-Y"
 row_z = "Absolute of ~relatieve rij-Z"
 source_menu = "ID van het geladen bronmenu"
-web_session = "Sessie-ID voor de webeditor"
+editor_label = "Naam in de tokenlijst"
+editor_scopes = "Wat de editor mag doen, gescheiden door komma's"
+editor_folders = "Beperken tot deze mappen, gescheiden door komma's"
+editor_expires = "Geldigheid zonder gebruik, zoals 7d, 12h of 30m"
+editor_token = "Token-ID, of all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cJe hebt hier geen toestemming voor."
@@ -391,6 +392,7 @@ lines = "{count} regels"
 header = "&8[&dGloss&8] &d{id} &7op &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8schaal &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7staat in wereld &f{world}&7, die niet geladen is."
 
 [command.board]
 exists = "&8[&dGloss&8] &cScorebord '&f{id}&c' bestaat al."
@@ -505,13 +507,12 @@ execution_failed = "Opdracht {command} kon niet worden uitgevoerd: {reason}"
 menu_name_required = "Menunaam mag niet leeg zijn"
 hologram_id_required = "Het hologram-ID mag niet leeg zijn"
 panel_id_required = "Paneel-ID mag niet leeg zijn"
-web_subject_required = "Document-ID voor de webeditor mag niet leeg zijn"
-web_session_required = "Sessie-ID voor de webeditor mag niet leeg zijn"
 panel_player_required = "Doelspeler mag niet leeg zijn"
 row_icon_type_required = "Pictogramtype mag niet leeg zijn"
 row_style_property_required = "Stijleigenschap mag niet leeg zijn"
 import_source_required = "Bron voor import van oude gegevens mag niet leeg zijn"
 import_source_unknown = "Onbekende bron voor import van oude gegevens: {source}"
+editor_token_required = "Geef een token-ID op, of all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cJe hebt de machtiging &f{permission}&c niet."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cBewerking van menu-inhoud voor &f{menu}&c mislukt: {r
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cDeze opdracht is alleen beschikbaar voor spelers."
 
-[gloss.message.web]
-header = "Webeditor"
-open_hover = "Klik om de Gloss-webeditor te openen."
-open = "&8[&dGloss&8]: &7Webeditor: &f{url}"
-preparing = "&8[&dGloss&8]: &7Beveiligde synchronisatiesessie voor &f{subject}&7 voorbereiden..."
-unavailable = "&8[&dGloss&8]: &cLive bewerken via de webeditor is niet beschikbaar. Controleer de synchronisatie-instellingen en de verbinding met de relay."
-open_failed = "&8[&dGloss&8]: &cKan &f{kind}={subject}&c niet openen in de live webeditor: {reason}"
-open_console = "&8[&dGloss&8]: &7Toegangslink voor de editor van &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eMet deze URL kunnen wijzigingen op de server worden gepubliceerd totdat de toegang wordt ingetrokken of verloopt. Houd de URL geheim."
+[gloss.message.editor]
+link_ready = "Link klaar. Open hem binnen {minutes} minuten"
+link_console = "&8[&dGloss&8]: &aLink klaar. Open hem binnen {minutes} minuten: &f{url}"
+link_details = "&8[&dGloss&8]: &7Rechten {scopes}; {folders}; verloopt na {lifetime} zonder gebruik; token {token}"
+all_folders = "alle mappen"
+some_folders = "mappen {folders}"
 open_label = "Editor openen"
-copy_label = "Link kopiëren"
+open_hover = "Openen in je browser"
+copy_label = "Kopiëren"
+copy_hover = "De link kopiëren"
 revoke_label = "Intrekken"
-link_hover = "Open de editor, kopieer de toegangslink of trek sessie {session} in."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Er zijn geen actieve synchronisatiesessies voor de editor."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7verloopt=&f{seconds}s &7publicatie=&f{revision} &7wachtend=&f{pending}"
-revoked = "&8[&dGloss&8]: &aSynchronisatiesessie &f{session}&a ingetrokken."
-pulled = "&8[&dGloss&8]: &aSynchronisatiesessie &f{session}&a gecontroleerd."
-unknown = "&8[&dGloss&8]: &cSynchronisatiesessie &f{session}&c is onbekend of verlopen."
-failed = "&8[&dGloss&8]: &cSynchronisatiebewerking voor sessie &f{session}&c mislukt: {reason}"
+revoke_hover = "Deze link annuleren of de gekoppelde editor loskoppelen"
+details_label = "Details"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cEditor draait niet; zet [editor] enabled = true in gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7Geen editortokens."
+unknown_token = "&8[&dGloss&8]: &cGeen token &f{token}&c."
+revoked_one = "&8[&dGloss&8]: &a1 token ingetrokken; de verbindingen zijn gesloten."
+revoked_many = "&8[&dGloss&8]: &a{count} tokens ingetrokken; de verbindingen zijn gesloten."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7&f{source}&7 scannen voor een migratievoorbeeld zonder gegevens te wijzigen..."

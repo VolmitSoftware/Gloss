@@ -17,7 +17,8 @@ import java.util.Map;
 import java.util.Set;
 
 final class EditorSyncDocuments {
-  static final int MAX_DOCUMENTS = 512;
+  static final java.util.regex.Pattern WIRE_KIND_PATTERN = java.util.regex.Pattern.compile("^[a-z][a-z0-9-]{0,31}$");
+  static final int MAX_DOCUMENTS = 20_000;
   static final int MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
   static final int MAX_DOCUMENT_ID_CHARS = 256;
   static final String MENU_KIND = EditorSyncDocumentKind.MENU.wireName();
@@ -95,12 +96,6 @@ final class EditorSyncDocuments {
     }
   }
 
-  static void requireHandledKinds(List<Entry> documents) {
-    for (Entry entry : documents) {
-      EditorSyncDocumentKind.parseWireName(entry.kind());
-    }
-  }
-
   /** The kind this build handles, or null when the wire name belongs to a kind it does not. */
   static EditorSyncDocumentKind handledKind(String wireName) {
     for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.values()) {
@@ -164,7 +159,7 @@ final class EditorSyncDocuments {
           "sync document entry contains missing or unsupported fields");
     }
     String kind = EditorSyncJson.requireString(entry, "kind");
-    if (!EditorSyncKind.WIRE_KIND_PATTERN.matcher(kind).matches()) {
+    if (!WIRE_KIND_PATTERN.matcher(kind).matches()) {
       throw new IllegalArgumentException("sync document kind must be a sync v3 slug: " + kind);
     }
     String id = EditorSyncJson.requireString(entry, "id");

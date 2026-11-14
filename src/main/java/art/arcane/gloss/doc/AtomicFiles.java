@@ -82,6 +82,21 @@ public final class AtomicFiles {
         } finally {
             Files.deleteIfExists(temporary);
         }
+        WriteNotices.touched(target);
+    }
+
+    /** {@link #replace} with the content and the rename forced to disk, so a crash leaves the old or the new file. */
+    public static void replaceDurable(Path target, byte[] content) throws IOException {
+        Path parent = requireParent(target);
+        Files.createDirectories(parent);
+        Path temporary = writeDurableTemporary(parent, "." + target.getFileName() + ".", content);
+        try {
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+        forceDirectory(parent);
+        WriteNotices.touched(target);
     }
 
     /**
@@ -92,6 +107,7 @@ public final class AtomicFiles {
      * flush is skipped there rather than failing the write that asked for it.
      */
     public static void forceDirectory(Path directory) throws IOException {
+        WriteNotices.touched(directory);
         if (directory == null || !DIRECTORY_FLUSH_SUPPORTED) {
             return;
         }

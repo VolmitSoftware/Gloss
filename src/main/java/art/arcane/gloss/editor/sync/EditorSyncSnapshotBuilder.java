@@ -26,9 +26,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource {
+public final class EditorSyncSnapshotBuilder {
   static final int MAX_MENU_COUNT = 256;
-  static final int MAX_IMAGE_COUNT = 512;
+  static final int MAX_IMAGE_COUNT = 4_096;
   static final int MAX_IMAGE_BYTES = 512 * 1024;
   static final int MAX_WARNING_COUNT = 256;
   static final int MAX_WARNING_CHARACTERS = 512;
@@ -52,10 +52,19 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
         plugin.getDataFolder().toPath());
   }
 
-  @Override
-  public EditorSyncProject open(EditorSyncKind kind, String subjectId, int maximumBytes) {
-    return contentSnapshots.open(kind, subjectId, maximumBytes,
-        new PluginSections(kind == EditorSyncKind.WORKSPACE));
+  /** The whole workspace as one project, with this server's warnings, history, schemas and defaults. */
+  public EditorSyncProject open(int maximumBytes) {
+    return contentSnapshots.open(maximumBytes, new PluginSections());
+  }
+
+  /** Every document and image as the files are now; unreadable files become warnings. */
+  EditorSyncContentSnapshotBuilder.Listing listing(int maximumBytes) {
+    return contentSnapshots.list(true, maximumBytes);
+  }
+
+  /** History rows of these documents, as the notes section carries them. */
+  JsonArray history(List<EditorSyncDocuments.Entry> documents) {
+    return documentHistory(documents);
   }
 
   /**
@@ -84,19 +93,8 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
     }
   }
 
-  @Override
-  public List<String> subjectIds(EditorSyncKind kind) {
-    return contentSnapshots.subjectIds(kind);
-  }
-
   /** The sections this server contributes to every snapshot it builds. */
   private final class PluginSections implements EditorSyncContentSnapshotBuilder.ServerSections {
-    private final boolean workspace;
-
-    private PluginSections(boolean workspace) {
-      this.workspace = workspace;
-    }
-
     @Override
     public List<String> warnings(List<EditorSyncDocuments.Entry> documents) {
       return lintWarnings(documents);
@@ -109,12 +107,12 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
 
     @Override
     public JsonObject schemas() {
-      return workspace ? EditorSyncServerCatalog.schemas() : new JsonObject();
+      return EditorSyncServerCatalog.schemas();
     }
 
     @Override
     public JsonObject defaults() {
-      return workspace ? EditorSyncServerCatalog.defaults() : new JsonObject();
+      return EditorSyncServerCatalog.defaults();
     }
   }
 
@@ -124,6 +122,7 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
       return new JsonArray();
     }
     JsonArray entries = new JsonArray();
+    HistoryService.Timeline timeline = history.timeline();
     for (EditorSyncDocuments.Entry document : documents) {
       EditorSyncDocumentKind kind = EditorSyncDocuments.handledKind(document.kind());
       if (kind == null) {
@@ -131,7 +130,7 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
       }
       String collection = HistoryKinds.collection(kind);
       int carried = 0;
-      for (HistoryEntry version : history.versions(collection, document.id())) {
+      for (HistoryEntry version : timeline.versions(collection, document.id())) {
         if (carried >= EditorSyncProjectSections.MAX_HISTORY_PER_DOCUMENT
             || entries.size() >= EditorSyncProjectSections.MAX_HISTORY_ENTRIES) {
           break;
@@ -180,12 +179,6 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
     }
   }
 
-  static void collectImagePaths(JsonElement element, Set<String> paths) {
-    List<String> usages = new ArrayList<>();
-    collectImageUsages(element, usages);
-    paths.addAll(usages);
-  }
-
   static void collectImageUsages(JsonElement element, List<String> paths) {
     if (element == null || element.isJsonNull()) {
       return;
@@ -216,38 +209,6 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
     for (java.util.Map.Entry<String, JsonElement> entry : object.entrySet()) {
       collectImageUsages(entry.getValue(), paths);
     }
-  }
-
-  static Path resolveConfinedFile(Path root, String relative, boolean requireExisting) throws IOException {
-    String normalizedRelative = normalizeRelative(relative);
-    Path canonicalRoot = root.toAbsolutePath().normalize();
-    if (Files.exists(canonicalRoot, LinkOption.NOFOLLOW_LINKS)
-        && (Files.isSymbolicLink(canonicalRoot)
-        || !Files.isDirectory(canonicalRoot, LinkOption.NOFOLLOW_LINKS))) {
-      throw new IOException("asset root is not a real directory");
-    }
-    Path candidate = canonicalRoot.resolve(normalizedRelative).normalize();
-    if (!candidate.startsWith(canonicalRoot) || candidate.equals(canonicalRoot)) {
-      throw new IOException("asset path escapes the image directory");
-    }
-    Path current = canonicalRoot;
-    Path parent = candidate.getParent();
-    if (parent == null) {
-      throw new IOException("asset path has no parent");
-    }
-    for (Path segment : canonicalRoot.relativize(parent)) {
-      current = current.resolve(segment);
-      if (Files.exists(current, LinkOption.NOFOLLOW_LINKS) && Files.isSymbolicLink(current)) {
-        throw new IOException("asset path contains a symbolic link");
-      }
-    }
-    if (Files.isSymbolicLink(candidate)) {
-      throw new IOException("asset file is a symbolic link");
-    }
-    if (requireExisting && !Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
-      throw new IOException("asset file does not exist");
-    }
-    return candidate;
   }
 
   static String normalizeRelative(String relative) {
@@ -313,26 +274,6 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
       return "image/bmp";
     }
     throw new IllegalArgumentException("unsupported image encoding");
-  }
-
-  static ValidatedImage validateImage(String path, byte[] data) {
-    String mediaType = detectMediaType(data);
-    try {
-      ImageInfo information = Imaging.getImageInfo(data);
-      if (information == null || information.getWidth() < 1 || information.getHeight() < 1
-          || information.getWidth() > MAX_IMAGE_DIMENSION
-          || information.getHeight() > MAX_IMAGE_DIMENSION
-          || (long) information.getWidth() * information.getHeight() > MAX_IMAGE_PIXELS) {
-        throw new IllegalArgumentException("image dimensions exceed the sync limit: " + path);
-      }
-      if (Imaging.getBufferedImage(data) == null) {
-        throw new IllegalArgumentException("image data is not decodable: " + path);
-      }
-      return new ValidatedImage(mediaType,
-          information.getWidth(), information.getHeight());
-    } catch (IOException failure) {
-      throw new IllegalArgumentException("image data is not decodable: " + path, failure);
-    }
   }
 
   static ValidatedImage validateWorkspaceImage(String path, byte[] data) {

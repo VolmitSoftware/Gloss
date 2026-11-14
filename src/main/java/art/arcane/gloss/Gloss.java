@@ -20,7 +20,10 @@ import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.gloss.doc.DataWatchdog;
 import art.arcane.gloss.drop.DropNameService;
-import art.arcane.gloss.editor.sync.EditorSyncService;
+import art.arcane.gloss.editor.BukkitEditorHost;
+import art.arcane.gloss.editor.EditorService;
+import art.arcane.gloss.editor.EditorSettings;
+import art.arcane.gloss.editor.sync.EditorWorkspace;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.emoji.EmojiService;
 import art.arcane.gloss.entity.EntityOverlayService;
@@ -171,7 +174,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private ContainerProtectionService containerProtection;
     private MenuSessionManager sessionManager;
     private PanelCreationService panelCreation;
-    private EditorSyncService editorSyncService;
+    private EditorService editorService;
     private GlossIntegrationService integrationService;
     private IntegrationBridgeService integrationBridge;
     private GlossApiServiceImpl apiService;
@@ -430,8 +433,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             panelCreation = new PanelCreationService(this);
             enableService("panel-creation", () -> {
             }, panelCreation::shutdown);
-            editorSyncService = new EditorSyncService(this);
-            enableService("editor-sync", this::startEditorSync, editorSyncService::shutdown);
+            editorService = new EditorService(getDataFolder().toPath(), new BukkitEditorHost(this), config.editor(),
+                (EditorSettings settings) -> EditorWorkspace.of(this,
+                    () -> GlossConfig.current().editor().maxProjectMiB() * 1024 * 1024),
+                java.time.Clock.systemUTC());
+            enableService("editor", this::startEditor, editorService::close);
             enableService("panel-creation-intake", () -> {
             }, panelCreation::stopAccepting);
             enableService("menu-catalog", menuCatalog::startWatching, menuCatalog::shutdown);
@@ -466,7 +472,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
         GlossConfig activeConfig = config;
         if (!success || activeConfig == null || activeConfig.splashScreen()) {
-            SplashScreen.print(this, success);
+            SplashScreen.print(this, success, activeConfig == null ? null : activeConfig.editor().editorUrl());
         }
         if (startupFailure != null) {
             throw propagateEnableFailure(startupFailure);
@@ -926,6 +932,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     private void applyMergedConfigHooks(GlossConfig previous, GlossConfig next, boolean cycleEveryService) {
+        if (editorService != null && !previous.editor().equals(next.editor())) {
+            editorService.settings(next.editor());
+        }
         if (menuCatalog != null
             && (cycleEveryService || !previous.menus().enabled() && next.menus().enabled())) {
             menuCatalog.loadShippedDefaults(next.menus().enabled());
@@ -1171,8 +1180,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         return panelCreation;
     }
 
-    public EditorSyncService getEditorSyncService() {
-        return editorSyncService;
+    public EditorService getEditorService() {
+        return editorService;
     }
 
     public GlossIntegrationService getIntegrationService() {
@@ -1244,13 +1253,13 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         PreviewScaleService.init(this);
     }
 
-    private void startEditorSync() {
+    private void startEditor() {
         try {
-            editorSyncService.start();
-        } catch (RuntimeException failure) {
+            editorService.start();
+        } catch (IOException | RuntimeException failure) {
             logExceptionStack(true, failure,
-                "Editor sync was disabled because its secure session store could not be loaded. "
-                    + "Repair or remove editor-sync-sessions.json; live web edit commands remain unavailable until restart.");
+                "The web editor was disabled: " + failure.getMessage() + ". /gloss editor stays unavailable until "
+                    + "the problem is fixed and the server restarts.");
         }
     }
 

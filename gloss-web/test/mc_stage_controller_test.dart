@@ -83,4 +83,59 @@ void main() {
     expect(notifications, 1);
     expect(controller.webGlAvailable, isFalse);
   });
+
+  group('showDocument', () {
+    test('each document starts at home until its camera is moved', () {
+      final McStageController controller = _controller();
+      controller.showDocument('a');
+      expect(controller.isHome, isTrue);
+      controller.camera = controller.camera.copyWith(distance: 2);
+      controller.showDocument('b');
+      expect(controller.isHome, isTrue);
+    });
+
+    test('a moved camera comes back with its document', () {
+      final McStageController controller = _controller();
+      controller.showDocument('a');
+      final McCamera moved = controller.camera.copyWith(distance: 2);
+      controller.camera = moved;
+      controller.showDocument('b');
+      controller.showDocument('a');
+      expect(controller.camera, moved);
+    });
+
+    test('a camera put back home is forgotten', () {
+      final Map<String, McCamera> cameras = <String, McCamera>{};
+      final McStageController controller = McStageController(
+        kind: McStageKind.drops,
+        homePivot: McVec3.zero,
+        cameras: cameras,
+      );
+      controller.showDocument('a');
+      controller.camera = controller.camera.copyWith(distance: 2);
+      controller.resetCamera();
+      controller.showDocument('b');
+      expect(cameras, isEmpty);
+    });
+
+    test('cameras outlive the controller when the map does', () {
+      final Map<String, McCamera> cameras = <String, McCamera>{};
+      final McStageController first = McStageController(
+        kind: McStageKind.drops,
+        homePivot: McVec3.zero,
+        cameras: cameras,
+      );
+      first.showDocument('a');
+      final McCamera moved = first.camera.copyWith(distance: 2);
+      first.camera = moved;
+      first.showDocument(null);
+      final McStageController second = McStageController(
+        kind: McStageKind.drops,
+        homePivot: McVec3.zero,
+        cameras: cameras,
+      );
+      second.showDocument('a');
+      expect(second.camera, moved);
+    });
+  });
 }

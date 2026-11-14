@@ -23,8 +23,6 @@ final class MarkerDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('marker');
 
-  @override
-  String get createLabel => huiText('New marker');
 
   @override
   String get pluralLabel => huiText('Markers');

@@ -30,23 +30,25 @@ extension _CanvasInteractions on _CanvasViewportState {
 
   void _commitViewport(HuiViewport next) {
     _viewport = next;
-    _syncZoomReadout();
     _statusDirty = true;
     _markDirty();
   }
 
-  void _syncZoomReadout() {
-    final web.Element? label = web.document.getElementById(_zoomLabelId);
-    if (label != null) {
-      label.textContent = _zoomPercentText;
-    }
+  /// A zoom or pan by the user: the menu keeps this camera from now on,
+  /// across resizes and document switches, until Reset view.
+  void _commitHandViewport(HuiViewport next) {
+    _camera.moved(next.transform);
+    _commitViewport(next);
   }
 
   void _zoomFromCenter(double factor) =>
-      _commitViewport(_viewport.zoomByAtCenter(factor));
+      _commitHandViewport(_viewport.zoomByAtCenter(factor));
 
+  /// Reset view (and the 0 and F keys): forget the hand-set camera and frame
+  /// the menu again.
   void _resetView() {
-    _commitViewport(_viewport.withTransform(CanvasTransform.identity));
+    _camera.reset();
+    _easeThrough(_fitToContent);
   }
 
   /// Frames the components, the menu centre and enough of the player reference
@@ -79,7 +81,14 @@ extension _CanvasInteractions on _CanvasViewportState {
         maxY: bounds.centerY + 0.35,
       );
     }
-    _commitViewport(_viewport.zoomToFit(bounds.expand(0.3), paddingPx: 44));
+    _commitViewport(
+      _viewport.zoomToFit(
+        bounds.expand(0.3),
+        paddingPx: 44,
+        minZoom: huiFitMinZoom,
+        maxZoom: huiFitMaxZoom,
+      ),
+    );
   }
 
   // --- coordinate helpers ---------------------------------------------------
@@ -113,7 +122,7 @@ extension _CanvasInteractions on _CanvasViewportState {
       _eventDouble(wheel, 'clientX'),
       _eventDouble(wheel, 'clientY'),
     );
-    _commitViewport(
+    _commitHandViewport(
       _viewport.zoomByAtScreenPoint(
         factor: factor,
         screenX: local.x,
@@ -332,7 +341,7 @@ extension _CanvasInteractions on _CanvasViewportState {
       case _DragMode.none:
         break;
       case _DragMode.pan:
-        _commitViewport(
+        _commitHandViewport(
           _viewport.panByPixels(clientX - _lastClientX, clientY - _lastClientY),
         );
         _setCursorReadout(_worldPoint(clientX, clientY));
@@ -526,9 +535,10 @@ extension _CanvasInteractions on _CanvasViewportState {
     if (!event.isA<web.MouseEvent>()) return;
     final web.MouseEvent mouse = event as web.MouseEvent;
     event.preventDefault();
-    final double clientX = _eventDouble(mouse, 'clientX');
-    final double clientY = _eventDouble(mouse, 'clientY');
-    _openCreationMenuAt(clientX, clientY);
+    _recordCreationPoint(
+      _eventDouble(mouse, 'clientX'),
+      _eventDouble(mouse, 'clientY'),
+    );
   }
 
   void _handleDoubleClick(web.Event event) {
@@ -616,13 +626,12 @@ extension _CanvasInteractions on _CanvasViewportState {
       case '-':
       case '_':
         _zoomFromCenter(1 / huiZoomStep);
-      // Reset and fit are single, large, non-repeating moves — the same ones
-      // the toolbar buttons ease (canvas_viewport.dart:303-304).
+      // Reset view is a single, large, non-repeating move, eased like the
+      // header button.
       case '0':
-        _easeThrough(_resetView);
       case 'f':
       case 'F':
-        _easeThrough(_fitToContent);
+        _resetView();
       default:
         handled = false;
     }

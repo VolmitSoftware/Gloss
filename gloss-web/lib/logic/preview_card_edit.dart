@@ -48,6 +48,9 @@ const List<int> previewZoomStops = <int>[1, 2, 3, 4, 6, 8, 12, 16];
 /// is about the size the same well occupies on a real Minecraft screen.
 const int previewDefaultZoom = 4;
 
+/// The largest stop a fit picks: past 2x a small card turns into blocks.
+const int previewFitMaxZoom = 2;
+
 /// Shown when a drag is refused because the model would have to be rewritten as
 /// a constant to accept it.
 const String previewExpressionMoveHint =
@@ -164,15 +167,19 @@ class PreviewCardView {
   PreviewCardView zoomedAtCenter(int nextZoom) =>
       zoomedAt(nextZoom, screenX: widthPx / 2, screenY: heightPx / 2);
 
-  /// Largest stop that fits [bounds] with [paddingPx] to spare, centred.
-  /// A null or empty box leaves the camera at its default, which is what an
-  /// empty document should show.
+  /// Largest stop up to [previewFitMaxZoom] that fits [bounds] with
+  /// [paddingPx] to spare, centred. With nothing to frame the card shows at
+  /// 100%, centred.
   PreviewCardView fittedTo(PreviewBox? bounds, {double paddingPx = 24}) {
-    if (bounds == null || !hasArea) return reset();
+    if (bounds == null) {
+      return PreviewCardView(widthPx: widthPx, heightPx: heightPx, zoom: 1);
+    }
+    if (!hasArea) return reset();
     final double usableWidth = math.max(1, widthPx - paddingPx * 2);
     final double usableHeight = math.max(1, heightPx - paddingPx * 2);
     int best = previewZoomStops.first;
     for (final int stop in previewZoomStops) {
+      if (stop > previewFitMaxZoom) break;
       if (bounds.width * stop <= usableWidth &&
           bounds.height * stop <= usableHeight) {
         best = stop;

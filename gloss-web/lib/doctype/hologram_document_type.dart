@@ -25,8 +25,6 @@ final class HologramDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('hologram');
 
-  @override
-  String get createLabel => huiText('New hologram');
 
   @override
   String get pluralLabel => huiText('Holograms');

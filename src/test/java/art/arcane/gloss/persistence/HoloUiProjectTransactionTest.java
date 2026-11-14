@@ -1,5 +1,7 @@
 package art.arcane.gloss.persistence;
 
+import art.arcane.gloss.doc.DocumentReviser;
+import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelTransform;
 import com.google.gson.JsonObject;
@@ -10,15 +12,20 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
@@ -265,9 +272,134 @@ public class HoloUiProjectTransactionTest {
     transaction.apply("session", write(menu, "{\"offset\":[0,0,1],\"components\":[]}"),
         Map.of(menu, original));
     Files.writeString(menu, "external-change", StandardCharsets.UTF_8);
+    List<String> reports = new ArrayList<>();
 
-    assertThrows(IOException.class, transaction::recover);
+    new GlossProjectTransaction(data, directory -> {
+    }, reports::add).recover();
+
     assertEquals("external-change", Files.readString(menu));
+    assertArrayEquals(original, Files.readAllBytes(quarantined(data).resolve("backup/menus/shop.json")));
+    assertEquals(1, reports.size());
+  }
+
+  @Test
+  public void aLeftoverDeleteOfAShippedDefaultThatGlossPutBackRestoresTheCustomizedCopy() throws Exception {
+    Path data = temp.newFolder("default-put-back").toPath();
+    Path board = data.resolve("boards/default.json");
+    Files.createDirectories(board.getParent());
+    byte[] stock;
+    try (java.io.InputStream shipped = getClass().getResourceAsStream("/defaults/boards/default.json")) {
+      stock = shipped.readAllBytes();
+    }
+    JsonObject customized = JsonParser.parseString(new String(stock, StandardCharsets.UTF_8)).getAsJsonObject();
+    customized.addProperty("revision", 2L);
+    customized.getAsJsonObject("presentation").addProperty("title", "&dR3 custom default");
+    byte[] custom = customized.toString().getBytes(StandardCharsets.UTF_8);
+    Files.write(board, custom);
+    GlossProjectTransaction.Pending pending = new GlossProjectTransaction(data).apply("chg_delete",
+        Map.of(board, GlossProjectTransaction.Mutation.delete()), Map.of(board, custom));
+    JsonObject journal = JsonParser.parseString(Files.readString(pending.transactionDirectory().resolve("journal.json")))
+        .getAsJsonObject();
+    Files.write(board, stock);
+    List<String> reports = new ArrayList<>();
+
+    List<String> stranded = new GlossProjectTransaction(data, directory -> {
+    }, reports::add).recover();
+
+    assertEquals("published", journal.get("state").getAsString());
+    JsonObject entry = journal.getAsJsonArray("entries").get(0).getAsJsonObject();
+    assertEquals("DELETE", entry.get("operation").getAsString());
+    assertTrue(entry.get("existed").getAsBoolean());
+    assertTrue(entry.get("stagedHash").isJsonNull());
+    assertTrue(stranded.isEmpty());
+    assertArrayEquals(custom, Files.readAllBytes(board));
+    Path quarantine = quarantined(data);
+    assertTrue(Files.isRegularFile(quarantine.resolve("journal.json")));
+    try (Stream<Path> transactions = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertTrue(transactions.findAny().isEmpty());
+    }
+    assertEquals(1, reports.size());
+    assertTrue(reports.getFirst(), reports.getFirst().contains("boards/default.json"));
+    assertTrue(reports.getFirst(), reports.getFirst().contains("editor-sync-quarantine"));
+  }
+
+  @Test
+  public void aLeftoverDeleteWhoseFileWasMadeAgainByHandIsQuarantinedAndLeftAlone() throws Exception {
+    Path data = temp.newFolder("default-came-back").toPath();
+    Path board = data.resolve("boards/default.json");
+    Files.createDirectories(board.getParent());
+    byte[] custom = "{\"title\":\"&dCustom default\"}".getBytes(StandardCharsets.UTF_8);
+    Files.write(board, custom);
+    new GlossProjectTransaction(data).apply("chg_delete", Map.of(board, GlossProjectTransaction.Mutation.delete()),
+        Map.of(board, custom));
+    Files.writeString(board, "{\"title\":\"stock\"}", StandardCharsets.UTF_8);
+    List<String> reports = new ArrayList<>();
+
+    new GlossProjectTransaction(data, directory -> {
+    }, reports::add).recover();
+    new GlossProjectTransaction(data, directory -> {
+    }, reports::add).recover();
+
+    assertEquals("{\"title\":\"stock\"}", Files.readString(board));
+    Path quarantine = quarantined(data);
+    assertArrayEquals(custom, Files.readAllBytes(quarantine.resolve("backup/boards/default.json")));
+    assertTrue(Files.isRegularFile(quarantine.resolve("journal.json")));
+    try (Stream<Path> transactions = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertTrue(transactions.findAny().isEmpty());
+    }
+    assertEquals(1, reports.size());
+    assertTrue(reports.getFirst(), reports.getFirst().contains("editor-sync-quarantine"));
+    assertTrue(reports.getFirst(), reports.getFirst().contains("boards/default.json"));
+  }
+
+  @Test
+  public void anInGameSaveWaitsForTheCheckedReplaceInsteadOfLandingInsideIt() throws Exception {
+    Path data = temp.newFolder("in-game-save").toPath();
+    Path note = data.resolve("holograms/spawn.json");
+    Files.createDirectories(note.getParent());
+    byte[] original = "{\"revision\":1,\"text\":\"Spawn\"}".getBytes(StandardCharsets.UTF_8);
+    Files.write(note, original);
+    DocumentStore<Note> store = new DocumentStore<>("holograms", note.getParent().toFile(), new DocumentReviser<>() {
+      @Override
+      public long revisionOf(Note value) {
+        return value.revision();
+      }
+
+      @Override
+      public Note withRevision(Note value, long revision) {
+        return new Note(revision, value.text());
+      }
+    });
+    CountDownLatch saved = new CountDownLatch(1);
+    AtomicBoolean started = new AtomicBoolean();
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+      Path journal = directory.resolve("journal.json");
+      if (Files.isRegularFile(journal) && Files.readString(journal).contains("\"publishing\"")
+          && started.compareAndSet(false, true)) {
+        Thread.ofPlatform().start(() -> {
+          try {
+            store.write("spawn", new Note(2L, "In game"));
+          } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+          }
+          saved.countDown();
+        });
+        try {
+          saved.await(500L, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    });
+
+    transaction.apply("session", write(note, "{\"revision\":2,\"text\":\"Published\"}"), Map.of(note, original));
+
+    assertTrue(started.get());
+    assertTrue(saved.await(5L, TimeUnit.SECONDS));
+    assertTrue(Files.readString(note), Files.readString(note).contains("In game"));
+  }
+
+  private record Note(long revision, String text) {
   }
 
   @Test
@@ -280,12 +412,14 @@ public class HoloUiProjectTransactionTest {
     transaction.apply("session", write(menu, "{\"components\":[]}"), expected);
     Files.writeString(menu, "unrelated", StandardCharsets.UTF_8);
 
-    assertThrows(IOException.class, transaction::recover);
+    transaction.recover();
+
     assertEquals("unrelated", Files.readString(menu));
+    assertTrue(Files.isRegularFile(quarantined(data).resolve("journal.json")));
   }
 
   @Test
-  public void duplicateJournalTargetsFailClosed() throws Exception {
+  public void duplicateJournalTargetsAreQuarantinedWithoutTouchingTheTarget() throws Exception {
     Path data = temp.newFolder("duplicate-journal").toPath();
     Path menu = data.resolve("menus/shop.json");
     Files.createDirectories(menu.getParent());
@@ -299,12 +433,14 @@ public class HoloUiProjectTransactionTest {
     root.getAsJsonArray("entries").add(root.getAsJsonArray("entries").get(0).deepCopy());
     Files.writeString(journal, root.toString());
 
-    assertThrows(IOException.class, transaction::recover);
+    transaction.recover();
+
     assertTrue(Files.readString(menu).contains("offset"));
+    assertTrue(Files.isRegularFile(quarantined(data).resolve("journal.json")));
   }
 
   @Test
-  public void stagedHashMismatchFailsClosedWithoutChangingThePublishedTarget() throws Exception {
+  public void stagedHashMismatchIsQuarantinedWithoutChangingThePublishedTarget() throws Exception {
     Path data = temp.newFolder("staged-hash").toPath();
     Path menu = data.resolve("menus/shop.json");
     Files.createDirectories(menu.getParent());
@@ -318,8 +454,10 @@ public class HoloUiProjectTransactionTest {
     Files.writeString(staged, "tampered", StandardCharsets.UTF_8);
     String published = Files.readString(menu);
 
-    assertThrows(IOException.class, transaction::recover);
+    transaction.recover();
+
     assertEquals(published, Files.readString(menu));
+    assertArrayEquals(original, Files.readAllBytes(quarantined(data).resolve("backup/menus/shop.json")));
   }
 
   @Test
@@ -415,17 +553,20 @@ public class HoloUiProjectTransactionTest {
     assertTrue(failure.getMessage().contains("changed after the session snapshot"));
     assertTrue(failure.getSuppressed().length > 0);
     assertArrayEquals(grown, Files.readAllBytes(menu));
-    assertThrows(IOException.class, transaction::recover);
-    assertArrayEquals(grown, Files.readAllBytes(menu));
     try (Stream<Path> transactions = Files.list(data.resolve("editor-sync-transactions"))) {
       Path pending = transactions.findFirst().orElseThrow();
       assertArrayEquals(original, Files.readAllBytes(pending.resolve("backup/menus/shop.json")));
       assertTrue(Files.isRegularFile(pending.resolve("journal.json")));
     }
+    transaction.recover();
+    assertArrayEquals(grown, Files.readAllBytes(menu));
+    Path quarantine = quarantined(data);
+    assertArrayEquals(original, Files.readAllBytes(quarantine.resolve("backup/menus/shop.json")));
+    assertTrue(Files.isRegularFile(quarantine.resolve("journal.json")));
   }
 
   @Test
-  public void oversizedSparseJournalIsRejectedBeforeAllocatingItsContents() throws Exception {
+  public void oversizedSparseJournalIsQuarantinedBeforeAllocatingItsContents() throws Exception {
     Path data = temp.newFolder("oversized-journal").toPath();
     Path menu = data.resolve("menus/shop.json");
     Files.createDirectories(menu.getParent());
@@ -441,13 +582,16 @@ public class HoloUiProjectTransactionTest {
       channel.write(ByteBuffer.wrap(new byte[]{0}));
     }
 
-    IOException failure = assertThrows(IOException.class, transaction::recover);
+    List<String> reports = new ArrayList<>();
 
-    assertTrue(failure.getMessage().contains("journal exceeds the size limit"));
+    new GlossProjectTransaction(data, directory -> {
+    }, reports::add).recover();
+
+    assertTrue(reports.getFirst(), reports.getFirst().contains("journal exceeds the size limit"));
     assertEquals("replacement", Files.readString(menu));
-    assertEquals(oversizedLength, Files.size(journal));
-    assertArrayEquals(original,
-        Files.readAllBytes(pending.transactionDirectory().resolve("backup/menus/shop.json")));
+    Path quarantine = quarantined(data);
+    assertEquals(oversizedLength, Files.size(quarantine.resolve("journal.json")));
+    assertArrayEquals(original, Files.readAllBytes(quarantine.resolve("backup/menus/shop.json")));
   }
 
   @Test
@@ -492,7 +636,7 @@ public class HoloUiProjectTransactionTest {
   }
 
   @Test
-  public void startupFailsClosedForUnknownPreJournalContent() throws Exception {
+  public void startupQuarantinesUnknownPreJournalContent() throws Exception {
     Path data = temp.newFolder("bad-pre-journal").toPath();
     Path transactions = data.resolve("editor-sync-transactions");
     Path partial = transactions.resolve(
@@ -500,8 +644,10 @@ public class HoloUiProjectTransactionTest {
     Files.createDirectories(partial);
     Files.writeString(partial.resolve("unexpected"), "preserve", StandardCharsets.UTF_8);
 
-    assertThrows(IOException.class, () -> new GlossProjectTransaction(data).recover());
-    assertEquals("preserve", Files.readString(partial.resolve("unexpected")));
+    new GlossProjectTransaction(data).recover();
+
+    assertFalse(Files.exists(partial));
+    assertEquals("preserve", Files.readString(quarantined(data).resolve("unexpected")));
   }
 
   @Test
@@ -614,6 +760,14 @@ public class HoloUiProjectTransactionTest {
     assertThrows(IOException.class, () -> transaction.apply("session",
         write(escaped, "{\"components\":[]}"), expected));
     assertFalse(Files.exists(outside.resolve("shop.json")));
+  }
+
+  private static Path quarantined(Path data) throws IOException {
+    try (Stream<Path> moved = Files.list(data.resolve("editor-sync-quarantine"))) {
+      List<Path> all = moved.toList();
+      assertEquals(all.toString(), 1, all.size());
+      return all.getFirst();
+    }
   }
 
   private static Map<Path, GlossProjectTransaction.Mutation> write(Path path, String source) {

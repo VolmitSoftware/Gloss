@@ -1,0 +1,10 @@
+{
+  "kind": "menu",
+  "id": "shop/main",
+  "hash": "sha256:04a13c70728cd5f50e69e7d36b66d536918835b83b41e1b3fd09e85e4696806a",
+  "json": "{\"title\":\"&6Shop\",\"components\":[]}",
+  "summary": {
+    "name": "Shop",
+    "folder": "shop"
+  }
+}

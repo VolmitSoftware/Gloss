@@ -41,6 +41,9 @@ class CanvasAssets {
 
   bool _disposed = false;
 
+  /// True while a bitmap asked for is still decoding.
+  bool get hasPending => _pendingImages.isNotEmpty;
+
   /// Backdrop photo, or null until it decodes.
   web.HTMLImageElement? get backdrop => image(huiBackdropAssetUrl);
 

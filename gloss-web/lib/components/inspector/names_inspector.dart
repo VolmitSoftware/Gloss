@@ -1,51 +1,14 @@
+/// The names catalog's centre form: one group of display names per category.
+library;
+
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show ListenableBuilder;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../l10n/hui_localizations.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import 'catalog_form.dart';
 import 'extras_editor.dart';
-import 'inspector_widgets.dart';
-
-class NamesInspector extends StatelessWidget {
-  const NamesInspector({required this.store, super.key});
-
-  final EditorStore store;
-
-  @override
-  Widget build(BuildContext context) {
-    final GlossDoc? active = store.glossDoc;
-    if (active is! GlossNamesDoc) return const dom.div(<Widget>[]);
-    return dom.div(classes: 'hui-inspector-body', <Widget>[
-      InspectorSection(
-        title: huiText('Names'),
-        children: <Widget>[
-          HuiRevisionRow(revision: active.revision),
-          for (final GlossNameCategory category in GlossNameCategory.values)
-            ExtrasEditor(
-              title: glossNameCategoryLabel(category),
-              extensionKeys: false,
-              stringsOnly: true,
-              extras: Map<String, Object?>.of(
-                active.categories[category] ?? const <String, String>{},
-              ),
-              onChanged: (String label, Map<String, dynamic> next) =>
-                  store.mutateGloss(label, (GlossDoc doc) {
-                    if (doc is GlossNamesDoc) {
-                      doc.categories[category] = GlossNamesDoc.readNames(
-                        next,
-                        '\$.${category.name}',
-                      );
-                    }
-                  }),
-            ),
-        ],
-      ),
-    ]);
-  }
-}
 
 String glossNameCategoryLabel(GlossNameCategory category) => switch (category) {
   GlossNameCategory.materials => huiText('Materials'),
@@ -64,24 +27,38 @@ class NamesView extends StatelessWidget {
   final EditorStore store;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: store,
-    builder: (BuildContext context) => _content(),
-  );
+  Widget build(BuildContext context) =>
+      CatalogFormHost(store: store, builder: _content);
 
-  Widget _content() {
-    final GlossNamesCatalog catalog = store.workspaceNames;
-    return dom.div(classes: 'hui-inspector-body', <Widget>[
-      for (final GlossNameCategory category in GlossNameCategory.values)
-        InspectorSection(
-          title: glossNameCategoryLabel(category),
-          children: <Widget>[
-            for (final MapEntry<String, String> entry
-                in (catalog.categories[category] ?? const <String, String>{})
-                    .entries)
-              HuiField(label: entry.key, control: Text(entry.value)),
-          ],
-        ),
-    ]);
+  Widget _content(BuildContext context) {
+    final GlossDoc? active = store.glossDoc;
+    if (active is! GlossNamesDoc) return const Component.fragment(<Widget>[]);
+    return CatalogForm(
+      kind: huiText('Names'),
+      title: store.menuId,
+      revision: active.revision,
+      kindClass: 'is-names',
+      children: <Widget>[
+        for (final GlossNameCategory category in GlossNameCategory.values)
+          ExtrasEditor(
+            open: true,
+            title: glossNameCategoryLabel(category),
+            extensionKeys: false,
+            stringsOnly: true,
+            extras: Map<String, Object?>.of(
+              active.categories[category] ?? const <String, String>{},
+            ),
+            onChanged: (String label, Map<String, Object?> next) =>
+                store.mutateGloss(label, (GlossDoc doc) {
+                  if (doc is GlossNamesDoc) {
+                    doc.categories[category] = GlossNamesDoc.readNames(
+                      next,
+                      '\$.${category.name}',
+                    );
+                  }
+                }),
+          ),
+      ],
+    );
   }
 }

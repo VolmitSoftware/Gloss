@@ -5,15 +5,14 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 void main() {
-  test('the editor mounts both authored and in-game renderer surfaces', () {
+  test('the editor mounts the damage stage once, in game', () {
     final String app = File('lib/app.dart').readAsStringSync();
     expect(
-      RegExp(
-        r'DocumentSurface\.damageIndicators\s*:\s*DamageIndicatorView',
-      ).allMatches(app),
-      hasLength(2),
+      RegExp(r'DocumentSurface\.damageIndicators\s*:\s*DamageIndicatorView')
+          .allMatches(app),
+      hasLength(1),
     );
-    expect(app, contains('gameContext: true'));
+    expect(app, matches(RegExp(r'DamageIndicatorView\(store: _?store\)')));
   });
 
   test('the renderer exposes looping trajectory and transport controls', () {
@@ -33,14 +32,13 @@ void main() {
     expect(source, contains('_workspaceAnimationsPlaying'));
   });
 
-  test('the selected indicator type uses a complete perimeter emphasis', () {
-    final String css = File('web/styles/10-gloss.css').readAsStringSync();
-    expect(
-      css,
-      contains(
-        '.hui-damage-indicator-kind .arcane-button[aria-pressed="true"]',
-      ),
-    );
-    expect(css, contains('inset 0 0 0 1px var(--hui-accent)'));
+  test('the indicator type is the kit choice control, not pressed buttons', () {
+    final String source = File(
+      'lib/components/damage_indicators/damage_indicator_view.dart',
+    ).readAsStringSync();
+    expect(source, contains('ToggleChoice<DamageIndicatorPreviewKind>('));
+    expect(source, contains("huiText('Indicator type')"));
+    expect(source, isNot(contains("'aria-pressed'")));
+    expect(source, isNot(contains("'title'")));
   });
 }

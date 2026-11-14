@@ -1,0 +1,17 @@
+{
+  "type": "catalog",
+  "documents": [
+    {
+      "kind": "hologram",
+      "id": "spawn",
+      "path": "holograms/spawn.json",
+      "hash": "sha256:74d9b69ca7f83f99bee25de308c32fccf02db40fda445ba8f90a2f1beefa83eb",
+      "size": 331,
+      "revision": 2,
+      "summary": {
+        "name": "spawn"
+      },
+      "source": "server"
+    }
+  ]
+}

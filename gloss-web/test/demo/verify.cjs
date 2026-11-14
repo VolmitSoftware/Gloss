@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const shell = require('../support/shell.cjs');
 const captureRoot = path.resolve(__dirname,'../../.qa/demo/captures');
 const ids = process.argv.slice(2);
 const server = http.createServer((request,response)=>{
@@ -14,7 +14,7 @@ const server = http.createServer((request,response)=>{
 });
 (async()=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser=await chromium.launch({headless:true});
+  const browser=await shell.launch();
   const accepted=[];
   try {const page=await browser.newPage();for(const id of ids){
     await page.setContent('<video muted></video>');

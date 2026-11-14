@@ -14,6 +14,7 @@ import 'entity_overlays_document_type.dart';
 import 'gloss_document_type.dart';
 import 'hologram_document_type.dart';
 import 'inventory_document_type.dart';
+import 'leaderboard_document_type.dart';
 import 'marker_document_type.dart';
 import 'menu_document_type.dart';
 import 'names_document_type.dart';
@@ -62,6 +63,7 @@ abstract final class DocumentTypes {
   static const NameplateDocumentType nameplate = NameplateDocumentType();
   static const NametagDocumentType nametag = NametagDocumentType();
   static const MarkerDocumentType marker = MarkerDocumentType();
+  static const LeaderboardDocumentType leaderboard = LeaderboardDocumentType();
 }
 
 /// The closed set of adapters.
@@ -96,6 +98,7 @@ abstract final class DocumentTypeRegistry {
         WorkspaceDocKind.nameplate: DocumentTypes.nameplate,
         WorkspaceDocKind.nametag: DocumentTypes.nametag,
         WorkspaceDocKind.marker: DocumentTypes.marker,
+        WorkspaceDocKind.leaderboard: DocumentTypes.leaderboard,
       };
 
   /// Every adapter, in workspace-rail order.
@@ -126,6 +129,7 @@ abstract final class DocumentTypeRegistry {
     DocumentTypes.nameplate,
     DocumentTypes.nametag,
     DocumentTypes.marker,
+    DocumentTypes.leaderboard,
   ];
 
   /// Every adapter in mode-tab order, which is [DocumentTypeAdapter.tabOrder]

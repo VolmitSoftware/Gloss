@@ -36,23 +36,33 @@ extension _PreviewCardInteractions on _PreviewCardViewportState {
 
   void _commitView(PreviewCardView next) {
     _view = next;
-    _syncZoomReadout();
     _statusDirty = true;
     _markDirty();
   }
 
-  void _syncZoomReadout() {
-    web.document.getElementById(_zoomLabelId)?.textContent = _zoomLabelText;
+  /// A zoom or pan by the user: the card keeps this camera from now on,
+  /// across resizes and document switches, until Reset view.
+  void _commitHandView(PreviewCardView next) {
+    _camera.moved(next);
+    _commitView(next);
   }
 
-  void _resetView() => _commitView(_view.reset());
+  /// Reset view (and the 0 and F keys): forget the hand-set camera and frame
+  /// the card again.
+  void _resetView() {
+    _camera.reset();
+    _fitToContent();
+  }
 
   void _fitToContent() {
     if (!_view.hasArea) return;
+    _fittedLabelWidths = _labelWidths;
+    // The card zooms in whole steps, so a phone-wide frame spends less on
+    // padding to reach the next step.
     _commitView(
       _view.fittedTo(
         previewSceneBounds(_currentScene, labelWidths: _labelWidths),
-        paddingPx: 32,
+        paddingPx: math.min(32, math.min(_view.widthPx, _view.heightPx) * 0.04),
       ),
     );
   }
@@ -90,7 +100,7 @@ extension _PreviewCardInteractions on _PreviewCardViewportState {
       _eventDouble(wheel, 'clientX'),
       _eventDouble(wheel, 'clientY'),
     );
-    _commitView(_view.zoomedAt(next, screenX: local.x, screenY: local.y));
+    _commitHandView(_view.zoomedAt(next, screenX: local.x, screenY: local.y));
   }
 
   // --- pointer --------------------------------------------------------------
@@ -244,7 +254,7 @@ extension _PreviewCardInteractions on _PreviewCardViewportState {
       case _PreviewDragMode.none:
         break;
       case _PreviewDragMode.pan:
-        _commitView(
+        _commitHandView(
           _view.pannedBy(clientX - _lastClientX, clientY - _lastClientY),
         );
       case _PreviewDragMode.element:
@@ -413,15 +423,14 @@ extension _PreviewCardInteractions on _PreviewCardViewportState {
         _nudge(0, -1, key.shiftKey);
       case '+':
       case '=':
-        _commitView(_view.zoomedAtCenter(previewZoomIn(_view.zoom)));
+        _commitHandView(_view.zoomedAtCenter(previewZoomIn(_view.zoom)));
       case '-':
       case '_':
-        _commitView(_view.zoomedAtCenter(previewZoomOut(_view.zoom)));
+        _commitHandView(_view.zoomedAtCenter(previewZoomOut(_view.zoom)));
       case '0':
-        _resetView();
       case 'f':
       case 'F':
-        _fitToContent();
+        _resetView();
       default:
         handled = false;
     }

@@ -5,9 +5,9 @@
 /// components without character truncation. Empty titles stay blank. At most
 /// 15 visible lines reach the client, with each row's authored score format.
 ///
-/// With `gameContext` the sidebar mounts into the shared game-screen frame at
-/// the right edge, where the client actually draws it; without it the surface
-/// keeps its editor stage, readout and the board-selection simulator.
+/// The sidebar mounts into the shared game-screen frame at the right edge,
+/// where the client draws it, scaled down as one picture when the screen is
+/// too small for it.
 ///
 /// Owns a playback clock while any rendered line (or the title) plays an
 /// animation and the store's animations toggle is on. Mounted only while the
@@ -16,6 +16,7 @@ library;
 
 import '../../logic/gloss_show.dart';
 import '../../logic/scoreboard_layout.dart';
+
 import 'dart:async';
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
@@ -25,39 +26,31 @@ import '../../logic/gloss_text.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
 import '../gloss/gloss_game_screen.dart';
-import '../gloss/gloss_preview_zoom.dart';
+import '../../ui/action_row.dart';
+import '../../ui/mode.dart';
 import '../gloss/gloss_text_line.dart';
 import 'scoreboard_selection.dart';
-import 'scoreboard_selection_simulator.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// Animation repaint period, matching the hologram stage.
 const Duration _tickPeriod = Duration(milliseconds: 50);
 
 class ScoreboardView extends StatefulWidget {
-  const ScoreboardView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const ScoreboardView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the sidebar inside the shared Minecraft game-screen frame instead
-  /// of the editor stage. False renders exactly the editor surface.
-  final bool gameContext;
 
   @override
   State<ScoreboardView> createState() => _ScoreboardViewState();
 }
 
 class _ScoreboardViewState extends State<ScoreboardView> {
+  /// The sample viewer every condition is resolved for.
+  static const String _world = 'world';
+  static const double _health = 20;
+
   Timer? _ticker;
-  bool _sceneBackdrop = false;
-  String _world = 'world';
-  String _groups = '';
-  String _permission = '';
-  double _health = 20;
 
   EditorStore get _store => component.store;
 
@@ -145,15 +138,9 @@ class _ScoreboardViewState extends State<ScoreboardView> {
     final GlossScoreboardDoc? doc = _store.scoreboardDoc;
     if (doc == null) {
       _syncTicker(false);
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.sidebar,
-          label: huiText('Scoreboard in game'),
-        );
-      }
-      return const dom.div(
-        classes: 'hui-scoreboard-stage is-empty',
-        <Widget>[],
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.sidebar,
+        label: huiText('Scoreboard in game'),
       );
     }
     final GlossAnimationResolver animations = _store.workspaceAnimations;
@@ -202,7 +189,7 @@ class _ScoreboardViewState extends State<ScoreboardView> {
         ]),
         for (int index = 0; index < rendered; index++)
           dom.div(classes: 'hui-scoreboard-row', <Widget>[
-            dom.span(classes: 'hui-scoreboard-row-text', <Widget>[
+            dom.span(<Widget>[
               GlossTextLine(
                 render: renderGlossScoreboardLine(
                   presentation.lines[index].text,
@@ -236,91 +223,32 @@ class _ScoreboardViewState extends State<ScoreboardView> {
       ],
     );
 
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.sidebar,
-        label: huiText('Scoreboard in game'),
-        controls: <Widget>[_playPause()],
-        child: sidebar,
-      );
-    }
-
-    return dom.div(classes: 'hui-scoreboard-stage', <Widget>[
-      dom.div(
-        classes: 'hui-scoreboard-sky${_sceneBackdrop ? ' is-scene' : ''}',
-        <Widget>[
-          GlossPreviewZoom(
-            label: huiText('Scoreboard preview'),
-            alignment: _sceneBackdrop
-                ? GlossPreviewAlignment.end
-                : GlossPreviewAlignment.center,
-            child: sidebar,
-          ),
-          dom.div(
-            classes: 'hui-scoreboard-view-controls',
-            attributes: <String, String>{
-              'role': 'group',
-              'aria-label': huiText('Scoreboard preview controls'),
-            },
-            <Widget>[
-              _playPause(),
-              Button(
-                variant: ButtonVariant.outline,
-                size: ButtonSize.small,
-                onPressed: () =>
-                    setState(() => _sceneBackdrop = !_sceneBackdrop),
-                icon: ArcaneIcon.image(size: IconSize.sm),
-                label: _sceneBackdrop
-                    ? huiText('Centered stage')
-                    : huiText('Right-side scene'),
-              ),
-            ],
-          ),
-        ],
-      ),
-      dom.div(classes: 'hui-scoreboard-readout', <Widget>[
-        Text(_readout(presentation, variantId, clipped)),
-      ]),
-      _conditionControls(),
-      ScoreboardSelectionSimulator(store: _store, context: conditionContext),
-    ]);
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.sidebar,
+      label: huiText('Scoreboard in game'),
+      actions: <RowAction>[_playPause()],
+      status: _status(ModeScope.advanced(context) ? variantId : null, clipped),
+      child: sidebar,
+    );
   }
 
-  /// The animation transport, the same shape the hologram stage uses. It
-  /// drives the store's workspace-wide toggle, so pausing here pauses every
-  /// surface that references an animation.
-  Widget _playPause() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: () => _store.animationsPlaying = !_store.animationsPlaying,
-    attributes: <String, String>{
-      'aria-label': _store.animationsPlaying
-          ? huiText('Pause animations')
-          : huiText('Play animations'),
-      'title': _store.animationsPlaying
-          ? huiText('Pause animations')
-          : huiText('Play animations'),
-    },
-    icon: _store.animationsPlaying
-        ? ArcaneIcon.pause(size: IconSize.sm)
-        : ArcaneIcon.play(size: IconSize.sm),
+  /// The animation transport. It drives the store's workspace-wide toggle,
+  /// so pausing here pauses every surface that references an animation.
+  RowAction _playPause() => RowAction(
+    _store.animationsPlaying
+        ? huiText('Pause animations')
+        : huiText('Play animations'),
+    () => _store.animationsPlaying = !_store.animationsPlaying,
+    icon: _store.animationsPlaying ? ArcaneIcon.pause() : ArcaneIcon.play(),
+    iconOnly: true,
   );
 
-  String _readout(
-    GlossScoreboardPresentation presentation,
-    String? variantId,
-    int clipped,
-  ) {
+  /// What one look at the sidebar cannot tell: the variant shown (Advanced)
+  /// and the lines past the client's cap. Null when there is nothing to say.
+  String? _status(String? variantId, int clipped) {
     final List<String> parts = <String>[
-      variantId == null
-          ? huiText('default presentation')
-          : huiText('variant: {id}', <String, Object?>{'id': variantId}),
-      presentation.hideNumbers
-          ? huiText(
-              'score numbers hidden — 1.20.3 and newer only; older servers '
-              'still draw the red column',
-            )
-          : huiText('score numbers visible'),
+      if (variantId != null)
+        huiText('variant: {id}', <String, Object?>{'id': variantId}),
       if (clipped > 0)
         huiPlural(
           'scoreboard.readout.clipped-lines',
@@ -329,21 +257,13 @@ class _ScoreboardViewState extends State<ScoreboardView> {
           otherEnglish: '{count} lines past the 15-line render cap',
         ),
     ];
-    return parts.join(' · ');
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   String _effectiveTitle(GlossScoreboardPresentation presentation) =>
       presentation.title;
 
   GlossConditionContext _conditionContext() {
-    final Set<String> groups = _groups
-        .split(',')
-        .map((String value) => value.trim().toLowerCase())
-        .where((String value) => value.isNotEmpty)
-        .toSet();
-    final Set<String> permissions = <String>{
-      if (_permission.trim().isNotEmpty) _permission.trim(),
-    };
     const double maxHealth = 20;
     return GlossConditionContext(
       variables: <String, Object?>{
@@ -368,60 +288,9 @@ class _ScoreboardViewState extends State<ScoreboardView> {
         'server.maxPlayers': 100.0,
         'server.tps': 20.0,
       },
-      groups: groups,
-      permissions: permissions,
+      groups: const <String>{},
+      permissions: const <String>{},
       metrics: <String, double>{'react.tick-ms': 50},
     );
   }
-
-  Widget _conditionControls() =>
-      dom.div(classes: 'hui-scoreboard-sim-controls', <Widget>[
-        dom.label(classes: 'hui-scoreboard-sim-field', <Widget>[
-          dom.span(classes: 'hui-scoreboard-sim-label', <Widget>[
-            Text(huiText('World')),
-          ]),
-          TextInput(
-            value: _world,
-            size: ComponentSize.sm,
-            onChanged: (String value) => setState(() => _world = value),
-          ),
-        ]),
-        dom.label(classes: 'hui-scoreboard-sim-field', <Widget>[
-          dom.span(classes: 'hui-scoreboard-sim-label', <Widget>[
-            Text(huiText('Health')),
-          ]),
-          TextInput(
-            value: '$_health',
-            size: ComponentSize.sm,
-            onChanged: (String value) {
-              final double? parsed = double.tryParse(value);
-              if (parsed != null) {
-                setState(() => _health = parsed.clamp(0, 20));
-              }
-            },
-          ),
-        ]),
-        dom.label(classes: 'hui-scoreboard-sim-field', <Widget>[
-          dom.span(classes: 'hui-scoreboard-sim-label', <Widget>[
-            Text(huiText('Groups')),
-          ]),
-          TextInput(
-            value: _groups,
-            size: ComponentSize.sm,
-            placeholder: huiText('vip, staff'),
-            onChanged: (String value) => setState(() => _groups = value),
-          ),
-        ]),
-        dom.label(classes: 'hui-scoreboard-sim-field', <Widget>[
-          dom.span(classes: 'hui-scoreboard-sim-label', <Widget>[
-            Text(huiText('Permission')),
-          ]),
-          TextInput(
-            value: _permission,
-            size: ComponentSize.sm,
-            placeholder: huiText('gloss.board.vip'),
-            onChanged: (String value) => setState(() => _permission = value),
-          ),
-        ]),
-      ]);
 }

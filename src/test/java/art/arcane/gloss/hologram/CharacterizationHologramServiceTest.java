@@ -86,11 +86,11 @@ class CharacterizationHologramServiceTest {
     }
 
     @Test
-    void renderStaticLinesJoinsWithNewlinesAndAppliesColors() {
-        assertEquals("§aA§r\nB", harness.service.renderStaticLines(List.of("&aA", "B")));
+    void renderStaticLinesJoinsOneDisplayAndAppliesColors() {
+        assertEquals("§aA\nB", harness.service.renderStaticLines(List.of("&aA", "B")));
         assertEquals("solo", harness.service.renderStaticLines(List.of("solo")));
         assertEquals("", harness.service.renderStaticLines(List.of()));
-        assertEquals("a§r\n§r\nb", harness.service.renderStaticLines(List.of("a", "", "b")),
+        assertEquals("a\n\nb", harness.service.renderStaticLines(List.of("a", "", "b")),
             "blank lines must be preserved as empty segments");
     }
 

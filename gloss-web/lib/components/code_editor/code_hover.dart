@@ -24,7 +24,7 @@ import '../../logic/json_schema.dart';
 import 'json_caret.dart';
 
 /// One key token's box, in the highlight layer's own coordinates: relative to
-/// the `<pre>` border box, so it survives every scroll of `.hui-code-body`.
+/// the `<pre>` border box, so it survives every scroll of `.hui-json-body`.
 final class HuiCodeKeyBox {
   const HuiCodeKeyBox({
     required this.offset,

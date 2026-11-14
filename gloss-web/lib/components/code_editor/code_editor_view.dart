@@ -38,9 +38,9 @@
 ///
 /// Highlighting is a `<pre>` of coloured spans laid out underneath a
 /// transparent textarea. Both carry identical font metrics and padding, and
-/// `.hui-code-input` is sized to the pre — as wide as the longest line and as
-/// tall as the document — so the textarea over it covers every line and neither
-/// layer can scroll on its own. All scrolling belongs to `.hui-code-body`,
+/// `.hui-json-input` is sized to the pre (as wide as the longest line and as
+/// tall as the document), so the textarea over it covers every line and neither
+/// layer can scroll on its own. All scrolling belongs to `.hui-json-body`,
 /// which moves both layers and the gutter as one.
 ///
 /// ## Completion
@@ -69,13 +69,9 @@
 ///
 /// Measured boxes rather than character arithmetic, because they come from the
 /// browser's layout of the very glyphs on screen: a wide glyph, a ligature or a
-/// fallback font cannot slide the answer onto the wrong key. The card itself
-/// reuses the app's tooltip surface — the `gloss-tooltip-overlay-content`
-/// classes from `11-tooltip-overlay.css` — rather than inventing a second
-/// tooltip look. It cannot use the shared overlay's `data-gloss-tooltip-text`
-/// trigger convention, because that script keys off `mouseover`, which fires
-/// once when the pointer enters the textarea and never again as it moves from
-/// key to key.
+/// fallback font cannot slide the answer onto the wrong key. The card is drawn
+/// on popover tokens at the measured point: a trigger-bound library tooltip
+/// cannot follow the pointer from key to key inside one textarea.
 ///
 /// The one place this pane still does character arithmetic is the completion
 /// popup's anchor, which needs a caret pixel and has no span to measure. The
@@ -97,17 +93,19 @@ import '../../config/gloss_json_schema.dart';
 import '../../logic/json_schema.dart';
 import '../../model/json_codec.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/confirm_dialog.dart';
 import '../inspector/dom_bridge.dart';
 import '../shell/key_listener.dart';
-import '../shell/shell_keys.dart';
 import 'code_completion.dart';
 import 'code_dom.dart';
 import 'code_editor_chrome.dart';
 import 'code_drafts.dart';
+import 'code_text.dart';
 import 'code_hover.dart';
 import 'json_caret.dart';
 import 'json_highlight.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class CodeEditorView extends StatefulWidget {
@@ -128,10 +126,10 @@ class CodeEditorView extends StatefulWidget {
 /// pane is torn down and re-created sixty times a second for the whole gesture.
 const Duration huiCodeAdoptQuiet = Duration(milliseconds: 250);
 
-/// The highlight layer's padding, in px. `.hui-code-area` in
-/// `05-panels-dialogs.css` must carry the same two numbers or the colours slide
-/// off the glyphs; they are named here because the caret arithmetic measures
-/// from them.
+/// The highlight layer's padding, in px. `.hui-json-area` in
+/// `04-inspector.css` must carry the same two numbers or the colours slide off
+/// the glyphs; they are named here because the caret arithmetic measures from
+/// them.
 const int huiCodePadTop = 12;
 const int huiCodePadLeft = 16;
 
@@ -199,11 +197,11 @@ class _CodeEditorViewState extends State<CodeEditorView> {
   late final int _seq = _nextSeq++;
   static int _nextSeq = 0;
 
-  String get _areaId => 'hui-code-area-$_seq';
+  String get _areaId => 'hui-json-area-$_seq';
 
-  String get _preId => 'hui-code-pre-$_seq';
+  String get _preId => 'hui-json-pre-$_seq';
 
-  String get _measureId => 'hui-code-measure-$_seq';
+  String get _measureId => 'hui-json-measure-$_seq';
 
   EditorStore get _store => component.store;
 
@@ -254,12 +252,13 @@ class _CodeEditorViewState extends State<CodeEditorView> {
   void _bindDocument() {
     _documentId = _store.workspace.activeId ?? '';
     _lastStoreJson = _store.canTransferDocument ? _store.exportJson() : '';
+    final String shown = huiCodeViewText(_lastStoreJson);
     final String? draft = _documentId.isEmpty
         ? null
         : _drafts.peek(_documentId);
-    final bool restore = draft != null && draft != _lastStoreJson;
-    _setText(restore ? draft : _lastStoreJson);
-    _baseText = _lastStoreJson;
+    final bool restore = draft != null && draft != shown;
+    _setText(restore ? draft : shown);
+    _baseText = shown;
     _restoredDraft = restore;
     _actionError = null;
     _syntaxHint = restore ? _hintFor(_text) : null;
@@ -330,8 +329,8 @@ class _CodeEditorViewState extends State<CodeEditorView> {
   void _adoptStoreText() {
     if (!_store.canTransferDocument) return;
     _lastStoreJson = _store.exportJson();
-    _setText(_lastStoreJson);
-    _baseText = _lastStoreJson;
+    _setText(huiCodeViewText(_lastStoreJson));
+    _baseText = _text;
     _actionError = null;
     _syntaxHint = null;
     _pendingExternal = null;
@@ -716,16 +715,19 @@ class _CodeEditorViewState extends State<CodeEditorView> {
 
   @override
   Widget build(BuildContext context) => dom.div(
-    classes: 'hui-code',
+    classes: 'hui-json',
     events: <String, EventCallback>{'keydown': _onKeyDown},
     <Widget>[
       _toolbar(),
-      if (_actionError != null) HuiCodeErrorStrip(_actionError!()),
-      if (_pendingExternal != null) _externalNotice(),
-      if (_restoredDraft) _draftNotice(),
+      if (_actionError != null || _pendingExternal != null || _restoredDraft)
+        dom.div(classes: 'hui-json-notes', <Widget>[
+          if (_actionError != null) HuiJsonErrorAlert(_actionError!()),
+          if (_pendingExternal != null) _externalNotice(),
+          if (_restoredDraft) _draftNotice(),
+        ]),
       _editor(),
       if (_completionOpen)
-        HuiCodeCompletionPopup(
+        HuiJsonCompletionPopup(
           items: _completionItems,
           index: _completionIndex,
           x: _completionX,
@@ -737,166 +739,129 @@ class _CodeEditorViewState extends State<CodeEditorView> {
           },
         ),
       if (_hoverDoc != null)
-        HuiCodeHoverCard(doc: _hoverDoc!, x: _hoverX, y: _hoverY),
+        HuiJsonHoverCard(doc: _hoverDoc!, x: _hoverX, y: _hoverY),
       ListenableBuilder(
         listenable: _store,
-        builder: (BuildContext inner) => HuiCodeIssueList(_store.issues),
+        builder: (BuildContext inner) => HuiJsonIssueList(_store.issues),
       ),
     ],
   );
 
+  /// One dense toolbar: what the buffer is on the left, then Revert (only
+  /// while dirty), Format, and Save last. Save is disabled rather than a
+  /// no-op on a clean buffer, and the chord is disabled with it in [_save].
   Widget _toolbar() {
-    final bool apple = isApplePlatform();
-    final String saveKeys = shortcutLabel('mod+S', apple: apple);
-    return dom.div(classes: 'hui-code-toolbar', <Widget>[
-      dom.div(classes: 'hui-code-toolbar-info', <Widget>[
-        // Every kind shares this view now, so the eyebrow names the open one
-        // rather than claiming a scoreboard's JSON is a menu's.
-        HuiEyebrow(
-          huiText("{noun} JSON", <String, Object?>{
-            'noun': _store.docType.noun,
-          }),
-        ),
-        dom.span(classes: 'hui-code-stat', <Widget>[
-          Text(
-            huiText('{lines} · {characters}', <String, Object?>{
-              'lines': huiPlural(
-                'code_editor.line_count',
-                _lineCount,
-                oneEnglish: '{count} line',
-                otherEnglish: '{count} lines',
+    final String noun = huiText('{noun} JSON', <String, Object?>{
+      'noun': _store.docType.noun,
+    });
+    return dom.div(classes: 'hui-json-toolbar', <Widget>[
+      ActionRow(
+        dense: true,
+        label: noun,
+        moreId: 'hui-json-more',
+        leading: <Widget>[
+          dom.div(classes: 'hui-json-meta', <Widget>[
+            // Every kind shares this view, so the title names the open one.
+            dom.span(classes: 'hui-json-title', <Widget>[Text(noun)]),
+            // The state stays whole; the stat after it is what shortens.
+            huiJsonStateBadge(dirty: _dirty, saved: _saved),
+            if (_syntaxHint != null)
+              dom.span(
+                classes: 'hui-json-hint',
+                attributes: const <String, String>{'aria-live': 'polite'},
+                <Widget>[Text(_syntaxHint!())],
               ),
-              'characters': huiPlural(
-                'code_editor.character_count',
-                _text.length,
-                oneEnglish: '{count} character',
-                otherEnglish: '{count} characters',
+            dom.span(classes: 'hui-json-stat', <Widget>[
+              Text(
+                huiText('{lines} · {characters}', <String, Object?>{
+                  'lines': huiPlural(
+                    'code_editor.line_count',
+                    _lineCount,
+                    oneEnglish: '{count} line',
+                    otherEnglish: '{count} lines',
+                  ),
+                  'characters': huiPlural(
+                    'code_editor.character_count',
+                    _text.length,
+                    oneEnglish: '{count} character',
+                    otherEnglish: '{count} characters',
+                  ),
+                }),
               ),
-            }),
-          ),
-        ]),
-        HuiCodeStateChip(dirty: _dirty, saved: _saved),
-      ]),
-      dom.div(classes: 'hui-code-toolbar-tools', <Widget>[
-        if (_syntaxHint != null)
-          dom.span(
-            classes: 'hui-code-syntax-hint',
-            attributes: const <String, String>{'aria-live': 'polite'},
-            <Widget>[Text(_syntaxHint!())],
-          ),
-        if (_dirty)
-          ArcaneTooltip(
-            text: huiText(
-              'Throw the unsaved text away and re-read the document',
-            ),
-            child: Button(
-              variant: ButtonVariant.ghost,
-              size: ButtonSize.small,
-              onPressed: _revert,
-              icon: ArcaneIcon.rotateCcw(size: IconSize.sm),
-              label: huiText('Revert'),
-              attributes: <String, String>{
-                'aria-label': huiText('Discard the unsaved code edits'),
-              },
-            ),
-          ),
-        ArcaneTooltip(
-          text: huiText('Re-indent this buffer'),
-          child: Button(
-            variant: ButtonVariant.ghost,
-            size: ButtonSize.small,
-            onPressed: _reformat,
-            icon: ArcaneIcon.wand(size: IconSize.sm),
-            label: huiText('Format'),
-            attributes: <String, String>{
-              'aria-label': huiText('Reformat the JSON in the buffer'),
-            },
-          ),
-        ),
-        dom.span(
-          classes: classNames(<String?>[
-            'hui-code-save',
-            _dirty ? 'is-dirty' : null,
+            ]),
           ]),
-          <Widget>[
-            ArcaneTooltip(
-              text: _dirty
-                  ? huiText(
-                      'Commit this buffer to the document ({keys})',
-                      <String, Object?>{'keys': saveKeys},
-                    )
-                  : huiText('Nothing to save ({keys})', <String, Object?>{
-                      'keys': saveKeys,
-                    }),
-              child: Button(
-                variant: _dirty ? ButtonVariant.primary : ButtonVariant.ghost,
-                size: ButtonSize.small,
-                // Disabled rather than a no-op: a live control that reports
-                // "Saved" without saving anything is a lie about what just
-                // happened. The chord is disabled with it, in `_save`.
-                disabled: !_dirty,
-                onPressed: _save,
-                icon: ArcaneIcon.save(size: IconSize.sm),
-                label: huiText('Save'),
-                attributes: <String, String>{
-                  'aria-label': huiText('Save the JSON to the document'),
-                },
-              ),
+        ],
+        secondary: <RowAction>[
+          if (_dirty)
+            RowAction(
+              huiText('Revert'),
+              _confirmRevert,
+              icon: ArcaneIcon.rotateCcw(),
             ),
-          ],
+          RowAction(huiText('Format'), _reformat, icon: ArcaneIcon.wand()),
+        ],
+        primary: RowAction(
+          huiText('Save'),
+          _dirty ? _save : null,
+          icon: ArcaneIcon.save(),
+          attributes: <String, String>{
+            'aria-keyshortcuts': isApplePlatform() ? 'Meta+S' : 'Control+S',
+          },
         ),
-      ]),
+      ),
     ]);
   }
 
-  Widget _externalNotice() => HuiCodeNotice(
+  /// The buffer is not on the undo stack, so throwing it away asks first.
+  Future<void> _confirmRevert() async {
+    final bool discard = await askToConfirm(
+      title: huiText('Discard the unsaved code edits'),
+      message: huiText('Throw the unsaved text away and re-read the document'),
+      confirmLabel: huiText('Revert'),
+      destructive: true,
+    );
+    if (discard && mounted) _revert();
+  }
+
+  Widget _externalNotice() => HuiJsonNotice(
     warning: true,
     message: huiText(
-      'The document changed somewhere else while this buffer had unsaved '
-      'edits. Your text is still here; saving it overwrites that change.',
+      'The document changed elsewhere. Saving overwrites that change.',
     ),
-    actions: <Widget>[
-      Button(
-        variant: ButtonVariant.ghost,
-        size: ButtonSize.small,
-        onPressed: () => setState(() => _pendingExternal = null),
-        label: huiText('Keep editing'),
-      ),
-      Button(
-        variant: ButtonVariant.ghost,
-        size: ButtonSize.small,
-        onPressed: _revert,
-        label: huiText('Discard mine and reload'),
-      ),
-    ],
+    cancel: RowAction(
+      huiText('Keep editing'),
+      () => setState(() => _pendingExternal = null),
+    ),
+    primary: RowAction(
+      huiText('Discard mine and reload'),
+      _confirmRevert,
+      destructive: true,
+    ),
   );
 
-  Widget _draftNotice() => HuiCodeNotice(
-    message: huiText(
-      'Unsaved code edits restored. They were kept when this pane closed '
-      'and have not reached the document yet.',
-    ),
-    actions: <Widget>[
-      Button(
-        variant: ButtonVariant.ghost,
-        size: ButtonSize.small,
-        onPressed: () => setState(() => _restoredDraft = false),
-        label: huiText('Got it'),
+  Widget _draftNotice() => HuiJsonNotice(
+    message: huiText('Unsaved code edits restored.'),
+    secondary: <RowAction>[
+      RowAction(
+        huiText('Got it'),
+        () => setState(() => _restoredDraft = false),
       ),
     ],
   );
 
   Widget _editor() => dom.div(
-    classes: 'hui-code-body',
+    classes: 'hui-json-body',
+    // JSON reads left to right in every locale.
+    attributes: const <String, String>{'dir': 'ltr'},
     events: <String, EventCallback>{'scroll': _onScroll},
     <Widget>[
       dom.div(
-        classes: 'hui-code-gutter',
+        classes: 'hui-json-gutter',
         attributes: const <String, String>{'aria-hidden': 'true'},
         <Widget>[
           for (int line = 1; line <= _lineCount; line++)
-            dom.span(classes: 'hui-code-line', <Widget>[
-              Text(huiText("{line}", <String, Object?>{'line': line})),
+            dom.span(<Widget>[
+              Text(huiText('{line}', <String, Object?>{'line': line})),
             ]),
         ],
       ),
@@ -905,7 +870,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
       // over it at 100% x 100%. Both must agree on font, padding and
       // wrapping or the colours slide off the glyphs.
       dom.div(
-        classes: 'hui-code-input',
+        classes: 'hui-json-input',
         events: <String, EventCallback>{
           'mousemove': _onPointerMove,
           'mouseleave': _onPointerLeave,
@@ -916,7 +881,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
           dom.textarea(
             <Widget>[Component.text(_text)],
             key: ValueKey<int>(_syncGeneration),
-            classes: 'hui-code-area',
+            classes: 'hui-json-area',
             rows: _lineCount,
             onInput: _onInput,
             id: _areaId,
@@ -928,7 +893,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
                 'width': '100%',
                 'height': '100%',
                 'color': 'transparent',
-                'caret-color': 'var(--hui-text)',
+                'caret-color': 'var(--foreground)',
                 'background': 'transparent',
               },
             ),
@@ -938,7 +903,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
               'autocapitalize': 'off',
               'autocomplete': 'off',
               'autocorrect': 'off',
-              'aria-label': huiText("{noun} JSON", <String, Object?>{
+              'aria-label': huiText('{noun} JSON', <String, Object?>{
                 'noun': _store.docType.noun,
               }),
             },
@@ -953,7 +918,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
   /// arithmetic needs and the only honest way to get it: the font stack resolves
   /// in the browser, not here.
   Widget _measureProbe() => dom.span(
-    classes: 'hui-code-measure',
+    classes: 'hui-json-measure',
     attributes: <String, String>{'id': _measureId, 'aria-hidden': 'true'},
     const <Widget>[Text('0000000000')],
   );
@@ -963,7 +928,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
   ///
   /// Key spans carry `data-hui-key` with their source offset. That attribute is
   /// the hover's whole index: `huiCodeKeyBoxes` finds the spans by it and reads
-  /// their measured boxes.
+  /// their measured boxes. Token colours come from `is-<kind>` classes.
   Widget _highlightLayer() => dom.pre(
     <Widget>[
       for (final JsonSpan span in _spans)
@@ -971,26 +936,24 @@ class _CodeEditorViewState extends State<CodeEditorView> {
           Component.text(span.token.text)
         else
           dom.span(
+            classes: 'is-${span.token.kind.name}',
             attributes: span.token.kind == JsonTokenKind.key
                 ? <String, String>{'data-hui-key': '${span.start}'}
                 : const <String, String>{},
-            styles: dom.Styles(
-              raw: <String, String>{'color': _tokenColor(span.token.kind)},
-            ),
             <Widget>[Component.text(span.token.text)],
           ),
       // Keeps a final line box alive when the document ends on a newline,
       // so the pre never comes up one line shorter than the textarea.
       const Component.text('\u200B'),
     ],
-    classes: 'hui-code-highlight',
+    classes: 'hui-json-highlight',
     id: _preId,
     attributes: const <String, String>{'aria-hidden': 'true'},
     styles: const dom.Styles(
       raw: <String, String>{
         'margin': '0',
-        // Must match `.hui-code-area` exactly or the colours slide off the
-        // glyphs — and it is this padding that the wrapper, and through it
+        // Must match `.hui-json-area` exactly or the colours slide off the
+        // glyphs, and it is this padding that the wrapper, and through it
         // the textarea, is measured from.
         'padding': '${huiCodePadTop}px ${huiCodePadLeft}px',
         'font': 'inherit',
@@ -998,17 +961,7 @@ class _CodeEditorViewState extends State<CodeEditorView> {
         'white-space': 'pre',
         'tab-size': '2',
         'pointer-events': 'none',
-        'color': 'var(--hui-text)',
       },
     ),
   );
-
-  static String _tokenColor(JsonTokenKind kind) => switch (kind) {
-    JsonTokenKind.key => 'var(--hui-accent)',
-    JsonTokenKind.string => 'var(--hui-success, #2e7d55)',
-    JsonTokenKind.number => 'var(--hui-info, #007acc)',
-    JsonTokenKind.literal => 'var(--hui-warning, #a06022)',
-    JsonTokenKind.punctuation => 'var(--hui-muted)',
-    JsonTokenKind.plain => 'var(--hui-text)',
-  };
 }

@@ -19,14 +19,17 @@ import '../../mc/scene/mc_scene.dart';
 import '../../model/model.dart';
 import '../../preview/projection.dart';
 import '../../state/editor_store.dart';
-import '../common/hui_number_field.dart';
+import '../../ui/action_row.dart';
+import '../../ui/menu.dart';
+import '../../ui/field.dart';
+import '../../ui/number_field.dart';
+import '../../ui/toggle_choice.dart';
 import '../gloss/gloss_display_text.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_particle_overlay.dart';
 import '../gloss/gloss_text_line.dart';
 import '../mc/mc_asset_loader.dart';
 import '../mc/mc_dom_layer.dart';
-import '../mc/mc_stage.dart';
 import '../mc/mc_stage_controller.dart';
 import '../scoreboard/scoreboard_selection.dart';
 
@@ -38,14 +41,9 @@ const int _hurtMs = 500;
 const int _critMs = 200;
 
 class DamageIndicatorView extends StatefulWidget {
-  const DamageIndicatorView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const DamageIndicatorView({required this.store, super.key});
 
   final EditorStore store;
-  final bool gameContext;
 
   @override
   State<DamageIndicatorView> createState() => _DamageIndicatorViewState();
@@ -69,12 +67,12 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
   /// clock, so the flash repeats with the loop.
   int _hitAtMs = 0;
 
-  /// The editor stage frames the target's midriff and orbits; the game frame
-  /// stands at the client's eye over the target and does not.
+  /// The game frame stands at the client's eye over the target and does not
+  /// orbit.
   late final McStageController _stage = McStageController(
-    kind: component.gameContext ? McStageKind.frame : McStageKind.indicators,
-    homePivot: McVec3(0.5, component.gameContext ? mcCameraEyeHeight : 0.9, 0.5),
-    freeCamera: !component.gameContext,
+    kind: McStageKind.frame,
+    homePivot: const McVec3(0.5, mcCameraEyeHeight, 0.5),
+    freeCamera: false,
   );
   late McCamera _lastCamera = _stage.camera;
   late bool _lastWebGl = _stage.webGlAvailable;
@@ -97,7 +95,8 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
   }
 
   /// The no-WebGL sprite for a node, off the catalogs the store holds now.
-  String? _spriteFor(McSceneNode node) => mcCatalogSpriteFor(_store.catalogs, node);
+  String? _spriteFor(McSceneNode node) =>
+      mcCatalogSpriteFor(_store.catalogs, node);
 
   @override
   void didUpdateWidget(covariant DamageIndicatorView oldComponent) {
@@ -133,7 +132,7 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
   }
 
   /// Only a camera move or a lost WebGL context needs a rebuild here: the
-  /// anchor transforms and the readout are built in [build], every other
+  /// anchor transforms are built in [build], every other
   /// notification is this view's own scene write.
   void _onStageChanged() {
     if (_lastCamera == _stage.camera && _lastWebGl == _stage.webGlAvailable) {
@@ -210,15 +209,9 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
       _ticker?.cancel();
       _ticker = null;
       _stage.animating = false;
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.world,
-          label: huiText('Damage indicators in game'),
-        );
-      }
-      return const dom.div(
-        classes: 'hui-damage-indicator-stage is-empty',
-        <Widget>[],
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.world,
+        label: huiText('Damage indicators in game'),
       );
     }
 
@@ -275,7 +268,6 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
         ? 1 - sinceHit / _hurtMs
         : 0;
     final double originY = _rig.heightBlocks / 2;
-    if (!component.gameContext) _stage.homePivot = McVec3(0.5, originY, 0.5);
     _stage.scene = McScene(<McSceneNode>[
       McRigNode(
         key: 'target',
@@ -304,34 +296,58 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
     ]);
     _stage.animating = _playing && _workspaceAnimationsPlaying;
 
-    final List<Widget> overlay = shown
-        ? _overlay(frame, formatted, cycle.elapsedMs, presentation, originY)
-        : const <Widget>[];
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.world,
-        label: huiText('Damage indicators in game'),
-        controls: <Widget>[
-          _playPauseButton(),
-          _replayButton(),
-          if (_kind == DamageIndicatorPreviewKind.damage) _criticalButton(),
-        ],
-        world: _stage,
-        worldOverlay: overlay,
-        child: shown ? const dom.div(<Widget>[]) : _conditionFalseScene(),
-      );
-    }
-    return dom.div(classes: 'hui-damage-indicator-stage', <Widget>[
-      dom.div(classes: 'hui-damage-indicator-sky', <Widget>[
-        McStage(
-          controller: _stage,
-          overlay: overlay,
-          label: huiText('Damage indicators in game'),
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.world,
+      label: huiText('Damage indicators in game'),
+      title: huiText('Preview'),
+      status: shown ? null : huiText('Hidden'),
+      statusTip: shown
+          ? null
+          : huiText(
+              'The document show condition is false right now, so nothing is drawn.',
+            ),
+      toggles: <Widget>[_kindChoice()],
+      controls: <Widget>[_amountField()],
+      actions: <RowAction>[
+        _playPauseAction(),
+        RowAction(
+          huiText('Replay'),
+          _replay,
+          icon: ArcaneIcon.refreshCcw(),
+          iconOnly: true,
         ),
-        if (!shown) _conditionFalseScene(),
-      ]),
-      _controls(doc, cycle),
-    ]);
+        RowAction(
+          huiText('Next trajectory'),
+          () => _replay(nextSeed: true),
+          icon: ArcaneIcon.shuffle(),
+          iconOnly: true,
+        ),
+        if (_kind == DamageIndicatorPreviewKind.damage)
+          RowAction(
+            huiText('Critical hit'),
+            _toggleCritical,
+            icon: ArcaneIcon.sword(),
+            iconOnly: true,
+            pressed: _critical,
+          ),
+      ],
+      more: <AppMenuEntry>[
+        AppMenuEntry.heading(huiText('Target')),
+        for (final String id in mcRiggedEntityTypes)
+          AppMenuEntry.radio(
+            _targetLabel(id),
+            group: 'damage-indicator-target',
+            value: id,
+            checked: _target == id,
+            onPicked: _selectTarget,
+          ),
+      ],
+      world: _stage,
+      worldOverlay: shown
+          ? _overlay(frame, formatted, cycle.elapsedMs, presentation, originY)
+          : const <Widget>[],
+      child: const dom.div(<Widget>[]),
+    );
   }
 
   /// The stage's CSS-3D layer: the origin marker at the entity origin and the
@@ -436,114 +452,44 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
     );
   }
 
-  /// Drawn over the stage, so the rig stays visible while the condition hides
-  /// the indicator.
-  Widget _conditionFalseScene() => dom.div(
-    classes: 'hui-damage-indicator-empty-state',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'position': 'absolute',
-        'inset': '0',
-        'pointer-events': 'none',
-      },
-    ),
-    <Widget>[
-      dom.span(<Widget>[Text(huiText('condition false'))]),
+  Widget _kindChoice() => ToggleChoice<DamageIndicatorPreviewKind>(
+    label: huiText('Indicator type'),
+    value: _kind,
+    onChanged: _selectKind,
+    options: <ChoiceOption<DamageIndicatorPreviewKind>>[
+      ChoiceOption<DamageIndicatorPreviewKind>(
+        DamageIndicatorPreviewKind.damage,
+        huiText('Damage'),
+        icon: ArcaneIcon.heartCrack(),
+        iconOnly: true,
+      ),
+      ChoiceOption<DamageIndicatorPreviewKind>(
+        DamageIndicatorPreviewKind.healing,
+        huiText('Healing'),
+        icon: ArcaneIcon.heartPlus(),
+        iconOnly: true,
+      ),
     ],
   );
 
-  Widget _controls(
-    GlossDamageIndicatorsDoc doc,
-    DamageIndicatorPreviewCycle cycle,
-  ) => dom.div(classes: 'hui-damage-indicator-controls', <Widget>[
-    dom.div(
-      classes: 'hui-damage-indicator-kind',
-      attributes: <String, String>{
-        'role': 'group',
-        'aria-label': huiText('Indicator type'),
+  /// The health change the preview formats.
+  Widget _amountField() => Field(
+    label: huiText('Sample amount'),
+    forId: _amountId,
+    child: NumberField(
+      id: _amountId,
+      value: _amount,
+      step: 0.25,
+      decimals: 2,
+      steppers: false,
+      onChanged: (double value) {
+        _amount = value;
+        _replay();
       },
-      <Widget>[
-        _kindButton(DamageIndicatorPreviewKind.damage, huiText('Damage')),
-        _kindButton(DamageIndicatorPreviewKind.healing, huiText('Healing')),
-      ],
     ),
-    dom.div(
-      classes: 'hui-damage-indicator-kind',
-      attributes: <String, String>{
-        'role': 'group',
-        'aria-label': huiText('Target'),
-      },
-      <Widget>[
-        for (final String id in mcRiggedEntityTypes)
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.sm,
-            onPressed: () => _selectTarget(id),
-            attributes: <String, String>{
-              'aria-pressed': (_target == id).toString(),
-              'title': _targetLabel(id),
-            },
-            label: _targetLabel(id),
-          ),
-      ],
-    ),
-    _playPauseButton(),
-    _replayButton(),
-    if (_kind == DamageIndicatorPreviewKind.damage) _criticalButton(),
-    Button(
-      variant: ButtonVariant.outline,
-      size: ButtonSize.iconSm,
-      onPressed: () => _replay(nextSeed: true),
-      attributes: <String, String>{
-        'aria-label': huiText('Next trajectory'),
-        'title': huiText('Next trajectory'),
-      },
-      icon: ArcaneIcon.shuffle(size: IconSize.sm),
-    ),
-    Button(
-      variant: ButtonVariant.outline,
-      size: ButtonSize.sm,
-      onPressed: _stage.resetCamera,
-      attributes: <String, String>{'title': huiText('Reset view')},
-      label: huiText('Reset view'),
-    ),
-    dom.label(classes: 'hui-damage-indicator-amount', <Widget>[
-      dom.span(<Widget>[Text(huiText('Sample amount'))]),
-      dom.div(classes: 'hui-damage-indicator-amount-field', <Widget>[
-        HuiNumberField(
-          value: _amount,
-          step: 0.25,
-          decimals: 2,
-          steppers: false,
-          fullWidth: false,
-          onChanged: (double value) {
-            _amount = value;
-            _replay();
-          },
-        ),
-      ]),
-    ]),
-    dom.span(classes: 'hui-damage-indicator-readout', <Widget>[
-      Text(
-        huiText(
-          '{elapsed} / {lifetime} ms · seed {seed} · {rate}/s global cap',
-          <String, Object?>{
-            'elapsed': cycle.elapsedMs,
-            'lifetime': doc.limits.lifetimeMs,
-            'seed': cycle.seed,
-            'rate': doc.limits.maxPerSecond,
-          },
-        ),
-      ),
-      if (!_stage.webGlAvailable) Text(' · ${_noWebGlNote()}'),
-    ]),
-  ]);
-
-  /// Appended to the readout when the stage fell back to the still.
-  String _noWebGlNote() => huiText(
-    'No WebGL2 in this browser: the world is a still and models are '
-    'sprites',
   );
+
+  static const String _amountId = 'damage-indicator-sample-amount';
 
   String _targetLabel(String id) => switch (id) {
     'player' => huiText('Player'),
@@ -555,49 +501,10 @@ class _DamageIndicatorViewState extends State<DamageIndicatorView> {
     _ => huiText('Sheep'),
   };
 
-  Widget _kindButton(DamageIndicatorPreviewKind kind, String label) => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.sm,
-    onPressed: () => _selectKind(kind),
-    attributes: <String, String>{
-      'aria-pressed': (_kind == kind).toString(),
-      'title': label,
-    },
-    label: label,
-  );
-
-  Widget _playPauseButton() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _togglePlaying,
-    attributes: <String, String>{
-      'aria-label': _playing ? huiText('Pause') : huiText('Play'),
-      'title': _playing ? huiText('Pause') : huiText('Play'),
-    },
-    icon: _playing
-        ? ArcaneIcon.pause(size: IconSize.sm)
-        : ArcaneIcon.play(size: IconSize.sm),
-  );
-
-  Widget _replayButton() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _replay,
-    attributes: <String, String>{
-      'aria-label': huiText('Replay'),
-      'title': huiText('Replay'),
-    },
-    icon: ArcaneIcon.refreshCcw(size: IconSize.sm),
-  );
-
-  Widget _criticalButton() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.sm,
-    onPressed: _toggleCritical,
-    attributes: <String, String>{
-      'aria-pressed': _critical.toString(),
-      'title': huiText('Critical hit'),
-    },
-    label: huiText('Critical hit'),
+  RowAction _playPauseAction() => RowAction(
+    _playing ? huiText('Pause') : huiText('Play'),
+    _togglePlaying,
+    icon: _playing ? ArcaneIcon.pause() : ArcaneIcon.play(),
+    iconOnly: true,
   );
 }

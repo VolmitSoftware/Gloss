@@ -1,6 +1,7 @@
 package art.arcane.gloss.config;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.editor.EditorSettings;
 import art.arcane.gloss.util.common.PacketTeamAllocator;
 import java.util.HashMap;
 import art.arcane.gloss.condition.ShowCondition;
@@ -10,6 +11,7 @@ import art.arcane.volmlib.util.config.ConfigDescription;
 import art.arcane.volmlib.util.config.ConfigDoc;
 import art.arcane.volmlib.util.localization.VolmitLocales;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -17,12 +19,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 
 @ConfigDescription("Gloss runtime configuration. Every knob is emitted with a comment, values outside their documented range are clamped back on load, and edits hot-reload while the server runs.")
 public final class GlossConfigFile {
-    public static final String BUILDER_URL_DEFAULT = "https://gloss.volmitsoftware.com";
-    public static final String EDITOR_SYNC_ENDPOINT_DEFAULT = "https://sync.gloss.volmitsoftware.com/v3";
 
     @ConfigDoc("Default language for players without an override. Missing official translations download when selected; edit messages directly in languages/<locale>.toml. Blank values use en_US.")
     public String language = VolmitLocales.ENGLISH;
@@ -66,7 +67,7 @@ public final class GlossConfigFile {
     public Commands commands = new Commands();
     @ConfigDoc("Operator diagnostics and visual debug overlays.")
     public Debug debug = new Debug();
-    @ConfigDoc("Hosted editor and live relay connection settings.")
+    @ConfigDoc("Web editor pairing: the hosted editor address, this server's listener and its relay connection.")
     public Editor editor = new Editor();
     @ConfigDoc("Shared holographic menu and panel rendering scale.")
     public Menus menus = new Menus();
@@ -457,31 +458,80 @@ public final class GlossConfigFile {
     }
 
     public static final class Editor {
-        @ConfigDoc("Base URL of the hosted web editor; must be a plain http(s) link or the default is used.")
-        public String builderUrl = BUILDER_URL_DEFAULT;
+        @ConfigDoc("Turns the web editor API on: the pairing commands, the listener and the relay connection.")
+        public boolean enabled = true;
 
-        @ConfigDoc("Live web-editor relay authentication, polling and project limits.")
-        public Sync sync = new Sync();
+        @ConfigDoc("Name the editor shows for this server; empty uses the MOTD's first line, else the server folder's name. At most 64 characters.")
+        public String serverName = "";
 
-        public static final class Sync {
-            @ConfigDoc("Enables live editor sync sessions through the relay.")
-            public boolean enabled = true;
+        @ConfigDoc("Address of the hosted web editor that pairing links open; must be a plain http(s) link or the default is used.")
+        public String editorUrl = EditorSettings.EDITOR_URL;
 
-            @ConfigDoc("Relay endpoint URL; must be https (or loopback http) ending in /v3 or the default is used.")
-            public String endpoint = EDITOR_SYNC_ENDPOINT_DEFAULT;
+        @ConfigDoc("Serves the editor API on this server's own HTTP listener.")
+        public boolean listenerEnabled = true;
 
-            @ConfigDoc("Relay session creation token of 22..128 characters from A-Z, a-z, 0-9, _ and -; anything else is treated as empty.")
-            public String createToken = "";
+        @ConfigDoc("Address the listener binds. Plain HTTP only on loopback; any other address needs tlsCertificate and tlsPrivateKey.")
+        public String listenAddress = "127.0.0.1";
 
-            @ConfigDoc("Minutes an editor sync session stays alive. Clamped to 5..1440.")
-            public int sessionMinutes = 60;
+        @ConfigDoc("Listener port; 0 picks a free one. Clamped to 0..65535.")
+        public int port = EditorSettings.PORT;
 
-            @ConfigDoc("Seconds between relay polls during an active session. Clamped to 1..60.")
-            public int pollSeconds = 3;
+        @ConfigDoc("The https:// address a TLS proxy in front of the loopback listener answers on; pairing links carry it. Empty when there is none.")
+        public String advertisedUrl = "";
 
-            @ConfigDoc("Maximum editor sync project size in mebibytes. Clamped to 1..32.")
-            public int maxProjectMiB = 8;
-        }
+        @ConfigDoc("Addresses of reverse proxies in front of the listener, such as 127.0.0.1 for one on this host. A request from one counts under the client address it names in X-Forwarded-For. At most 32.")
+        public List<String> trustedProxies = new ArrayList<>();
+
+        @ConfigDoc("PEM certificate chain, relative to the Gloss folder, for HTTPS on a non-loopback listenAddress. Empty for none.")
+        public String tlsCertificate = "";
+
+        @ConfigDoc("Unencrypted PKCS#8 PEM private key for tlsCertificate, relative to the Gloss folder. Empty for none.")
+        public String tlsPrivateKey = "";
+
+        @ConfigDoc("Exact browser origins (scheme://host[:port]) the listener accepts; http:// only on loopback; at most 32.")
+        public List<String> allowedOrigins = new ArrayList<>(EditorSettings.ALLOWED_ORIGINS);
+
+        @ConfigDoc("Days a pairing lasts after its last use, unless pair set expires=. Clamped to 1..365.")
+        public int tokenDays = 7;
+
+        @ConfigDoc("Largest request body a paired browser may send to the listener, in bytes. Clamped to 65536..67108864.")
+        public int requestBodyBytes = 4 * 1024 * 1024;
+
+        @ConfigDoc("Requests one pairing may run at once. Clamped to 1..64.")
+        public int concurrentRequestsPerToken = 8;
+
+        @ConfigDoc("Requests per second one pairing may send, bursting to twice that. Clamped to 1..1000.")
+        public int requestsPerSecond = 20;
+
+        @ConfigDoc("Pairing attempts per minute from one address. Clamped to 1..600.")
+        public int pairAttemptsPerMinute = 10;
+
+        @ConfigDoc("Listener connections and event streams open at once. Clamped to 1..1024.")
+        public int openConnections = 64;
+
+        @ConfigDoc("Event frames per second sent to one editor. Clamped to 1..100.")
+        public int eventFramesPerSecond = 20;
+
+        @ConfigDoc("Server limit, in mebibytes, on the workspace's image bytes and on uploads waiting for a publish; a larger publish is refused. Clamped to 1..1024.")
+        public int maxProjectMiB = 64;
+
+        @ConfigDoc("Connects out to the relay, so browsers reach this server without an open port. It connects at the first pairing.")
+        public boolean relayEnabled = true;
+
+        @ConfigDoc("Relay address: wss://host[:port][/path], or ws:// on loopback; anything else uses the default.")
+        public String relayUrl = EditorSettings.RELAY_URL;
+
+        @ConfigDoc("Seconds before the first reconnect to the relay; doubles up to relayReconnectMaxSeconds. Clamped to 1..3600.")
+        public int relayReconnectMinSeconds = 1;
+
+        @ConfigDoc("Longest wait between relay reconnects, in seconds. Clamped to relayReconnectMinSeconds..3600.")
+        public int relayReconnectMaxSeconds = 60;
+
+        @ConfigDoc("Largest relay frame in bytes; it must match the relay's MAX_FRAME_BYTES. Clamped to 65536..16777216.")
+        public int relayFrameBytes = 1024 * 1024;
+
+        @ConfigDoc("Relayed requests this server runs at once. Clamped to 1..1024.")
+        public int relayConcurrentRequests = 64;
     }
 
     public static final class Menus {
@@ -859,9 +909,6 @@ public final class GlossConfigFile {
         if (editor == null) {
             editor = new Editor();
         }
-        if (editor.sync == null) {
-            editor.sync = new Editor.Sync();
-        }
         if (menus == null) {
             menus = new Menus();
         }
@@ -965,13 +1012,37 @@ public final class GlossConfigFile {
         tablist.snapshotReadLimit = clampInt(tablist.snapshotReadLimit, 16, 65536);
 
 
-        editor.builderUrl = sanitizeBuilderUrl(editor.builderUrl);
-        editor.sync.endpoint = sanitizeSyncEndpoint(editor.sync.endpoint);
-        editor.sync.createToken = sanitizeSyncCreateToken(editor.sync.createToken);
-        editor.sync.sessionMinutes = clampInt(editor.sync.sessionMinutes, 5, 1440);
-        editor.sync.pollSeconds = clampInt(editor.sync.pollSeconds, 1, 60);
-        editor.sync.maxProjectMiB = clampInt(editor.sync.maxProjectMiB, 1, 32);
-
+        editor.serverName = editor.serverName == null ? "" : editor.serverName.strip();
+        if (editor.serverName.length() > 64) {
+            editor.serverName = editor.serverName.substring(0, 64);
+        }
+        editor.editorUrl = sanitizeEditorUrl(editor.editorUrl);
+        editor.listenAddress = editor.listenAddress == null || editor.listenAddress.isBlank()
+            ? "127.0.0.1" : editor.listenAddress.strip();
+        editor.port = clampInt(editor.port, 0, 65535);
+        editor.advertisedUrl = sanitizeAdvertisedUrl(editor.advertisedUrl);
+        editor.trustedProxies = sanitizeProxies(editor.trustedProxies);
+        editor.tlsCertificate = editor.tlsCertificate == null ? "" : editor.tlsCertificate.strip();
+        editor.tlsPrivateKey = editor.tlsPrivateKey == null ? "" : editor.tlsPrivateKey.strip();
+        if (editor.tlsCertificate.isEmpty() != editor.tlsPrivateKey.isEmpty()) {
+            Gloss.log(Level.WARNING, "editor.tlsCertificate and editor.tlsPrivateKey must be set together; TLS is off.");
+            editor.tlsCertificate = "";
+            editor.tlsPrivateKey = "";
+        }
+        editor.allowedOrigins = sanitizeOrigins(editor.allowedOrigins);
+        editor.tokenDays = clampInt(editor.tokenDays, 1, 365);
+        editor.requestBodyBytes = clampInt(editor.requestBodyBytes, 64 * 1024, 64 * 1024 * 1024);
+        editor.concurrentRequestsPerToken = clampInt(editor.concurrentRequestsPerToken, 1, 64);
+        editor.requestsPerSecond = clampInt(editor.requestsPerSecond, 1, 1000);
+        editor.pairAttemptsPerMinute = clampInt(editor.pairAttemptsPerMinute, 1, 600);
+        editor.openConnections = clampInt(editor.openConnections, 1, 1024);
+        editor.eventFramesPerSecond = clampInt(editor.eventFramesPerSecond, 1, 100);
+        editor.maxProjectMiB = clampInt(editor.maxProjectMiB, 1, 1024);
+        editor.relayUrl = sanitizeRelayUrl(editor.relayUrl);
+        editor.relayReconnectMinSeconds = clampInt(editor.relayReconnectMinSeconds, 1, 3600);
+        editor.relayReconnectMaxSeconds = clampInt(editor.relayReconnectMaxSeconds, editor.relayReconnectMinSeconds, 3600);
+        editor.relayFrameBytes = clampInt(editor.relayFrameBytes, 64 * 1024, 16 * 1024 * 1024);
+        editor.relayConcurrentRequests = clampInt(editor.relayConcurrentRequests, 1, 1024);
 
         menus.uiScale = clampDouble(menus.uiScale, 0.25D, 4.0D, 1.0D);
 
@@ -1064,71 +1135,113 @@ public final class GlossConfigFile {
         bedrock.detection = normalizeChoice(bedrock.detection, "AUTO", "FLOODGATE", "GEYSER", "UUID", "OFF").toLowerCase(Locale.ROOT);
     }
 
-    public static String sanitizeBuilderUrl(String configured) {
+    public static String sanitizeEditorUrl(String configured) {
         if (configured == null) {
-            return BUILDER_URL_DEFAULT;
+            return EditorSettings.EDITOR_URL;
         }
         String trimmed = configured.trim();
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-            return BUILDER_URL_DEFAULT;
+            return EditorSettings.EDITOR_URL;
         }
         for (int i = 0; i < trimmed.length(); i++) {
             char current = trimmed.charAt(i);
             if (current <= ' ' || current == '\'' || current == '"' || current == '<' || current == '>' || current == '\\') {
-                return BUILDER_URL_DEFAULT;
+                return EditorSettings.EDITOR_URL;
             }
         }
         return trimmed;
     }
 
-    public static String sanitizeSyncEndpoint(String configured) {
-        if (configured == null || !configured.equals(configured.strip())) {
-            return EDITOR_SYNC_ENDPOINT_DEFAULT;
-        }
-        String sanitized = configured;
-        while (sanitized.endsWith("/")) {
-            sanitized = sanitized.substring(0, sanitized.length() - 1);
-        }
-        URI uri;
-        try {
-            uri = URI.create(sanitized).normalize();
-        } catch (IllegalArgumentException failure) {
-            return EDITOR_SYNC_ENDPOINT_DEFAULT;
-        }
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        if (scheme == null || host == null || uri.getUserInfo() != null || uri.getQuery() != null
-            || uri.getFragment() != null || !uri.isAbsolute()) {
-            return EDITOR_SYNC_ENDPOINT_DEFAULT;
-        }
-        boolean https = scheme.equalsIgnoreCase("https");
-        boolean loopbackHttp = scheme.equalsIgnoreCase("http") && isLoopbackHost(host);
-        String path = uri.getPath();
-        if ((!https && !loopbackHttp) || path == null || !path.endsWith("/v3")
-            || path.contains("//") || path.contains("/../") || path.contains("/./")) {
-            return EDITOR_SYNC_ENDPOINT_DEFAULT;
-        }
-        try {
-            String normalized = new URI(scheme.toLowerCase(Locale.ROOT), null, host.toLowerCase(Locale.ROOT),
-                uri.getPort(), path, null, null).toString();
-            return normalized.length() <= 1024 ? normalized : EDITOR_SYNC_ENDPOINT_DEFAULT;
-        } catch (URISyntaxException failure) {
-            return EDITOR_SYNC_ENDPOINT_DEFAULT;
-        }
-    }
-
-    public static String sanitizeSyncCreateToken(String configured) {
+    /** An https:// address, or http:// on loopback; anything else is dropped with a warning. */
+    static String sanitizeAdvertisedUrl(String configured) {
         if (configured == null || configured.isBlank()) {
             return "";
         }
-        String normalized = configured.strip();
-        if (!normalized.equals(configured) || normalized.length() < 22 || normalized.length() > 128
-            || !normalized.matches("[A-Za-z0-9_-]+")) {
-            Gloss.log(Level.WARNING,
-                "editor.sync.createToken is invalid; live editor session creation will use no token.");
+        String trimmed = configured.strip();
+        URI uri;
+        try {
+            uri = new URI(trimmed);
+        } catch (URISyntaxException invalid) {
+            uri = null;
+        }
+        boolean https = uri != null && "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null;
+        boolean loopbackHttp = uri != null && "http".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
+            && isLoopbackHost(uri.getHost());
+        if ((!https && !loopbackHttp) || uri.getUserInfo() != null) {
+            Gloss.log(Level.WARNING, "editor.advertisedUrl must be an https:// address; it is ignored.");
             return "";
         }
-        return normalized;
+        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+    }
+
+    /** wss://host[:port][/path], or ws:// on loopback; anything else is the default. */
+    public static String sanitizeRelayUrl(String configured) {
+        if (configured == null || configured.isBlank()) {
+            return EditorSettings.RELAY_URL;
+        }
+        String trimmed = configured.strip();
+        try {
+            URI uri = new URI(trimmed);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            String host = uri.getHost();
+            if (host == null || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null
+                || !(scheme.equals("wss") || scheme.equals("ws") && isLoopbackHost(host))) {
+                throw new URISyntaxException(trimmed, "unsupported relay address");
+            }
+            return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+        } catch (URISyntaxException invalid) {
+            Gloss.log(Level.WARNING, "editor.relayUrl must be wss://host[:port][/path] (ws:// only on loopback); "
+                + "using the default relay.");
+            return EditorSettings.RELAY_URL;
+        }
+    }
+
+    /** IP address literals, at most 32; host names and ranges are dropped with a warning. */
+    public static List<String> sanitizeProxies(List<String> configured) {
+        List<String> proxies = new ArrayList<>();
+        List<InetAddress> seen = new ArrayList<>();
+        for (String value : cleanStrings(configured)) {
+            if (value.isBlank()) {
+                continue;
+            }
+            Optional<InetAddress> address = EditorSettings.literal(value);
+            if (address.isEmpty()) {
+                Gloss.log(Level.WARNING, "editor.trustedProxies entry " + value.strip()
+                    + " is not an IP address; it is ignored.");
+                continue;
+            }
+            if (!seen.contains(address.get()) && proxies.size() < 32) {
+                seen.add(address.get());
+                proxies.add(value.strip());
+            }
+        }
+        return proxies;
+    }
+
+    /** Exact scheme://host[:port] origins, http:// only on loopback, at most 32; others are dropped with a warning. */
+    public static List<String> sanitizeOrigins(List<String> configured) {
+        List<String> origins = new ArrayList<>();
+        if (configured == null) {
+            return origins;
+        }
+        for (String value : configured) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            Optional<String> normalized = EditorSettings.origin(value);
+            boolean valid = normalized.isPresent() && (normalized.get().startsWith("https://")
+                || normalized.get().startsWith("http://") && isLoopbackHost(URI.create(normalized.get()).getHost()));
+            if (!valid) {
+                Gloss.log(Level.WARNING, "editor.allowedOrigins entry " + value.strip() + " is not scheme://host[:port] "
+                    + "(http:// only on loopback); it is ignored.");
+                continue;
+            }
+            String origin = normalized.get();
+            if (!origins.contains(origin) && origins.size() < 32) {
+                origins.add(origin);
+            }
+        }
+        return origins;
     }
 
     private static boolean isLoopbackHost(String host) {

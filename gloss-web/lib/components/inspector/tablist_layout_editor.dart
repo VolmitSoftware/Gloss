@@ -1,12 +1,30 @@
-import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
-import '../../model/gloss_tab_layout.dart';
-import '../../l10n/hui_localizations.dart';
-import '../common/common.dart';
-import 'gloss_visibility_editor.dart';
-import 'inspector_widgets.dart';
+/// The tab list's fixed layout: the switch, the presentation being edited
+/// (the base layout or one variant, picked at the top) and that
+/// presentation's fixed cells, roster sections and skins, then the variants'
+/// own keys. Every part is one section of items with their fields, never
+/// deeper. Inputs keep a full accessible name ("Base layout cell 1 text")
+/// under a short visible label.
+library;
 
-class TablistLayoutEditor extends StatelessWidget {
+import 'package:arcane_jaspr/arcane_jaspr.dart';
+import 'package:jaspr/jaspr.dart' show Component;
+
+import '../../l10n/hui_localizations.dart';
+import '../../model/gloss_tab_layout.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/technical_input.dart';
+import '../../ui/toggle_choice.dart';
+import 'gloss_visibility_editor.dart';
+
+class TablistLayoutEditor extends StatefulWidget {
   const TablistLayoutEditor({
     required this.value,
     required this.onChanged,
@@ -14,134 +32,205 @@ class TablistLayoutEditor extends StatelessWidget {
   });
   final GlossTabLayout? value;
   final void Function(GlossTabLayout) onChanged;
+
+  @override
+  State<TablistLayoutEditor> createState() => _TablistLayoutEditorState();
+}
+
+class _TablistLayoutEditorState extends State<TablistLayoutEditor> {
+  /// The presentation the cell, roster and skin sections edit: -1 for the
+  /// base layout, else a variant index.
+  int _editing = -1;
+
   void _edit(void Function(GlossTabLayout) edit) {
-    final GlossTabLayout copy = value?.copy() ?? GlossTabLayout();
+    final GlossTabLayout copy = component.value?.copy() ?? GlossTabLayout();
     edit(copy);
-    onChanged(copy);
+    component.onChanged(copy);
   }
 
   @override
   Widget build(BuildContext context) {
-    final GlossTabLayout? layout = value;
-    return InspectorSection(
-      title: huiText('Layout'),
-      children: <Widget>[
-        HuiSwitchRow(
-          label: huiText('Enable fixed layout'),
-          value: layout?.enabled ?? false,
-          onChanged: (bool enabled) =>
-              _edit((GlossTabLayout copy) => copy.enabled = enabled),
-        ),
-        if (layout != null) ...<Widget>[
-          GlossVisibilityEditor(
-            raw: layout.show,
-            onChanged: (Object? show) =>
-                _edit((GlossTabLayout copy) => copy.show = show),
+    final GlossTabLayout? layout = component.value;
+    final int editing = layout == null || _editing >= layout.variants.length
+        ? -1
+        : _editing;
+    return Component.fragment(<Widget>[
+      AppSection(
+        title: huiText('Layout'),
+        memoryKey: 'tablist.layout',
+        children: <Widget>[
+          SwitchField(
+            id: 'tab-layout-enabled',
+            label: huiText('Enable fixed layout'),
+            value: layout?.enabled ?? false,
+            onChanged: (bool enabled) =>
+                _edit((GlossTabLayout copy) => copy.enabled = enabled),
           ),
-          TablistPresentationEditor(
-            value: layout,
-            prefix: huiText('Base layout'),
-            onChanged: (GlossTabPresentation edited) =>
-                _edit((GlossTabLayout copy) {
+          if (layout != null) ...<Widget>[
+            GlossVisibilityEditor(
+              raw: layout.show,
+              sectionKey: 'tablist.layout.visibility',
+              onChanged: (Object? show) =>
+                  _edit((GlossTabLayout copy) => copy.show = show),
+            ),
+            if (layout.variants.isNotEmpty)
+              Field(
+                label: huiText('Presentation'),
+                forId: 'tab-layout-editing',
+                child: ArcaneSelect(
+                  id: 'tab-layout-editing',
+                  value: '$editing',
+                  size: controlSize(DensityScope.of(context)),
+                  fullWidth: true,
+                  options: <ArcaneSelectOption>[
+                    ArcaneSelectOption(
+                      value: '-1',
+                      label: huiText('Base layout'),
+                    ),
+                    for (int index = 0; index < layout.variants.length; index++)
+                      ArcaneSelectOption(
+                        value: '$index',
+                        label: _variantName(index),
+                      ),
+                  ],
+                  onChanged: (String picked) =>
+                      setState(() => _editing = int.tryParse(picked) ?? -1),
+                ),
+              ),
+          ],
+        ],
+      ),
+      if (layout != null) ...<Widget>[
+        TablistPresentationEditor(
+          key: ValueKey<int>(editing),
+          value: editing < 0 ? layout : layout.variants[editing].presentation,
+          prefix: editing < 0 ? huiText('Base layout') : _variantName(editing),
+          onChanged: (GlossTabPresentation edited) => editing < 0
+              ? _edit((GlossTabLayout copy) {
                   copy.entries = edited.entries;
                   copy.slots = edited.slots;
                   copy.sections = edited.sections;
                   copy.skins = edited.skins;
-                }),
-          ),
-          for (int index = 0; index < layout.variants.length; index++)
-            InspectorSection(
-              title: huiText('Layout variant {index}', <String, Object?>{
+                })
+              : _edit(
+                  (GlossTabLayout copy) =>
+                      copy.variants[editing].presentation = edited,
+                ),
+        ),
+        _variants(context, layout),
+      ],
+    ]);
+  }
+
+  String _variantName(int index) =>
+      huiText('Layout variant {index}', <String, Object?>{'index': index + 1});
+
+  Widget _variants(BuildContext context, GlossTabLayout layout) => AppSection(
+    title: huiText('Variants'),
+    memoryKey: 'tablist.layout.variants',
+    count: layout.variants.length,
+    actions: <Widget>[
+      AppIconButton(
+        icon: ArcaneIcon.plus(),
+        label: huiText('Add layout variant'),
+        onPressed: () => _edit((GlossTabLayout copy) {
+          String id = 'variant';
+          int suffix = 1;
+          while (copy.variants.any(
+            (GlossTabLayoutVariant variant) => variant.id == id,
+          )) {
+            id = 'variant_${suffix++}';
+          }
+          copy.variants.add(
+            GlossTabLayoutVariant(
+              id: id,
+              presentation: GlossTabPresentation(
+                entries: copy.entries,
+                slots: <GlossTabSlot>[
+                  for (final GlossTabSlot slot in copy.slots) slot.copy(),
+                ],
+                sections: <GlossTabSection>[
+                  for (final GlossTabSection section in copy.sections)
+                    section.copy(),
+                ],
+                skins: <String, GlossTabSkin>{
+                  for (final MapEntry<String, GlossTabSkin> skin
+                      in copy.skins.entries)
+                    skin.key: skin.value.copy(),
+                },
+              ),
+            ),
+          );
+        }),
+      ),
+    ],
+    children: <Widget>[
+      for (int index = 0; index < layout.variants.length; index++)
+        AppSection(
+          title: _variantName(index),
+          memoryKey: 'tab.layout.variant.$index',
+          actions: <Widget>[
+            AppIconButton(
+              icon: ArcaneIcon.trash2(),
+              label: huiText('Remove layout variant {index}', <String, Object?>{
                 'index': index + 1,
               }),
-              sectionKey: 'tab.layout.variant.$index',
-              children: <Widget>[
-                _text(
-                  huiText('Layout variant {index} id', <String, Object?>{
-                    'index': index + 1,
-                  }),
-                  layout.variants[index].id,
-                  (String text) => _edit(
-                    (GlossTabLayout copy) => copy.variants[index].id = text,
-                  ),
-                ),
-                _integer(
-                  huiText('Layout variant {index} priority', <String, Object?>{
-                    'index': index + 1,
-                  }),
-                  layout.variants[index].priority,
-                  (int number) => _edit(
-                    (GlossTabLayout copy) =>
-                        copy.variants[index].priority = number,
-                  ),
-                ),
-                _text(
-                  huiText('Layout variant {index} condition', <String, Object?>{
-                    'index': index + 1,
-                  }),
-                  layout.variants[index].when,
-                  (String text) => _edit(
-                    (GlossTabLayout copy) => copy.variants[index].when = text,
-                  ),
-                ),
-                TablistPresentationEditor(
-                  value: layout.variants[index].presentation,
-                  prefix: huiText('Layout variant {index}', <String, Object?>{
-                    'index': index + 1,
-                  }),
-                  onChanged: (GlossTabPresentation edited) => _edit(
-                    (GlossTabLayout copy) =>
-                        copy.variants[index].presentation = edited,
-                  ),
-                ),
-                _button(
-                  huiText('Remove layout variant {index}', <String, Object?>{
-                    'index': index + 1,
-                  }),
-                  () => _edit(
-                    (GlossTabLayout copy) => copy.variants.removeAt(index),
-                  ),
-                ),
-              ],
+              onPressed: () =>
+                  _edit((GlossTabLayout copy) => copy.variants.removeAt(index)),
             ),
-          _button(
-            huiText('Add layout variant'),
-            () => _edit((GlossTabLayout copy) {
-              String id = 'variant';
-              int suffix = 1;
-              while (copy.variants.any(
-                (GlossTabLayoutVariant variant) => variant.id == id,
-              )) {
-                id = 'variant_${suffix++}';
-              }
-              copy.variants.add(
-                GlossTabLayoutVariant(
-                  id: id,
-                  presentation: GlossTabPresentation(
-                    entries: copy.entries,
-                    slots: <GlossTabSlot>[
-                      for (final GlossTabSlot slot in copy.slots) slot.copy(),
-                    ],
-                    sections: <GlossTabSection>[
-                      for (final GlossTabSection section in copy.sections)
-                        section.copy(),
-                    ],
-                    skins: <String, GlossTabSkin>{
-                      for (final MapEntry<String, GlossTabSkin> skin
-                          in copy.skins.entries)
-                        skin.key: skin.value.copy(),
-                    },
-                  ),
+          ],
+          children: <Widget>[
+            AdvancedOnly(
+              child: _text(
+                context,
+                id: 'tab-layout-variant-$index-id',
+                label: huiText('Id'),
+                name: huiText('Layout variant {index} id', <String, Object?>{
+                  'index': index + 1,
+                }),
+                value: layout.variants[index].id,
+                changed: (String text) => _edit(
+                  (GlossTabLayout copy) => copy.variants[index].id = text,
                 ),
-              );
-            }),
-          ),
-        ],
-      ],
-    );
-  }
+              ),
+            ),
+            AdvancedOnly(
+              child: _integer(
+                id: 'tab-layout-variant-$index-priority',
+                label: huiText('Priority'),
+                name: huiText(
+                  'Layout variant {index} priority',
+                  <String, Object?>{'index': index + 1},
+                ),
+                value: layout.variants[index].priority,
+                changed: (int number) => _edit(
+                  (GlossTabLayout copy) =>
+                      copy.variants[index].priority = number,
+                ),
+              ),
+            ),
+            _text(
+              context,
+              id: 'tab-layout-variant-$index-when',
+              label: huiText('When'),
+              name: huiText(
+                'Layout variant {index} condition',
+                <String, Object?>{'index': index + 1},
+              ),
+              value: layout.variants[index].when,
+              changed: (String text) => _edit(
+                (GlossTabLayout copy) => copy.variants[index].when = text,
+              ),
+            ),
+          ],
+        ),
+    ],
+  );
 }
 
+/// One presentation's entry count, fixed cells, roster sections and skins,
+/// as three sections of items. [prefix] names the presentation in every
+/// input's accessible name.
 class TablistPresentationEditor extends StatelessWidget {
   const TablistPresentationEditor({
     required this.value,
@@ -152,6 +241,7 @@ class TablistPresentationEditor extends StatelessWidget {
   final GlossTabPresentation value;
   final String prefix;
   final void Function(GlossTabPresentation) onChanged;
+
   void _edit(void Function(GlossTabPresentation) edit) {
     final GlossTabPresentation copy = value.copy();
     edit(copy);
@@ -162,362 +252,522 @@ class TablistPresentationEditor extends StatelessWidget {
       _edit((GlossTabPresentation copy) => edit(copy.slots[index]));
   void _section(int index, void Function(GlossTabSection) edit) =>
       _edit((GlossTabPresentation copy) => edit(copy.sections[index]));
+
+  /// The id stem of this presentation's inputs.
+  String get _stem => 'tab-layout-${prefix.hashCode.toUnsigned(32)}';
+
   @override
-  Widget build(BuildContext context) => dom.div(<Widget>[
-    _integer(
-      huiText('{prefix} entries', <String, Object?>{'prefix': prefix}),
-      value.entries,
-      (int number) =>
-          _edit((GlossTabPresentation copy) => copy.entries = number),
-    ),
-    dom.p(classes: 'hui-field-help-text', <Widget>[
-      Text(
-        huiText(
-          '{columns} columns × {rows} rows; Java 1.21.2 or later.',
-          <String, Object?>{'columns': value.columns, 'rows': value.rows},
+  Widget build(BuildContext context) => Component.fragment(<Widget>[
+    AppSection(
+      title: huiText('Slots'),
+      memoryKey: 'tablist.layout.slots',
+      count: value.slots.length,
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.plus(),
+          label: huiText('Add {prefix} fixed cell', <String, Object?>{
+            'prefix': prefix,
+          }),
+          onPressed: () => _edit(
+            (GlossTabPresentation copy) => copy.slots.add(GlossTabSlot()),
+          ),
         ),
-      ),
-    ]),
-    for (int index = 0; index < value.slots.length; index++)
-      InspectorSection(
+      ],
+      children: <Widget>[
+        _integer(
+          id: '$_stem-entries',
+          label: huiText('Entries'),
+          name: huiText('{prefix} entries', <String, Object?>{
+            'prefix': prefix,
+          }),
+          value: value.entries,
+          hint: huiText(
+            '{columns} columns × {rows} rows; Java 1.21.2 or later.',
+            <String, Object?>{'columns': value.columns, 'rows': value.rows},
+          ),
+          changed: (int number) =>
+              _edit((GlossTabPresentation copy) => copy.entries = number),
+        ),
+        for (int index = 0; index < value.slots.length; index++)
+          _cell(context, index),
+      ],
+    ),
+    AppSection(
+      title: huiText('Sections'),
+      memoryKey: 'tablist.layout.rosters',
+      count: value.sections.length,
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.plus(),
+          label: huiText('Add {prefix} roster section', <String, Object?>{
+            'prefix': prefix,
+          }),
+          onPressed: () => _edit((GlossTabPresentation copy) {
+            String id = 'players';
+            int suffix = 1;
+            while (copy.sections.any(
+              (GlossTabSection section) => section.id == id,
+            )) {
+              id = 'players_${suffix++}';
+            }
+            copy.sections.add(
+              GlossTabSection(id: id, rows: copy.rows.clamp(1, 20)),
+            );
+          }),
+        ),
+      ],
+      children: <Widget>[
+        for (int index = 0; index < value.sections.length; index++)
+          _roster(context, index),
+      ],
+    ),
+    AppSection(
+      title: huiText('Skins'),
+      memoryKey: 'tablist.layout.skins',
+      count: value.skins.length,
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.plus(),
+          label: huiText('Add {prefix} skin', <String, Object?>{
+            'prefix': prefix,
+          }),
+          onPressed: () => _edit((GlossTabPresentation copy) {
+            String name = 'skin';
+            int suffix = 1;
+            while (copy.skins.containsKey(name)) {
+              name = 'skin_${suffix++}';
+            }
+            copy.skins[name] = GlossTabSkin();
+          }),
+        ),
+      ],
+      children: <Widget>[
+        for (final String name in value.skins.keys) _skin(context, name),
+      ],
+    ),
+  ]);
+
+  Widget _cell(BuildContext context, int index) {
+    final GlossTabSlot slot = value.slots[index];
+    final String id = '$_stem-cell-$index';
+    return FieldOwner(
+      name: huiText('Fixed cell {index}', <String, Object?>{
+        'index': index + 1,
+      }),
+      child: AppSection(
         title: huiText('Fixed cell {index}', <String, Object?>{
           'index': index + 1,
         }),
-        sectionKey: '$prefix.slot.$index',
-        children: <Widget>[
-          _integer(
-            huiText('{prefix} cell {index} column', <String, Object?>{
+        memoryKey: 'tablist.layout.cell.$index',
+        actions: <Widget>[
+          AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText('Remove {prefix} cell {index}', <String, Object?>{
               'prefix': prefix,
               'index': index + 1,
             }),
-            value.slots[index].column,
-            (int n) => _slot(index, (GlossTabSlot slot) => slot.column = n),
-          ),
-          _integer(
-            huiText('{prefix} cell {index} row', <String, Object?>{
-              'prefix': prefix,
-              'index': index + 1,
-            }),
-            value.slots[index].row,
-            (int n) => _slot(index, (GlossTabSlot slot) => slot.row = n),
-          ),
-          _text(
-            huiText('{prefix} cell {index} text', <String, Object?>{
-              'prefix': prefix,
-              'index': index + 1,
-            }),
-            value.slots[index].text,
-            (String text) =>
-                _slot(index, (GlossTabSlot slot) => slot.text = text),
-          ),
-          _text(
-            huiText('{prefix} cell {index} skin', <String, Object?>{
-              'prefix': prefix,
-              'index': index + 1,
-            }),
-            value.slots[index].skin ?? '',
-            (String text) => _slot(
-              index,
-              (GlossTabSlot slot) => slot.skin = text.isEmpty ? null : text,
-            ),
-          ),
-          _text(
-            huiText('{prefix} cell {index} ping', <String, Object?>{
-              'prefix': prefix,
-              'index': index + 1,
-            }),
-            value.slots[index].ping?.toString() ?? '',
-            (String text) {
-              if (text.isEmpty || int.tryParse(text) != null) {
-                _slot(
-                  index,
-                  (GlossTabSlot slot) => slot.ping = int.tryParse(text),
-                );
-              }
-            },
-          ),
-          HuiSwitchRow(
-            label: huiText('{prefix} cell {index} hat', <String, Object?>{
-              'prefix': prefix,
-              'index': index + 1,
-            }),
-            value: value.slots[index].hat,
-            onChanged: (bool b) =>
-                _slot(index, (GlossTabSlot slot) => slot.hat = b),
-          ),
-          _button(
-            huiText('Remove {prefix} cell {index}', <String, Object?>{
-              'prefix': prefix,
-              'index': index + 1,
-            }),
-            () => _edit(
+            onPressed: () => _edit(
               (GlossTabPresentation copy) => copy.slots.removeAt(index),
             ),
           ),
         ],
-      ),
-    _button(
-      huiText('Add {prefix} fixed cell', <String, Object?>{'prefix': prefix}),
-      () =>
-          _edit((GlossTabPresentation copy) => copy.slots.add(GlossTabSlot())),
-    ),
-    for (int index = 0; index < value.sections.length; index++) _roster(index),
-    _button(
-      huiText('Add {prefix} roster section', <String, Object?>{
-        'prefix': prefix,
-      }),
-      () => _edit((GlossTabPresentation copy) {
-        String id = 'players';
-        int suffix = 1;
-        while (copy.sections.any(
-          (GlossTabSection section) => section.id == id,
-        )) {
-          id = 'players_${suffix++}';
-        }
-        copy.sections.add(
-          GlossTabSection(id: id, rows: copy.rows.clamp(1, 20)),
-        );
-      }),
-    ),
-    for (final String name in value.skins.keys)
-      InspectorSection(
-        title: huiText('Skin {name}', <String, Object?>{'name': name}),
-        sectionKey: '$prefix.skin.$name',
         children: <Widget>[
-          _text(
-            huiText('{prefix} skin {name} name', <String, Object?>{
+          _integer(
+            id: '$id-column',
+            label: huiText('Column'),
+            name: huiText('{prefix} cell {index} column', <String, Object?>{
               'prefix': prefix,
-              'name': name,
+              'index': index + 1,
             }),
-            name,
-            (String next) {
-              if (next.isEmpty ||
-                  (next != name && value.skins.containsKey(next))) {
-                return;
+            value: slot.column,
+            changed: (int n) => _slot(index, (GlossTabSlot cell) {
+              cell.column = n;
+            }),
+          ),
+          _integer(
+            id: '$id-row',
+            label: huiText('Row'),
+            name: huiText('{prefix} cell {index} row', <String, Object?>{
+              'prefix': prefix,
+              'index': index + 1,
+            }),
+            value: slot.row,
+            changed: (int n) =>
+                _slot(index, (GlossTabSlot cell) => cell.row = n),
+          ),
+          _text(
+            context,
+            id: '$id-text',
+            label: huiText('Text'),
+            name: huiText('{prefix} cell {index} text', <String, Object?>{
+              'prefix': prefix,
+              'index': index + 1,
+            }),
+            value: slot.text,
+            technical: false,
+            changed: (String text) =>
+                _slot(index, (GlossTabSlot cell) => cell.text = text),
+          ),
+          _text(
+            context,
+            id: '$id-skin',
+            label: huiText('Skin'),
+            name: huiText('{prefix} cell {index} skin', <String, Object?>{
+              'prefix': prefix,
+              'index': index + 1,
+            }),
+            value: slot.skin ?? '',
+            changed: (String text) => _slot(
+              index,
+              (GlossTabSlot cell) => cell.skin = text.isEmpty ? null : text,
+            ),
+          ),
+          _text(
+            context,
+            id: '$id-ping',
+            label: huiText('Ping'),
+            name: huiText('{prefix} cell {index} ping', <String, Object?>{
+              'prefix': prefix,
+              'index': index + 1,
+            }),
+            value: slot.ping?.toString() ?? '',
+            changed: (String text) {
+              if (text.isEmpty || int.tryParse(text) != null) {
+                _slot(
+                  index,
+                  (GlossTabSlot cell) => cell.ping = int.tryParse(text),
+                );
               }
-              _edit((GlossTabPresentation copy) {
-                final GlossTabSkin skin = copy.skins.remove(name)!;
-                copy.skins[next] = skin;
-              });
             },
           ),
-          _text(
-            huiText('{prefix} skin {name} value', <String, Object?>{
-              'prefix': prefix,
-              'name': name,
-            }),
-            value.skins[name]!.value,
-            (String text) => _edit(
-              (GlossTabPresentation copy) => copy.skins[name]!.value = text,
-            ),
-          ),
-          _text(
-            huiText('{prefix} skin {name} signature', <String, Object?>{
-              'prefix': prefix,
-              'name': name,
-            }),
-            value.skins[name]!.signature ?? '',
-            (String text) => _edit(
-              (GlossTabPresentation copy) =>
-                  copy.skins[name]!.signature = text.isEmpty ? null : text,
-            ),
-          ),
-          _button(
-            huiText('Remove {prefix} skin {name}', <String, Object?>{
-              'prefix': prefix,
-              'name': name,
-            }),
-            () => _edit((GlossTabPresentation copy) => copy.skins.remove(name)),
+          SwitchField(
+            id: '$id-hat',
+            label: huiText('Hat'),
+            value: slot.hat,
+            onChanged: (bool b) =>
+                _slot(index, (GlossTabSlot cell) => cell.hat = b),
           ),
         ],
       ),
-    _button(
-      huiText('Add {prefix} skin', <String, Object?>{'prefix': prefix}),
-      () => _edit((GlossTabPresentation copy) {
-        String name = 'skin';
-        int suffix = 1;
-        while (copy.skins.containsKey(name)) {
-          name = 'skin_${suffix++}';
-        }
-        copy.skins[name] = GlossTabSkin();
-      }),
-    ),
-  ]);
+    );
+  }
 
-  Widget _roster(int index) {
+  Widget _roster(BuildContext context, int index) {
     final GlossTabSection section = value.sections[index];
+    final String id = '$_stem-roster-$index';
     final String label = huiText('{prefix} roster {index}', <String, Object?>{
       'prefix': prefix,
       'index': index + 1,
     });
-    return InspectorSection(
+    return AppSection(
       title: huiText('Roster {index}', <String, Object?>{'index': index + 1}),
-      sectionKey: '$prefix.roster.$index',
-      children: <Widget>[
-        _text(
-          huiText('{label} id', <String, Object?>{'label': label}),
-          section.id,
-          (String text) =>
-              _section(index, (GlossTabSection row) => row.id = text),
-        ),
-        _integer(
-          huiText('{label} column', <String, Object?>{'label': label}),
-          section.column,
-          (int n) => _section(index, (GlossTabSection row) => row.column = n),
-        ),
-        _integer(
-          huiText('{label} row', <String, Object?>{'label': label}),
-          section.row,
-          (int n) => _section(index, (GlossTabSection row) => row.row = n),
-        ),
-        _integer(
-          huiText('{label} columns', <String, Object?>{'label': label}),
-          section.columns,
-          (int n) => _section(index, (GlossTabSection row) => row.columns = n),
-        ),
-        _integer(
-          huiText('{label} rows', <String, Object?>{'label': label}),
-          section.rows,
-          (int n) => _section(index, (GlossTabSection row) => row.rows = n),
-        ),
-        _text(
-          huiText('{label} filter', <String, Object?>{'label': label}),
-          section.filter,
-          (String text) =>
-              _section(index, (GlossTabSection row) => row.filter = text),
-        ),
-        HuiSwitchRow(
-          label: huiText('{label} override name format', <String, Object?>{
-            'label': label,
-          }),
-          value: section.format != null,
-          onChanged: (bool b) => _section(
-            index,
-            (GlossTabSection row) => row.format = b ? r'$player' : null,
-          ),
-        ),
-        if (section.format != null)
-          _text(
-            huiText('{label} name format', <String, Object?>{'label': label}),
-            section.format!,
-            (String text) =>
-                _section(index, (GlossTabSection row) => row.format = text),
-          ),
-        _choice(
-          huiText('{label} overflow', <String, Object?>{'label': label}),
-          section.overflow,
-          const <String>['hide', 'count'],
-          (String text) =>
-              _section(index, (GlossTabSection row) => row.overflow = text),
-        ),
-        _text(
-          huiText('{label} overflow format', <String, Object?>{'label': label}),
-          section.overflowFormat,
-          (String text) => _section(
-            index,
-            (GlossTabSection row) => row.overflowFormat = text,
-          ),
-        ),
-        _text(
-          huiText('{label} skin', <String, Object?>{'label': label}),
-          section.skin ?? '',
-          (String text) => _section(
-            index,
-            (GlossTabSection row) => row.skin = text.isEmpty ? null : text,
-          ),
-        ),
-        HuiSwitchRow(
-          label: huiText('{label} hat', <String, Object?>{'label': label}),
-          value: section.hat,
-          onChanged: (bool b) =>
-              _section(index, (GlossTabSection row) => row.hat = b),
-        ),
-        HuiSwitchRow(
-          label: huiText('{label} include NPCs', <String, Object?>{
-            'label': label,
-          }),
-          value: section.includeNpcs,
-          onChanged: (bool b) =>
-              _section(index, (GlossTabSection row) => row.includeNpcs = b),
-        ),
-        for (int key = 0; key < section.sort.length; key++)
-          InspectorSection(
-            title: huiText('Sort key {index}', <String, Object?>{
-              'index': key + 1,
-            }),
-            sectionKey: '$label.sort.$key',
-            children: <Widget>[
-              _text(
-                huiText('{label} sort {key} expression', <String, Object?>{
-                  'label': label,
-                  'key': key + 1,
-                }),
-                section.sort[key].expression,
-                (String text) => _section(
-                  index,
-                  (GlossTabSection row) => row.sort[key].expression = text,
-                ),
-              ),
-              _choice(
-                huiText('{label} sort {key} type', <String, Object?>{
-                  'label': label,
-                  'key': key + 1,
-                }),
-                section.sort[key].type,
-                const <String>['text', 'number'],
-                (String text) => _section(
-                  index,
-                  (GlossTabSection row) => row.sort[key].type = text,
-                ),
-              ),
-              _choice(
-                huiText('{label} sort {key} direction', <String, Object?>{
-                  'label': label,
-                  'key': key + 1,
-                }),
-                section.sort[key].direction,
-                const <String>['ascending', 'descending'],
-                (String text) => _section(
-                  index,
-                  (GlossTabSection row) => row.sort[key].direction = text,
-                ),
-              ),
-              if (key > 0)
-                _button(
-                  huiText('Move {label} sort {key} up', <String, Object?>{
-                    'label': label,
-                    'key': key + 1,
-                  }),
-                  () => _section(index, (GlossTabSection row) {
-                    final GlossTabSortKey moved = row.sort.removeAt(key);
-                    row.sort.insert(key - 1, moved);
-                  }),
-                ),
-              _button(
-                huiText('Remove {label} sort {key}', <String, Object?>{
-                  'label': label,
-                  'key': key + 1,
-                }),
-                () => _section(
-                  index,
-                  (GlossTabSection row) => row.sort.removeAt(key),
-                ),
-              ),
-            ],
-          ),
+      memoryKey: 'tablist.layout.roster.$index',
+      actions: <Widget>[
         if (section.sort.length < 16)
-          _button(
-            huiText('Add {label} sort key', <String, Object?>{'label': label}),
-            () => _section(
+          AppIconButton(
+            icon: ArcaneIcon.plus(),
+            label: huiText('Add {label} sort key', <String, Object?>{
+              'label': label,
+            }),
+            onPressed: () => _section(
               index,
               (GlossTabSection row) =>
                   row.sort = <GlossTabSortKey>[...row.sort, GlossTabSortKey()],
             ),
           ),
-        _button(
-          huiText('Remove {label}', <String, Object?>{'label': label}),
-          () => _edit(
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
+          label: huiText('Remove {label}', <String, Object?>{'label': label}),
+          onPressed: () => _edit(
             (GlossTabPresentation copy) => copy.sections.removeAt(index),
+          ),
+        ),
+      ],
+      children: <Widget>[
+        _text(
+          context,
+          id: '$id-id',
+          label: huiText('Id'),
+          name: huiText('{label} id', <String, Object?>{'label': label}),
+          value: section.id,
+          changed: (String text) =>
+              _section(index, (GlossTabSection row) => row.id = text),
+        ),
+        _integer(
+          id: '$id-column',
+          label: huiText('Column'),
+          name: huiText('{label} column', <String, Object?>{'label': label}),
+          value: section.column,
+          changed: (int n) =>
+              _section(index, (GlossTabSection row) => row.column = n),
+        ),
+        _integer(
+          id: '$id-row',
+          label: huiText('Row'),
+          name: huiText('{label} row', <String, Object?>{'label': label}),
+          value: section.row,
+          changed: (int n) =>
+              _section(index, (GlossTabSection row) => row.row = n),
+        ),
+        _integer(
+          id: '$id-columns',
+          label: huiText('Columns'),
+          name: huiText('{label} columns', <String, Object?>{'label': label}),
+          value: section.columns,
+          changed: (int n) =>
+              _section(index, (GlossTabSection row) => row.columns = n),
+        ),
+        _integer(
+          id: '$id-rows',
+          label: huiText('Rows'),
+          name: huiText('{label} rows', <String, Object?>{'label': label}),
+          value: section.rows,
+          changed: (int n) =>
+              _section(index, (GlossTabSection row) => row.rows = n),
+        ),
+        _text(
+          context,
+          id: '$id-filter',
+          label: huiText('Filter'),
+          name: huiText('{label} filter', <String, Object?>{'label': label}),
+          value: section.filter,
+          changed: (String text) =>
+              _section(index, (GlossTabSection row) => row.filter = text),
+        ),
+        _text(
+          context,
+          id: '$id-format',
+          label: huiText('Format'),
+          name: huiText('{label} name format', <String, Object?>{
+            'label': label,
+          }),
+          value: section.format ?? '',
+          placeholder: r'$player',
+          changed: (String text) => _section(
+            index,
+            (GlossTabSection row) => row.format = text.isEmpty ? null : text,
+          ),
+        ),
+        Field(
+          label: huiText('Overflow'),
+          child: ToggleChoice<String>(
+            label: huiText('{label} overflow', <String, Object?>{
+              'label': label,
+            }),
+            value: section.overflow,
+            options: const <ChoiceOption<String>>[
+              ChoiceOption<String>('hide', 'hide'),
+              ChoiceOption<String>('count', 'count'),
+            ],
+            onChanged: (String text) =>
+                _section(index, (GlossTabSection row) => row.overflow = text),
+          ),
+        ),
+        _text(
+          context,
+          id: '$id-overflow-format',
+          label: huiText('Format'),
+          name: huiText('{label} overflow format', <String, Object?>{
+            'label': label,
+          }),
+          value: section.overflowFormat,
+          technical: false,
+          changed: (String text) => _section(
+            index,
+            (GlossTabSection row) => row.overflowFormat = text,
+          ),
+        ),
+        _text(
+          context,
+          id: '$id-skin',
+          label: huiText('Skin'),
+          name: huiText('{label} skin', <String, Object?>{'label': label}),
+          value: section.skin ?? '',
+          changed: (String text) => _section(
+            index,
+            (GlossTabSection row) => row.skin = text.isEmpty ? null : text,
+          ),
+        ),
+        SwitchField(
+          id: '$id-hat',
+          label: huiText('Hat'),
+          value: section.hat,
+          onChanged: (bool b) =>
+              _section(index, (GlossTabSection row) => row.hat = b),
+        ),
+        SwitchField(
+          id: '$id-npcs',
+          label: huiText('Include NPCs'),
+          value: section.includeNpcs,
+          onChanged: (bool b) =>
+              _section(index, (GlossTabSection row) => row.includeNpcs = b),
+        ),
+        if (section.sort.isNotEmpty)
+          Field(
+            label: huiText('Sort'),
+            child: ReorderList(
+              label: huiText('Sort'),
+              itemCount: section.sort.length,
+              onReorder: (int from, int to) =>
+                  _section(index, (GlossTabSection row) {
+                    final GlossTabSortKey moved = row.sort.removeAt(from);
+                    row.sort.insert(to, moved);
+                  }),
+              onRemove: (int key) => _section(
+                index,
+                (GlossTabSection row) => row.sort.removeAt(key),
+              ),
+              itemBuilder: (int key) => _sortKey(context, index, key, label),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _sortKey(BuildContext context, int index, int key, String label) {
+    final GlossTabSortKey sort = value.sections[index].sort[key];
+    // The expression over its two icon choices.
+    return ArcaneFieldContent(
+      children: <Widget>[
+        TextInput(
+          id: '$_stem-roster-$index-sort-$key',
+          value: sort.expression,
+          size: controlSize(DensityScope.of(context)),
+          fullWidth: true,
+          onChanged: (String text) => _section(
+            index,
+            (GlossTabSection row) => row.sort[key].expression = text,
+          ),
+          styles: technicalInputStyles,
+          attributes: <String, String>{
+            ...technicalInputAttributes,
+            'aria-label': huiText(
+              '{label} sort {key} expression',
+              <String, Object?>{'label': label, 'key': key + 1},
+            ),
+          },
+        ),
+        ActionRow(
+          dense: true,
+          leading: <Widget>[
+            ToggleChoice<String>(
+              label: huiText('{label} sort {key} type', <String, Object?>{
+                'label': label,
+                'key': key + 1,
+              }),
+              value: sort.type,
+              options: <ChoiceOption<String>>[
+                ChoiceOption<String>(
+                  'text',
+                  'text',
+                  icon: ArcaneIcon.caseSensitive(),
+                  iconOnly: true,
+                ),
+                ChoiceOption<String>(
+                  'number',
+                  'number',
+                  icon: ArcaneIcon.hash(),
+                  iconOnly: true,
+                ),
+              ],
+              onChanged: (String text) => _section(
+                index,
+                (GlossTabSection row) => row.sort[key].type = text,
+              ),
+            ),
+            ToggleChoice<String>(
+              label: huiText('{label} sort {key} direction', <String, Object?>{
+                'label': label,
+                'key': key + 1,
+              }),
+              value: sort.direction,
+              options: <ChoiceOption<String>>[
+                ChoiceOption<String>(
+                  'ascending',
+                  'ascending',
+                  icon: ArcaneIcon.arrowUpNarrowWide(),
+                  iconOnly: true,
+                ),
+                ChoiceOption<String>(
+                  'descending',
+                  'descending',
+                  icon: ArcaneIcon.arrowDownWideNarrow(),
+                  iconOnly: true,
+                ),
+              ],
+              onChanged: (String text) => _section(
+                index,
+                (GlossTabSection row) => row.sort[key].direction = text,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _skin(BuildContext context, String name) {
+    final String id = '$_stem-skin-${name.hashCode.toUnsigned(32)}';
+    return AppSection(
+      title: huiText('Skin {name}', <String, Object?>{'name': name}),
+      memoryKey: 'tablist.layout.skin.$name',
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
+          label: huiText('Remove {prefix} skin {name}', <String, Object?>{
+            'prefix': prefix,
+            'name': name,
+          }),
+          onPressed: () =>
+              _edit((GlossTabPresentation copy) => copy.skins.remove(name)),
+        ),
+      ],
+      children: <Widget>[
+        _text(
+          context,
+          id: '$id-name',
+          label: huiText('Name'),
+          name: huiText('{prefix} skin {name} name', <String, Object?>{
+            'prefix': prefix,
+            'name': name,
+          }),
+          value: name,
+          changed: (String next) {
+            if (next.isEmpty ||
+                (next != name && value.skins.containsKey(next))) {
+              return;
+            }
+            _edit((GlossTabPresentation copy) {
+              final GlossTabSkin skin = copy.skins.remove(name)!;
+              copy.skins[next] = skin;
+            });
+          },
+        ),
+        _text(
+          context,
+          id: '$id-value',
+          label: huiText('Value'),
+          name: huiText('{prefix} skin {name} value', <String, Object?>{
+            'prefix': prefix,
+            'name': name,
+          }),
+          value: value.skins[name]!.value,
+          changed: (String text) => _edit(
+            (GlossTabPresentation copy) => copy.skins[name]!.value = text,
+          ),
+        ),
+        _text(
+          context,
+          id: '$id-signature',
+          label: huiText('Signature'),
+          name: huiText('{prefix} skin {name} signature', <String, Object?>{
+            'prefix': prefix,
+            'name': name,
+          }),
+          value: value.skins[name]!.signature ?? '',
+          changed: (String text) => _edit(
+            (GlossTabPresentation copy) =>
+                copy.skins[name]!.signature = text.isEmpty ? null : text,
           ),
         ),
       ],
@@ -525,49 +775,54 @@ class TablistPresentationEditor extends StatelessWidget {
   }
 }
 
-Widget _text(String label, String value, void Function(String) changed) =>
-    HuiField(
-      label: huiText(label),
-      control: TextInput(
-        value: value,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        onChanged: changed,
-        attributes: <String, String>{
-          'aria-label': huiText(label),
-          'spellcheck': 'false',
-        },
-      ),
-    );
-Widget _integer(String label, int value, void Function(int) changed) =>
-    _text(label, '$value', (String text) {
-      final int? parsed = int.tryParse(text);
-      if (parsed != null) changed(parsed);
-    });
-Widget _button(String label, void Function() pressed) => Button(
-  variant: ButtonVariant.outline,
-  size: ButtonSize.sm,
-  label: huiText(label),
-  onPressed: pressed,
+/// A text field: the short visible [label], the full accessible [name] on
+/// the input. Ids, keys and expressions are technical (left to right, no
+/// spellcheck); game text is not.
+Widget _text(
+  BuildContext context, {
+  required String id,
+  required String label,
+  required String name,
+  required String value,
+  required void Function(String) changed,
+  String? placeholder,
+  bool technical = true,
+}) => Field(
+  label: label,
+  forId: id,
+  child: TextInput(
+    id: id,
+    value: value,
+    size: controlSize(DensityScope.of(context)),
+    fullWidth: true,
+    placeholder: placeholder,
+    onChanged: changed,
+    styles: technical ? technicalInputStyles : null,
+    attributes: <String, String>{
+      if (technical) ...technicalInputAttributes else 'spellcheck': 'false',
+      'aria-label': name,
+    },
+  ),
 );
-Widget _choice(
-  String label,
-  String value,
-  List<String> choices,
-  void Function(String) changed,
-) => HuiField(
-  label: huiText(label),
-  control: dom.div(
-    attributes: <String, String>{'role': 'group', 'aria-label': huiText(label)},
-    <Widget>[
-      HuiSegmented(
-        value: value,
-        segments: <HuiSegment>[
-          for (final String choice in choices)
-            HuiSegment(value: choice, label: huiText(choice)),
-        ],
-        onChanged: changed,
-      ),
-    ],
+
+/// A whole-number field, named like [_text].
+Widget _integer({
+  required String id,
+  required String label,
+  required String name,
+  required int value,
+  required void Function(int) changed,
+  String? hint,
+}) => Field(
+  label: label,
+  forId: id,
+  hint: hint,
+  child: NumberField(
+    id: id,
+    label: name,
+    value: value.toDouble(),
+    integer: true,
+    step: 1,
+    onChanged: (double number) => changed(number.round()),
   ),
 );

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "revision": 17,
+  "namespace": "trails",
+  "font": "icons",
+  "glyphs": [
+    {
+      "id": "coin",
+      "image": "coin.png",
+      "height": 8,
+      "ascent": 7,
+      "frames": 1,
+      "fallback": "C"
+    }
+  ],
+  "overlays": [
+    {
+      "id": "frame",
+      "image": "frame.png",
+      "height": 8,
+      "ascent": 7,
+      "anchor": "bottom"
+    }
+  ],
+  "space": {
+    "enabled": true,
+    "range": [
+      -16,
+      32
+    ]
+  },
+  "waypointStyles": [
+    {
+      "id": "quest",
+      "nearDistance": 8,
+      "farDistance": 80,
+      "sprites": [
+        {
+          "id": "near",
+          "image": "near.png"
+        }
+      ]
+    }
+  ]
+}

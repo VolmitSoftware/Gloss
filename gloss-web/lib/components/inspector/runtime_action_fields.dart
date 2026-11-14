@@ -1,14 +1,19 @@
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../l10n/hui_localizations.dart';
 import '../../model/behavior_authoring.dart';
 import '../../model/hui_actions.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
 import 'actions_editor.dart';
 import 'inspector_session.dart';
-import 'inspector_widgets.dart';
 
 const List<String> runtimeAuthoringTypes = <String>[
   'sequence',
@@ -48,6 +53,8 @@ Set<String> runtimeManagedKeys(String type) => <String>{
   },
 };
 
+/// The fields of a flow action (sequence, if, repeat, state and the rest)
+/// and of a named-action call; nested lists are [ActionsEditor]s of their own.
 class RuntimeActionFields extends StatelessWidget {
   const RuntimeActionFields({
     required this.action,
@@ -62,10 +69,14 @@ class RuntimeActionFields extends StatelessWidget {
   final HuiRuntimeAction action;
   final EditorStore store;
   final InspectorSession session;
+
+  /// The action's path in its list; field ids end with `<sessionKey>/<key>`.
   final String sessionKey;
   final void Function(HuiRuntimeAction next) onChanged;
   final int depth;
   final bool clickContext;
+
+  String _id(String key) => 'hui-action-$sessionKey/$key';
 
   void _change(String key, Object? value) {
     final HuiRuntimeAction next = action.copy();
@@ -77,23 +88,33 @@ class RuntimeActionFields extends StatelessWidget {
     onChanged(next);
   }
 
-  Widget _text(String key, String label) => HuiField(
+  Widget _text(ComponentSize size, String key, String label) => Field(
     label: label,
-    control: TextInput(
+    forId: _id(key),
+    child: TextInput(
+      id: _id(key),
       value: '${action.extras[key] ?? ''}',
+      size: size,
       fullWidth: true,
-      attributes: <String, String>{'aria-label': '$sessionKey/$key'},
       onChanged: (String value) => _change(key, value.isEmpty ? null : value),
     ),
   );
 
-  Widget _number(String key, String label, {bool decimal = false}) => HuiField(
+  /// An optional number: cleared, the key leaves the action.
+  Widget _number(
+    ComponentSize size,
+    String key,
+    String label, {
+    bool decimal = false,
+  }) => Field(
     label: label,
-    control: TextInput(
+    forId: _id(key),
+    child: TextInput(
+      id: _id(key),
       value: '${action.extras[key] ?? ''}',
+      size: size,
       fullWidth: true,
       attributes: <String, String>{
-        'aria-label': '$sessionKey/$key',
         'inputmode': decimal ? 'decimal' : 'numeric',
       },
       onChanged: (String value) {
@@ -107,18 +128,22 @@ class RuntimeActionFields extends StatelessWidget {
     ),
   );
 
+  /// Shown where the stored list is not one these controls can edit.
+  Widget _repair(String title) => AppSection(
+    title: title,
+    description: huiText('Repair actions in Code view to use these controls.'),
+    children: const <Widget>[],
+  );
+
   Widget _actions(
     String key,
     Object? raw,
     void Function(List<Map<String, Object?>> next) update, {
     String? label,
+    Widget? remove,
   }) {
     final HuiActionSourceList? source = HuiActionSourceList.read(raw);
-    if (source == null || depth >= 32) {
-      return HuiNote(
-        huiText('Repair actions in Code view to use these controls.'),
-      );
-    }
+    if (source == null || depth >= 32) return _repair(label ?? key);
     return ActionsEditor(
       store: store,
       catalogs: store.catalogs,
@@ -130,6 +155,7 @@ class RuntimeActionFields extends StatelessWidget {
       title: label ?? key,
       depth: depth + 1,
       timedSteps: action.type == 'sequence' && key == 'steps',
+      headerActions: <Widget>[?remove],
       onEdit: (String label, void Function(List<HuiAction>) edit) {
         final HuiActionSourceList? current = HuiActionSourceList.read(raw);
         if (current != null) update(current.edit(edit));
@@ -145,59 +171,59 @@ class RuntimeActionFields extends StatelessWidget {
 
   Widget _branches() {
     final Object? raw = action.extras['branches'];
-    if (raw != null && raw is! List) {
-      return HuiNote(
-        huiText('Repair actions in Code view to use these controls.'),
-      );
-    }
+    if (raw != null && raw is! List) return _repair('branches');
     final List<Object?> branches = raw is List
         ? List<Object?>.of(raw)
         : <Object?>[];
-    return dom.div(<Widget>[
-      for (final (int index, Object? branch) in branches.indexed) ...<Widget>[
-        _actions('branches/$index', branch, (List<Map<String, Object?>> next) {
-          final List<Object?> changed = List<Object?>.of(branches);
-          changed[index] = next;
-          _change('branches', changed);
-        }, label: 'branches[$index]'),
-        Button(
-          label: huiText('Remove branch'),
-          variant: ButtonVariant.outline,
-          onPressed: () {
-            final List<Object?> changed = List<Object?>.of(branches)
-              ..removeAt(index);
+    return Component.fragment(<Widget>[
+      for (final (int index, Object? branch) in branches.indexed)
+        _actions(
+          'branches/$index',
+          branch,
+          (List<Map<String, Object?>> next) {
+            final List<Object?> changed = List<Object?>.of(branches);
+            changed[index] = next;
             _change('branches', changed);
           },
+          label: 'branches[$index]',
+          remove: AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText('Remove branch'),
+            onPressed: () => _change(
+              'branches',
+              List<Object?>.of(branches)..removeAt(index),
+            ),
+          ),
         ),
-      ],
-      Button(
-        label: huiText('Add branch'),
-        variant: ButtonVariant.outline,
-        onPressed: () =>
-            _change('branches', <Object?>[...branches, <Object?>[]]),
+      ActionRow(
+        dense: true,
+        secondary: <RowAction>[
+          RowAction(
+            huiText('Add branch'),
+            () => _change('branches', <Object?>[...branches, <Object?>[]]),
+            icon: ArcaneIcon.plus(),
+          ),
+        ],
       ),
     ]);
   }
 
-  Widget _cases() {
+  Widget _cases(ComponentSize size) {
     final Object? raw = action.extras['cases'];
-    if (raw != null && raw is! Map<String, Object?>) {
-      return HuiNote(
-        huiText('Repair actions in Code view to use these controls.'),
-      );
-    }
+    if (raw != null && raw is! Map<String, Object?>) return _repair('cases');
     final Map<String, Object?> cases = raw is Map<String, Object?>
         ? raw
         : <String, Object?>{};
-    return dom.div(<Widget>[
+    return Component.fragment(<Widget>[
       for (final MapEntry<String, Object?> entry in cases.entries) ...<Widget>[
-        HuiField(
+        Field(
           label: huiText('Case key'),
-          control: TextInput(
+          forId: _id('cases/${entry.key}/key'),
+          child: TextInput(
+            id: _id('cases/${entry.key}/key'),
             value: entry.key,
-            attributes: <String, String>{
-              'aria-label': '$sessionKey/cases/${entry.key}/key',
-            },
+            size: size,
+            fullWidth: true,
             onChanged: (String value) {
               if (value == entry.key || cases.containsKey(value)) return;
               _change('cases', <String, Object?>{
@@ -213,30 +239,30 @@ class RuntimeActionFields extends StatelessWidget {
           (List<Map<String, Object?>> next) =>
               _change('cases', <String, Object?>{...cases, entry.key: next}),
           label: entry.key,
-        ),
-        Button(
-          label: huiText('Remove case'),
-          variant: ButtonVariant.outline,
-          onPressed: () {
-            final Map<String, Object?> changed = Map<String, Object?>.of(cases)
-              ..remove(entry.key);
-            _change('cases', changed);
-          },
+          remove: AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText('Remove case'),
+            onPressed: () => _change(
+              'cases',
+              Map<String, Object?>.of(cases)..remove(entry.key),
+            ),
+          ),
         ),
       ],
-      Button(
-        label: huiText('Add case'),
-        variant: ButtonVariant.outline,
-        onPressed: () {
-          int index = 1;
-          while (cases.containsKey('case$index')) {
-            index++;
-          }
-          _change('cases', <String, Object?>{
-            ...cases,
-            'case$index': <Object?>[],
-          });
-        },
+      ActionRow(
+        dense: true,
+        secondary: <RowAction>[
+          RowAction(huiText('Add case'), () {
+            int index = 1;
+            while (cases.containsKey('case$index')) {
+              index++;
+            }
+            _change('cases', <String, Object?>{
+              ...cases,
+              'case$index': <Object?>[],
+            });
+          }, icon: ArcaneIcon.plus()),
+        ],
       ),
     ]);
   }
@@ -244,61 +270,72 @@ class RuntimeActionFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!runtimeAuthoringTypes.contains(action.type) && action.type != 'call') {
-      return const dom.div(<Widget>[]);
+      return const Component.fragment(<Widget>[]);
     }
-    return dom.div(<Widget>[
-      _text('when', huiText('Condition')),
-      _number('cooldownTicks', huiText('Cooldown ticks')),
-      if (action.type == 'call') _text('action', huiText('Named action')),
+    final ComponentSize size = controlSize(DensityScope.of(context));
+    final String targetId = _id('target');
+    return Component.fragment(<Widget>[
+      _text(size, 'when', huiText('Condition')),
+      AdvancedOnly(
+        child: _number(size, 'cooldownTicks', huiText('Cooldown ticks')),
+      ),
+      if (action.type == 'call') _text(size, 'action', huiText('Named action')),
       if (<String>{
         'setState',
         'addState',
         'clearState',
         'cooldown',
       }.contains(action.type))
-        _text('key', huiText('State key')),
+        _text(size, 'key', huiText('State key')),
       if (<String>{'setState', 'addState'}.contains(action.type))
-        _text('value', huiText('Value')),
+        _text(size, 'value', huiText('Value')),
       if (<String>{'setState', 'addState', 'clearState'}.contains(action.type))
-        ArcaneSelect(
+        Field(
           label: huiText('Target'),
-          value: '${action.extras['target'] ?? 'viewer'}',
-          options: <ArcaneSelectOption>[
-            for (final String role in <String>['viewer', 'subject', 'source'])
-              ArcaneSelectOption(value: role, label: role),
-          ],
-          onChanged: (String value) => _change('target', value),
+          forId: '$targetId-trigger',
+          child: ArcaneSelect(
+            id: targetId,
+            value: '${action.extras['target'] ?? 'viewer'}',
+            size: size,
+            fullWidth: true,
+            options: <ArcaneSelectOption>[
+              for (final String role in <String>['viewer', 'subject', 'source'])
+                ArcaneSelectOption(value: role, label: role),
+            ],
+            onChanged: (String value) => _change('target', value),
+          ),
         ),
-      if (action.type == 'emit') _text('name', huiText('Name')),
+      if (action.type == 'emit') _text(size, 'name', huiText('Name')),
       if (action.type == 'delay' || action.type == 'cooldown')
-        _number('ticks', huiText('Ticks')),
+        _number(size, 'ticks', huiText('Ticks')),
       if (action.type == 'repeat') ...<Widget>[
-        _number('times', huiText('Count')),
-        _number('everyTicks', huiText('Interval')),
-        _text('while', huiText('Condition')),
+        _number(size, 'times', huiText('Count')),
+        _number(size, 'everyTicks', huiText('Interval')),
+        _text(size, 'while', huiText('Condition')),
         _list('steps'),
       ],
       if (action.type == 'sequence') ...<Widget>[
-        HuiSwitchRow(
+        SwitchField(
+          id: _id('skippable'),
           label: huiText('Skippable'),
           value: action.extras['skippable'] == true,
           onChanged: (bool value) => _change('skippable', value),
         ),
-        _text('once', huiText('State key')),
+        _text(size, 'once', huiText('State key')),
         _list('steps'),
         _list('onSkip'),
       ],
       if (action.type == 'parallel') _branches(),
       if (action.type == 'chance')
-        _number('percent', huiText('Percent'), decimal: true),
+        _number(size, 'percent', huiText('Percent'), decimal: true),
       if (<String>{
         'if',
         'chance',
         'cooldown',
       }.contains(action.type)) ...<Widget>[_list('then'), _list('else')],
       if (action.type == 'switch') ...<Widget>[
-        _text('on', huiText('Expression')),
-        _cases(),
+        _text(size, 'on', huiText('Expression')),
+        _cases(size),
         _list('default'),
       ],
     ]);

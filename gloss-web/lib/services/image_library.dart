@@ -742,6 +742,7 @@ class ImageLibrary extends ChangeNotifier {
     ImageStorageWriter writer = _acceptImageStorage,
     String workspaceId = 'memory',
     bool queueWrites = false,
+    this.storageFailure,
   }) : _writer = writer,
        _workspaceId = workspaceId,
        _queueWrites = queueWrites;
@@ -756,6 +757,9 @@ class ImageLibrary extends ChangeNotifier {
       workspaceId: workspaceId,
       writer: repository.write,
       queueWrites: true,
+      storageFailure: repository is RecoverableWorkspaceRepository
+          ? () => (repository as RecoverableWorkspaceRepository).lastFailure
+          : null,
     );
     final String key = '$storageKeyPrefix.$workspaceId';
     final String? raw = await Future<String?>.value(repository.read(key));
@@ -773,6 +777,10 @@ class ImageLibrary extends ChangeNotifier {
   final Map<String, Future<ImagePixels?>> _pending =
       <String, Future<ImagePixels?>>{};
   final ImageStorageWriter _writer;
+
+  /// Why the storage refused the last write, when it knows (another tab
+  /// changed the workspace, IndexedDB unavailable). Null means quota.
+  final String? Function()? storageFailure;
   String _workspaceId;
   final bool _queueWrites;
   Future<void>? _writeTail;
@@ -1437,7 +1445,10 @@ class ImageLibrary extends ChangeNotifier {
     });
   }
 
-  /// Cached pixel grid, decoding it in the background on the first miss. Built
+  /// Removes every image in one write (a forgotten server's workspace).
+  bool removeAll() => _commit(_images.clear);
+
+    /// Cached pixel grid, decoding it in the background on the first miss. Built
   /// for synchronous draw loops: null means "not ready yet, a repaint is coming".
   ImagePixels? pixelsFor(String path) {
     final ImagePixels? cached = _pixels[path];
@@ -1515,6 +1526,19 @@ class ImageLibrary extends ChangeNotifier {
     return total;
   }
 
+  /// Marks a refused write: the storage's own reason when it gave one,
+  /// otherwise a full disk.
+  void _refused() {
+    final String? reason = storageFailure?.call();
+    if (reason != null && reason.isNotEmpty) {
+      _quotaExceeded = false;
+      _lastError = () => reason;
+      return;
+    }
+    _quotaExceeded = true;
+    _lastError = _quotaMessage;
+  }
+
   ImageLocalizedMessage get _quotaMessage =>
       () => huiText(
         'Browser storage is full, so nothing was saved. Remove images or shrink them (Gloss images are usually under {maximum}x{maximum} pixels).',
@@ -1539,8 +1563,7 @@ class ImageLibrary extends ChangeNotifier {
           _quotaExceeded = false;
           _lastError = null;
         } else {
-          _quotaExceeded = true;
-          _lastError = _quotaMessage;
+          _refused();
         }
         notifyListeners();
       });
@@ -1556,8 +1579,7 @@ class ImageLibrary extends ChangeNotifier {
         ..clear()
         ..addAll(snapshot);
       _saveRevision--;
-      _quotaExceeded = true;
-      _lastError = _quotaMessage;
+      _refused();
     } else {
       _quotaExceeded = false;
       _lastError = null;
@@ -1570,8 +1592,7 @@ class ImageLibrary extends ChangeNotifier {
           if (stored) {
             _persistedRevision = revision;
           } else {
-            _quotaExceeded = true;
-            _lastError = _quotaMessage;
+            _refused();
             notifyListeners();
           }
         });

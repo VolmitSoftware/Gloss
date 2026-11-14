@@ -32,8 +32,8 @@ class PaneLayout {
 
   /// Narrower than the 280/340 the editor shipped with: the canvas is the point
   /// of the app, and at 1280 this hands it back 60px.
-  static const double defaultRailWidth = 240;
-  static const double defaultInspectorWidth = 320;
+  static const double defaultRailWidth = 280;
+  static const double defaultInspectorWidth = 340;
 
   static const double minRailWidth = 200;
   static const double maxRailWidth = 420;

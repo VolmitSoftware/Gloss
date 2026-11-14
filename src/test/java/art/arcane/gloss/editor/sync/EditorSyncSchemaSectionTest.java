@@ -56,13 +56,12 @@ public class EditorSyncSchemaSectionTest {
           }
         };
 
-    EditorSyncProject workspace = builder.open(EditorSyncKind.WORKSPACE, "workspace",
-        8 * 1024 * 1024, sections);
-    EditorSyncProject menu = builder.open(EditorSyncKind.MENU, "shop", 8 * 1024 * 1024);
+    EditorSyncProject workspace = builder.open(8 * 1024 * 1024, sections);
+    EditorSyncProject bare = builder.open(8 * 1024 * 1024);
 
     assertTrue(workspace.json().has("schemas"));
     assertTrue(workspace.json().has("defaults"));
-    assertFalse(menu.json().has("schemas"));
-    assertFalse(menu.json().has("defaults"));
+    assertFalse(bare.json().has("schemas"));
+    assertFalse(bare.json().has("defaults"));
   }
 }

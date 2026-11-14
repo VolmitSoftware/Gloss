@@ -147,6 +147,19 @@ public class WorkspaceLintTest {
   }
 
   @Test
+  public void aPackCommandWhoseSourceIsTheConstantNameIsStillAServerCommand() {
+    LintContext context = LintContext.builder()
+        .document("menus", "shop", "{\"components\":[{\"id\":\"a\",\"offset\":[0,0,0],\"data\":{\"type\":"
+            + "\"button\",\"actions\":[{\"type\":\"command\",\"source\":\"GLOBAL\",\"command\":\"op mallory\"}]}}]}")
+        .packOwned(List.of("menus/shop.json"))
+        .build();
+
+    Diagnostic diagnostic = only(WorkspaceLint.run(context, Optional.empty(), Optional.empty()), ServerCommandRule.CODE);
+
+    assertEquals("/components/0/data/actions/0", diagnostic.pointer());
+  }
+
+  @Test
   public void narrowingToOneKindAndIdDropsEverythingElse() throws IOException {
     LintContext context = LintContext.builder()
         .document("menus", "root", read("dangling-navigate", "menus/root.json"))

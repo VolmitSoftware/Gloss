@@ -1,0 +1,50 @@
+{
+  "documents": [
+    {
+      "kind": "hologram",
+      "id": "spawn",
+      "path": "holograms/spawn.json",
+      "hash": "sha256:32db12d47bb71bfac66fff27602ecf885ac872a573adeb544f1d0a536e454430",
+      "size": 317,
+      "revision": 1,
+      "summary": {
+        "name": "spawn"
+      }
+    },
+    {
+      "kind": "hologram",
+      "id": "welcome",
+      "path": "holograms/welcome.json",
+      "hash": "sha256:7f6869313a34292141a07ccb2e5b8f0ed5562fb513904fea37993aea1d738049",
+      "size": 319,
+      "revision": 1,
+      "summary": {
+        "name": "welcome"
+      }
+    },
+    {
+      "kind": "menu",
+      "id": "shop/main",
+      "path": "menus/shop/main.json",
+      "hash": "sha256:04a13c70728cd5f50e69e7d36b66d536918835b83b41e1b3fd09e85e4696806a",
+      "size": 34,
+      "summary": {
+        "name": "Shop",
+        "folder": "shop"
+      }
+    }
+  ],
+  "images": [
+    {
+      "path": "shop/coin.png",
+      "hash": "sha256:2a2207e3e98d5b960e06f4ef2901d299d8090b7e5d992da89b3bd8ad58c1a75f",
+      "size": 79,
+      "mediaType": "image/png",
+      "width": 4,
+      "height": 4
+    }
+  ],
+  "metaHash": "sha256:17320c77a80af47809522c8d926ce811e3d2a0500ce191c7292247d2425485d3",
+  "notesHash": "",
+  "next": null
+}

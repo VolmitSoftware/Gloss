@@ -27,8 +27,6 @@ final class MenuDocumentType extends DocumentTypeAdapter {
   @override
   String get noun => huiText('menu');
 
-  @override
-  String get createLabel => huiText('New menu');
 
   @override
   String get pluralLabel => huiText('Menus');
@@ -55,9 +53,6 @@ final class MenuDocumentType extends DocumentTypeAdapter {
   bool get undoable => true;
 
   @override
-  bool get sourcePreserving => true;
-
-  @override
   String? get syncWireKind => 'menu';
 
   @override
@@ -81,7 +76,6 @@ final class MenuDocumentType extends DocumentTypeAdapter {
       return AdoptedDocument(
         editorId: editorId,
         model: decodeHuiMenu(doc.json),
-        preservedSource: doc.json,
       );
     } on HuiFormatException catch (e) {
       return AdoptedDocument(
@@ -109,13 +103,10 @@ final class MenuDocumentType extends DocumentTypeAdapter {
 
   @override
   String snapshot(DocumentStateView state) =>
-      state.preservedMenuSource ?? encodeHuiMenu(state.menu);
+      encodeHuiMenu(state.menu);
 
   @override
   String exportJson(DocumentStateView state) => snapshot(state);
-
-  @override
-  String formattedJson(DocumentStateView state) => encodeHuiMenu(state.menu);
 
   @override
   List<HuiIssue> validate(DocumentStateView state) {

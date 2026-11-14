@@ -8,6 +8,7 @@ import 'package:web/web.dart' as web;
 
 import '../l10n/hui_localizations.dart';
 import '../services/storage_service.dart';
+import 'workspace_records.dart';
 import 'workspace_repository_contract.dart';
 
 WorkspaceRepository createPlatformWorkspaceRepository() =>
@@ -18,7 +19,8 @@ final class IndexedDbWorkspaceRepository
         WorkspaceRepository,
         RecoverableWorkspaceRepository,
         WorkspaceMaintenanceRepository,
-        ObservableWorkspaceRepository {
+        ObservableWorkspaceRepository,
+        IncrementalWorkspaceRepository {
   static const String _databaseName = 'gloss.editor';
   static const String _legacyDatabaseName = 'holoui.editor';
   static const String _recordsStore = 'workspace-records';
@@ -90,6 +92,14 @@ final class IndexedDbWorkspaceRepository
     if (stored.kind == _RecordReadKind.valid) {
       final _StoredRecord record = stored.record!;
       _knownRevisions[key] = record.revision;
+      if (isWorkspaceHeader(record.value)) {
+        return _assemble(database, key, record.value);
+      }
+      // A workspace stored whole moves into records the first time it is
+      // read; it still loads when that write fails.
+      if (wholeWorkspaceOf(record.value) != null) {
+        await write(key, record.value);
+      }
       return record.value;
     }
     if (stored.kind == _RecordReadKind.malformed) {
@@ -103,7 +113,11 @@ final class IndexedDbWorkspaceRepository
     if (fromLegacyDatabase != null) return fromLegacyDatabase;
 
     final String? legacy = StorageService.read(key);
-    if (legacy == null || legacy.isEmpty) return null;
+    if (legacy == null || legacy.isEmpty) {
+      // Nothing stored yet: another tab creating it is still this key's news.
+      _knownRevisions.putIfAbsent(key, () => 0);
+      return null;
+    }
     final bool migrated = await write(key, legacy);
     if (!migrated) {
       _lastFailure ??=
@@ -234,7 +248,162 @@ final class IndexedDbWorkspaceRepository
       _backupsStore,
       key,
     );
-    return backup.record?.value;
+    final String? value = backup.record?.value;
+    if (value != null && isWorkspaceHeader(value)) {
+      return _assemble(database, key, value);
+    }
+    return value;
+  }
+
+  /// The workspace of [key] as one record, from [header] and the layout and
+  /// document records stored beside it.
+  Future<String> _assemble(
+    web.IDBDatabase database,
+    String key,
+    String header,
+  ) {
+    final Completer<String> completer = Completer<String>();
+    try {
+      final web.IDBTransaction transaction = database.transaction(
+        _recordsStore.toJS,
+        'readonly',
+      );
+      final web.IDBObjectStore records = transaction.objectStore(_recordsStore);
+      final web.IDBRequest layout = records.get(workspaceLayoutKey(key).toJS);
+      final web.IDBKeyRange range = _documentRange(key);
+      final web.IDBRequest keys = records.getAllKeys(range);
+      final web.IDBRequest values = records.getAll(range);
+      transaction.oncomplete = ((web.Event event) {
+        try {
+          final List<JSAny?> names = (keys.result! as JSArray<JSAny?>).toDart;
+          final List<JSAny?> bodies =
+              (values.result! as JSArray<JSAny?>).toDart;
+          final Map<String, String> documents = <String, String>{};
+          for (int index = 0; index < names.length; index++) {
+            final String? id = workspaceDocumentIdOf(
+              key,
+              (names[index]! as JSString).toDart,
+            );
+            final JSAny? body = bodies[index];
+            if (id != null && body != null && body.isA<JSString>()) {
+              documents[id] = (body as JSString).toDart;
+            }
+          }
+          final JSAny? shape = layout.result;
+          completer.complete(
+            assembleWorkspaceRecord(
+              header: header,
+              layout: shape != null && shape.isA<JSString>()
+                  ? (shape as JSString).toDart
+                  : null,
+              documents: documents,
+            ),
+          );
+        } catch (error, stackTrace) {
+          if (!completer.isCompleted) {
+            completer.completeError(error, stackTrace);
+          }
+        }
+      }).toJS;
+      transaction.onabort = ((web.Event event) {
+        if (!completer.isCompleted) {
+          completer.completeError(StateError('IndexedDB read failed.'));
+        }
+      }).toJS;
+    } catch (error, stackTrace) {
+      completer.completeError(error, stackTrace);
+    }
+    return completer.future;
+  }
+
+  web.IDBKeyRange _documentRange(String key) {
+    final String prefix = workspaceDocumentPrefix(key);
+    return web.IDBKeyRange.bound(prefix.toJS, '$prefix\uffff'.toJS);
+  }
+
+  /// Puts a workspace's layout and document records next to its header,
+  /// replacing every document record it had.
+  void _putRecords(
+    web.IDBObjectStore records,
+    String key,
+    WorkspaceRecordSet set,
+  ) {
+    records.delete(_documentRange(key));
+    set.documents.forEach((String id, String value) {
+      records.put(value.toJS, workspaceDocumentKey(key, id).toJS);
+    });
+    records.put(set.layout.toJS, workspaceLayoutKey(key).toJS);
+  }
+
+  @override
+  Future<bool> writeDelta(String key, WorkspaceDelta delta) async {
+    _lastFailure = null;
+    if (_requiresReload) return false;
+    final web.IDBDatabase? database = await _openOrNull();
+    if (database == null) return false;
+    final Completer<bool> completer = Completer<bool>();
+    try {
+      final web.IDBTransaction transaction = database.transaction(
+        <JSString>[_recordsStore.toJS, _backupsStore.toJS].toJS,
+        'readwrite',
+      );
+      final web.IDBObjectStore records = transaction.objectStore(_recordsStore);
+      final web.IDBObjectStore backups = transaction.objectStore(_backupsStore);
+      final web.IDBRequest currentRequest = records.get(key.toJS);
+      int nextRevision = 1;
+      bool refused = false;
+      currentRequest.onsuccess = ((web.Event event) {
+        final _RecordReadResult decoded = _decodeRecord(currentRequest.result);
+        final _StoredRecord? current = decoded.record;
+        if (decoded.revision != (_knownRevisions[key] ?? 0)) {
+          refused = true;
+          _markConflict();
+          transaction.abort();
+          return;
+        }
+        // Not stored as records yet: the workspace writes itself whole.
+        if (current == null || !isWorkspaceHeader(current.value)) {
+          refused = true;
+          transaction.abort();
+          return;
+        }
+        nextRevision = decoded.revision + 1;
+        backups.put(_encodeRecord(current), key.toJS);
+        workspaceDeltaRecords(key, delta).forEach((String name, String? value) {
+          if (name == key) return;
+          if (value == null) {
+            records.delete(name.toJS);
+          } else {
+            records.put(value.toJS, name.toJS);
+          }
+        });
+        records.put(
+          _encodeRecord(
+            _StoredRecord(value: delta.header, revision: nextRevision),
+          ),
+          key.toJS,
+        );
+      }).toJS;
+      transaction.oncomplete = ((web.Event event) {
+        _knownRevisions[key] = nextRevision;
+        _broadcastChange(key, nextRevision);
+        _complete(completer, true);
+      }).toJS;
+      transaction.onabort = ((web.Event event) {
+        if (!refused) {
+          _lastFailure ??=
+              'Browser storage refused the workspace transaction. Export '
+              'the workspace before closing this tab.';
+        }
+        _complete(completer, false);
+      }).toJS;
+    } catch (_) {
+      _lastFailure =
+          'Browser storage refused the workspace transaction. Export the '
+          'workspace before closing this tab.';
+      return false;
+    }
+    return completer.future;
   }
 
   @override
@@ -271,6 +440,7 @@ final class IndexedDbWorkspaceRepository
     String value,
   ) {
     final Completer<bool> completer = Completer<bool>();
+    final WorkspaceRecordSet? layered = _layered(value);
     try {
       final web.IDBTransaction transaction = database.transaction(
         <JSString>[_recordsStore.toJS, _backupsStore.toJS].toJS,
@@ -305,8 +475,14 @@ final class IndexedDbWorkspaceRepository
         if (current != null) {
           backups.put(_encodeRecord(current), key.toJS);
         }
+        if (layered != null) _putRecords(records, key, layered);
         records.put(
-          _encodeRecord(_StoredRecord(value: value, revision: nextRevision)),
+          _encodeRecord(
+            _StoredRecord(
+              value: layered?.header ?? value,
+              revision: nextRevision,
+            ),
+          ),
           key.toJS,
         );
       }).toJS;
@@ -360,6 +536,7 @@ final class IndexedDbWorkspaceRepository
     String value,
   ) {
     final Completer<bool> completer = Completer<bool>();
+    final WorkspaceRecordSet? layered = _layered(value);
     try {
       final web.IDBTransaction transaction = database.transaction(
         <JSString>[_recordsStore.toJS, _backupsStore.toJS].toJS,
@@ -381,8 +558,9 @@ final class IndexedDbWorkspaceRepository
           return;
         }
         nextRevision = actualRevision + 1;
+        if (layered != null) _putRecords(records, key, layered);
         final _StoredRecord recovered = _StoredRecord(
-          value: value,
+          value: layered?.header ?? value,
           revision: nextRevision,
         );
         final JSAny encoded = _encodeRecord(recovered);
@@ -415,6 +593,13 @@ final class IndexedDbWorkspaceRepository
       return Future<bool>.value(false);
     }
     return completer.future;
+  }
+
+  /// [value] as records when it is a workspace written whole; other records
+  /// (image libraries) are stored as they are.
+  WorkspaceRecordSet? _layered(String value) {
+    final Map<String, Object?>? whole = wholeWorkspaceOf(value);
+    return whole == null ? null : splitWorkspaceRecord(whole);
   }
 
   @override
@@ -655,8 +840,11 @@ final class IndexedDbWorkspaceRepository
         return;
       }
       if (kind != 'changed' || key is! String || revision is! num) return;
+      // Another tab's workspace (a server's, or the browser's) is not this
+      // one's conflict: only keys this repository read or wrote count.
+      final int? localRevision = _knownRevisions[key];
+      if (localRevision == null) return;
       final int remoteRevision = revision.toInt();
-      final int localRevision = _knownRevisions[key] ?? 0;
       if (remoteRevision > localRevision) {
         _markConflict();
         _noticeListener?.call(

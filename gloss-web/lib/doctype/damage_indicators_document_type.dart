@@ -22,8 +22,6 @@ final class DamageIndicatorsDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('damage-indicator settings');
 
-  @override
-  String get createLabel => huiText('Damage indicators');
 
   @override
   String get pluralLabel => huiText('Damage indicators');

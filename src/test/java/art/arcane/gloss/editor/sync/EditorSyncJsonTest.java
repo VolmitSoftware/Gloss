@@ -26,8 +26,7 @@ public class EditorSyncJsonTest {
     withoutRevision.remove("baseRevision");
     assertEquals(fixture.get("canonicalWithoutBaseRevision").getAsString(),
         EditorSyncJson.canonical(withoutRevision));
-    assertEquals(EditorSyncKind.WORKSPACE,
-        EditorSyncProject.validated(project, 1024 * 1024).kind());
+    assertEquals(expected, EditorSyncProject.validated(project, 1024 * 1024).baseRevision());
   }
 
   @Test

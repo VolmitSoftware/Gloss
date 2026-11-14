@@ -27,26 +27,24 @@ import 'package:jaspr/jaspr.dart' show Component;
 import '../../l10n/hui_localizations.dart';
 import '../../logic/preview_expr.dart';
 import '../../logic/validation.dart';
-import '../common/common.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
 
 /// Monospace, so a caret column in the error block lines up with the character
 /// it points at. Kept in step with the `.hui-drop-expr input` rule in
 /// `04-inspector.css`, which puts the same face on the input itself.
-const String realDropExprFont = 'var(--font-mono, ui-monospace, monospace)';
+const String realDropExprFont = 'var(--font-mono)';
 
 class RealDropExprField extends StatefulWidget {
   const RealDropExprField({
     required this.label,
     required this.value,
     required this.onChanged,
+    this.id,
     this.docKey,
     this.placeholder,
     this.neutral,
     this.issues = const <HuiIssue>[],
-    this.bare = false,
-    this.trailing,
     super.key,
   });
 
@@ -58,7 +56,10 @@ class RealDropExprField extends StatefulWidget {
   /// Fires with the trimmed source on every keystroke, broken or not.
   final void Function(String next) onChanged;
 
-  /// Key into the schema-derived help map, rendered as the row's popover.
+  /// The input's element id, so the label names it.
+  final String? id;
+
+  /// Key into the schema-derived help map, rendered as the row's (i) tip.
   final String? docKey;
 
   final String? placeholder;
@@ -69,13 +70,6 @@ class RealDropExprField extends StatefulWidget {
 
   /// Pre-filtered issues for this field's JSON path.
   final List<HuiIssue> issues;
-
-  /// Renders the input alone, with no label row around it. The `vars` list
-  /// uses it: the name field beside it already says which expression this is,
-  /// and a second label there would be a column of blanks.
-  final bool bare;
-
-  final Widget? trailing;
 
   @override
   State<RealDropExprField> createState() => _RealDropExprFieldState();
@@ -143,18 +137,17 @@ class _RealDropExprFieldState extends State<RealDropExprField> {
 
   @override
   Widget build(BuildContext context) {
-    final String? docKey = component.docKey;
-    final Widget control = _control();
-    if (component.bare) return control;
-    return HuiField(
+    final String? neutral = component.neutral;
+    return Field(
       label: component.label,
-      defaultValue: component.neutral,
-      onReset: component.neutral == null || _text == component.neutral
+      forId: component.id,
+      docKey: component.docKey,
+      defaultValue: neutral,
+      onReset: neutral == null || _text == neutral
           ? null
-          : () => _onInput(component.neutral!),
-      trailing:
-          component.trailing ?? (docKey == null ? null : HuiFieldHelp(docKey)),
-      control: control,
+          : () => _onInput(neutral),
+      problems: component.issues,
+      child: _control(),
     );
   }
 
@@ -163,8 +156,9 @@ class _RealDropExprFieldState extends State<RealDropExprField> {
     // inline style: the framework's input takes typed style data, not raw
     // CSS, and the caret block below only lines up if the two share a font.
     TextInput(
+      id: component.id,
       value: _text,
-      size: ComponentSize.sm,
+      size: controlSize(Density.dense),
       fullWidth: true,
       placeholder: component.placeholder,
       error: _syntaxError?.call(),
@@ -177,18 +171,16 @@ class _RealDropExprFieldState extends State<RealDropExprField> {
       },
     ),
     if (_syntaxError != null) _errorBlock(),
-    HuiInlineIssues(component.issues),
   ]);
 
   /// The parser's message and a caret under the character it stopped at. The
   /// caret is the whole reason the input is monospace.
   Widget _errorBlock() => dom.div(
-    classes: 'hui-expr-error',
     styles: const dom.Styles(
       raw: <String, String>{
-        'margin-top': '4px',
-        'font-size': '0.72rem',
-        'color': 'var(--hui-danger, var(--destructive))',
+        'margin-top': '0.25rem',
+        'font-size': 'var(--font-size-xs)',
+        'color': 'var(--destructive)',
       },
     ),
     <Widget>[
@@ -198,10 +190,10 @@ class _RealDropExprFieldState extends State<RealDropExprField> {
         dom.pre(
           styles: const dom.Styles(
             raw: <String, String>{
-              'margin': '2px 0 0',
+              'margin': '0',
               'padding': '0',
               'font-family': realDropExprFont,
-              'font-size': '0.7rem',
+              'font-size': 'var(--font-size-xs)',
               'line-height': '1.2',
               'white-space': 'pre',
               'overflow-x': 'auto',

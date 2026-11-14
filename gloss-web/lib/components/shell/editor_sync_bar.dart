@@ -1,122 +1,97 @@
+/// The save bar in a paired server's workspace (or in a workspace another
+/// tab holds, or after a local save failed), and the library badge for a
+/// document's server state. The shell mounts the bar in its bottom slot and
+/// passes [syncDocBadge] to the library rows.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
 
-import '../../services/editor_sync.dart';
-import 'package:gloss_editor/l10n/hui_localizations.dart';
-
-class EditorSyncControls {
-  const EditorSyncControls({
-    required this.status,
-    required this.subjectId,
-    required this.busy,
-    required this.onPublish,
-    required this.onCopyLink,
-    required this.onDisconnect,
-    this.message,
-  });
-
-  final EditorSyncStatus status;
-  final String subjectId;
-  final bool busy;
-  final String? message;
-  final VoidCallback onPublish;
-  final VoidCallback onCopyLink;
-  final VoidCallback onDisconnect;
-
-  bool get canPublish => busy == false && canPublishEditorSyncStatus(status);
-
-  String get publishLabel =>
-      busy ? huiText('Publishing…') : huiText('Publish to Server');
-
-  String get publishHint => switch (status) {
-    EditorSyncStatus.connected => huiText(
-      'Publish the connected {subject} project for server validation and apply.',
-      <String, Object?>{'subject': subjectId},
-    ),
-    EditorSyncStatus.applied => huiText(
-      'Publish new changes to the connected {subject} server project.',
-      <String, Object?>{'subject': subjectId},
-    ),
-    EditorSyncStatus.rejected => huiText(
-      'The last publication was rejected. Fix the reported issue, then publish again.',
-    ),
-    EditorSyncStatus.pending => huiText(
-      'The server is still validating and applying the current publication.',
-    ),
-    EditorSyncStatus.conflict => huiText(
-      'Resolve the server revision conflict before publishing again.',
-    ),
-    EditorSyncStatus.expired => huiText(
-      'This server capability expired. Create a new link in Minecraft.',
-    ),
-    EditorSyncStatus.revoked => huiText(
-      'This server capability was revoked. Create a new link in Minecraft.',
-    ),
-    EditorSyncStatus.disconnected => huiText(
-      'This tab is disconnected from the server project.',
-    ),
-    EditorSyncStatus.unavailable => huiText(
-      'The configured sync relay is currently unavailable.',
-    ),
-  };
-}
+import '../../services/editor_sync_controller.dart';
+import '../../state/editor_store.dart';
+import '../../ui/badge.dart';
+import '../../ui/save_bar.dart';
+import '../../ui/save_state.dart';
+import 'store_selector.dart';
+import '../../ui/tone.dart';
 
 class EditorSyncBar extends StatelessWidget {
-  const EditorSyncBar({required this.controls, super.key});
+  const EditorSyncBar({
+    required this.store,
+    required this.onAction,
+    this.controller,
+    this.waiting = false,
+    super.key,
+  });
 
-  final EditorSyncControls controls;
+  /// The paired server's workspace; null in the browser workspace.
+  final EditorSyncController? controller;
+  final EditorStore store;
+
+  /// Another tab holds this browser workspace.
+  final bool waiting;
+  final void Function(SaveAction action) onAction;
+
+  SaveBarState get _state {
+    final String? failure = store.workspace.lastError;
+    if (failure != null && failure.trim().isNotEmpty) {
+      return localSaveState(
+        saving: false,
+        failure: failure,
+        requiresReload: store.workspace.requiresReload,
+      );
+    }
+    final EditorSyncController? sync = controller;
+    if (sync != null) return sync.saveBarState;
+    if (waiting) return elsewhereSaveState();
+    return localSaveState(saving: false);
+  }
 
   @override
-  Widget build(BuildContext context) => dom.div(
-    classes: 'hui-sync-bar is-${controls.status.name}',
-    attributes: const <String, String>{'role': 'status', 'aria-live': 'polite'},
-    <Widget>[
-      dom.div(classes: 'hui-sync-identity', <Widget>[
-        ArcaneIcon.cloud(size: IconSize.sm),
-        dom.strong(<Widget>[Text(_label(controls.status))]),
-        dom.code(<Widget>[Text(controls.subjectId)]),
-        if (controls.message != null)
-          dom.span(<Widget>[Text(controls.message!)]),
-      ]),
-      dom.div(classes: 'hui-sync-actions', <Widget>[
-        Button(
-          variant: controls.canPublish
-              ? ButtonVariant.primary
-              : ButtonVariant.outline,
-          size: ButtonSize.sm,
-          disabled: controls.canPublish == false,
-          onPressed: controls.onPublish,
-          icon: ArcaneIcon.cloudUpload(size: IconSize.sm),
-          label: controls.publishLabel,
-          attributes: <String, String>{'title': controls.publishHint},
-        ),
-        Button.ghost(
-          size: ButtonSize.sm,
-          onPressed: controls.onCopyLink,
-          icon: ArcaneIcon.copy(size: IconSize.sm),
-          label: huiText('Copy link'),
-        ),
-        Button.ghost(
-          size: ButtonSize.sm,
-          onPressed: controls.onDisconnect,
-          icon: ArcaneIcon.unlink(size: IconSize.sm),
-          label: huiText('Disconnect'),
-        ),
-      ]),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final EditorSyncController? sync = controller;
+    if (sync == null) return SaveBar(state: _state, onAction: onAction);
+    // The fill's count redraws the bar alone.
+    return StoreSelector<SaveBarState>(
+      listenable: sync.progressChanges,
+      selector: () => _state,
+      builder: (BuildContext context, SaveBarState state) =>
+          SaveBar(state: state, onAction: onAction),
+    );
+  }
 }
 
-String _label(EditorSyncStatus status) => switch (status) {
-  EditorSyncStatus.connected => huiText('Connected'),
-  EditorSyncStatus.pending => huiText('Pending server apply'),
-  EditorSyncStatus.applied => huiText('Applied'),
-  EditorSyncStatus.conflict => huiText('Conflict'),
-  EditorSyncStatus.rejected => huiText('Rejected'),
-  EditorSyncStatus.expired => huiText('Expired'),
-  EditorSyncStatus.revoked => huiText('Revoked'),
-  EditorSyncStatus.disconnected => huiText('Disconnected'),
-  EditorSyncStatus.unavailable => huiText('Relay unavailable'),
+/// Whether the shell shows the bar: in a server's workspace, in a workspace
+/// another tab holds, or after the local autosave failed.
+bool showEditorSyncBar({
+  required EditorStore store,
+  required bool server,
+  required bool waiting,
+}) => showSaveBar(
+  synced: server || waiting,
+  failure: store.workspace.lastError,
+);
+
+BadgeTone _tone(SyncDocState state) => switch (state) {
+  // A local edit is the normal case: no colour of its own.
+  SyncDocState.changedHere => BadgeTone.neutral,
+  SyncDocState.added => BadgeTone.ok,
+  SyncDocState.deleted => BadgeTone.neutral,
+  SyncDocState.changedOnServer => BadgeTone.warning,
+  SyncDocState.conflict => BadgeTone.error,
 };
+
+/// The badge for [state], or null when the document matches the server.
+Widget? syncDocBadge(SyncDocState? state) => state == null
+    ? null
+    : StatusBadge(
+        state.label,
+        tone: _tone(state),
+        attributes: <String, String>{'data-sync-doc': state.name},
+      );
+
+/// The library row badge for one workspace document id, for
+/// `EditorRail(serverBadge:)`.
+Widget? Function(String documentId) syncDocBadgeFor(
+  EditorSyncController controller,
+) =>
+    (String documentId) => syncDocBadge(controller.stateOf(documentId));

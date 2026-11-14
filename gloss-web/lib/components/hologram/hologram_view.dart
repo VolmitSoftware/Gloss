@@ -18,12 +18,10 @@
 /// back out of the controller. Scene geometry still comes from
 /// `logic/gloss_hologram_scene.dart`, which is DOM-free and tested on the VM.
 ///
-/// The readout names the mode and what one camera cannot show about it: the
-/// three tracking modes are solved against this camera, while in game every
-/// viewer gets their own solution.
-///
-/// With `gameContext` the world is the game screen's world and the stack
-/// anchors into it, which puts the client's HUD around the in-world view.
+/// The world is the game screen's world, seen from the client's eye over the
+/// anchor, and the stack anchors into it with the client's HUD around it.
+/// The frame's status line says what one camera cannot show: a stack seen
+/// edge-on or from behind.
 ///
 /// The stage owns a playback clock while any line references an animation
 /// document and the store's animations toggle is on. It is only mounted while
@@ -33,12 +31,9 @@ library;
 
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show EventCallback;
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 import '../../logic/gloss_hologram_scene.dart';
@@ -56,12 +51,12 @@ import '../../mc/rigs/mc_rigs.dart';
 import '../../model/model.dart';
 import '../../preview/projection.dart';
 import '../../state/editor_store.dart';
+import '../../ui/action_row.dart';
 import '../gloss/gloss_display_text.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_particle_overlay.dart';
 import '../gloss/gloss_text_line.dart';
 import '../mc/mc_dom_layer.dart';
-import '../mc/mc_stage.dart';
 import '../mc/mc_stage_controller.dart';
 
 /// Animation playback repaint period. Fine enough for the 1 ms floor to look
@@ -69,17 +64,9 @@ import '../mc/mc_stage_controller.dart';
 const Duration _tickPeriod = Duration(milliseconds: 50);
 
 class HologramView extends StatefulWidget {
-  const HologramView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const HologramView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the stage inside the shared Minecraft game-screen frame instead
-  /// of filling the editor pane. False renders exactly the editor surface.
-  final bool gameContext;
 
   @override
   State<HologramView> createState() => _HologramViewState();
@@ -90,14 +77,13 @@ class _HologramViewState extends State<HologramView> {
   /// the world's ground plane at y = 0.
   static const McVec3 _stageAnchor = McVec3(0.5, 0, 0.5);
 
-  /// The editor stage frames the stack's midpoint and orbits; the game frame
-  /// stands at the client's eye over the anchor and does not.
+  /// The game frame stands at the client's eye over the anchor and does not
+  /// orbit.
   late final McStageController _stage = McStageController(
-    kind: component.gameContext ? McStageKind.frame : McStageKind.hologram,
-    homePivot: component.gameContext
-        ? McVec3(_stageAnchor.x, mcCameraEyeHeight, _stageAnchor.z)
-        : _pivotFor(_store.hologramDoc),
-    freeCamera: !component.gameContext,
+    kind: McStageKind.frame,
+    homePivot: McVec3(_stageAnchor.x, mcCameraEyeHeight, _stageAnchor.z),
+    freeCamera: false,
+    cameras: component.store.worldCameras,
   );
 
   Timer? _ticker;
@@ -112,9 +98,9 @@ class _HologramViewState extends State<HologramView> {
   void initState() {
     super.initState();
     _store.addListener(_onStoreChanged);
-    _stage.addListener(_onStageChanged);
     _stage.spriteFor = _spriteFor;
     _syncStage();
+    _stage.addListener(_onStageChanged);
   }
 
   /// The no-WebGL sprite for a node, off the catalogs the store holds now.
@@ -145,40 +131,45 @@ class _HologramViewState extends State<HologramView> {
   }
 
   /// The anchored text is built here, so a camera the stage moved has to
-  /// rebuild this view, not only the canvas.
+  /// rebuild this view, not only the canvas. A new stage size frames the
+  /// hologram again.
   void _onStageChanged() {
     if (!mounted) return;
+    if (_stage.widthPx != _framedWidth || _stage.heightPx != _framedHeight) {
+      _frame(_store.hologramDoc);
+    }
     setState(() {});
   }
 
-  /// What the stage draws for the open document: the home framing centres the
-  /// stack (the game frame keeps the client's eye), and the block grid follows
+  /// What the stage draws for the open document; the block grid follows
   /// this view's toggle.
   void _syncStage() {
-    if (!component.gameContext) {
-      _stage.homePivot = _pivotFor(_store.hologramDoc);
-    }
+    // Each hologram keeps its own zoom; a new one starts framed.
+    _stage.showDocument(_store.workspace.activeId);
+    final GlossHologramDoc? doc = _store.hologramDoc;
+    _frame(doc);
     final bool grid = _showGrid;
-    _stage.scene = McScene(_objectNodes(_store.hologramDoc), gridVisible: grid);
+    _stage.scene = McScene(_objectNodes(doc), gridVisible: grid);
   }
 
-  /// The anchor at half the stack height, in stage blocks: the framing the
-  /// home camera centres on.
-  static McVec3 _pivotFor(GlossHologramDoc? doc) {
-    final int lines = doc == null
-        ? 1
-        : hologramPreviewLines(
-            doc,
-            entityHeight: _entityHeight,
-            entityWidth: _entityWidth,
-          ).fold<int>(
-            0,
-            (int rows, HologramPreviewLine line) => rows + line.rows,
-          );
-    return McVec3(
-      _stageAnchor.x,
-      lines * glossHologramLineHeightBlocks / 2,
-      _stageAnchor.z,
+  double _framedWidth = 0;
+  double _framedHeight = 0;
+
+  /// Home is the camera that holds the whole stack inside the frame, above
+  /// the HUD. The stage follows it while the user has not zoomed.
+  void _frame(GlossHologramDoc? doc) {
+    _framedWidth = _stage.widthPx;
+    _framedHeight = _stage.heightPx;
+    if (doc == null || _framedWidth <= 0 || _framedHeight <= 0) return;
+    _stage.home = hologramFrameCamera(
+      anchor: _stageAnchor,
+      stack: hologramStackSize(
+        doc,
+        entityHeight: _entityHeight,
+        entityWidth: _entityWidth,
+      ),
+      viewportWidth: _framedWidth,
+      viewportHeight: _framedHeight,
     );
   }
 
@@ -351,10 +342,6 @@ class _HologramViewState extends State<HologramView> {
     }
   }
 
-  void _stopPointer(Object? event) {
-    (event as JSObject?)?.callMethod<JSAny?>('stopPropagation'.toJS);
-  }
-
   void _zoomBy(double factor) {
     _stage.camera = _stage.camera
         .copyWith(distance: _stage.camera.distance * factor)
@@ -370,13 +357,10 @@ class _HologramViewState extends State<HologramView> {
     GlossHologramDoc? doc = _store.hologramDoc;
     if (doc == null) {
       _syncTicker(false);
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.world,
-          label: huiText('Hologram in game'),
-        );
-      }
-      return const dom.div(classes: 'hui-hologram-stage is-empty', <Widget>[]);
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.world,
+        label: huiText('Hologram in game'),
+      );
     }
     final GlossAnimationResolver animations = _store.workspaceAnimations;
     final bool animated =
@@ -419,13 +403,6 @@ class _HologramViewState extends State<HologramView> {
             viewportWidth: viewportWidth,
             viewportHeight: viewportHeight,
           );
-    final double homeDistance = mcCameraHome(
-      _stage.kind,
-      _stage.homePivot,
-    ).distance;
-    final int zoomPercent = (homeDistance / _stage.camera.distance * 100)
-        .round();
-
     final List<HologramPreviewLine> scaledText = <HologramPreviewLine>[
       for (final HologramPreviewLine line in hologramPreviewLines(
         doc,
@@ -456,71 +433,36 @@ class _HologramViewState extends State<HologramView> {
         _anchored(billboard: McBillboardMode.center, child: _anchorMarker),
     ];
 
-    final List<Widget> controls = <Widget>[
-      dom.div(
-        // The stage listens for pointerdown on its own root to start an
-        // orbit; a control press must not become a drag.
-        styles: const dom.Styles(
-          raw: <String, String>{
-            'display': 'flex',
-            'align-items': 'center',
-            'gap': '8px',
-          },
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.world,
+      label: huiText('Hologram in game'),
+      world: _stage,
+      worldOverlay: overlay,
+      actions: <RowAction>[
+        RowAction(
+          huiText('Zoom out'),
+          () => _zoomBy(1.25),
+          icon: ArcaneIcon.zoomOut(),
+          iconOnly: true,
         ),
-        attributes: <String, String>{
-          'role': 'group',
-          'aria-label': huiText('Hologram preview controls'),
-        },
-        events: <String, EventCallback>{'pointerdown': _stopPointer},
-        <Widget>[
-          _cameraAction(
-            label: huiText('Zoom out'),
-            icon: ArcaneIcon.zoomOut(size: IconSize.sm),
-            onPressed: () => _zoomBy(1.25),
-          ),
-          dom.span(classes: 'hui-hologram-zoom', <Widget>[
-            Text(
-              huiText("{zoomPercent}%", <String, Object?>{
-                'zoomPercent': zoomPercent,
-              }),
-            ),
-          ]),
-          _cameraAction(
-            label: huiText('Zoom in'),
-            icon: ArcaneIcon.zoomIn(size: IconSize.sm),
-            onPressed: () => _zoomBy(0.8),
-          ),
-          _cameraAction(
-            label: huiText('Reset view'),
-            icon: ArcaneIcon.maximize(size: IconSize.sm),
-            onPressed: _stage.resetCamera,
-          ),
-          _cameraAction(
-            label: huiText('Block grid'),
-            icon: ArcaneIcon.grid3x3(size: IconSize.sm),
-            onPressed: _toggleGrid,
-            pressed: _showGrid,
-          ),
-        ],
-      ),
-      if (!component.gameContext) _readout(doc, plane),
-    ];
-
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.world,
-        label: huiText('Hologram in game'),
-        world: _stage,
-        worldOverlay: overlay,
-        controls: controls,
-        child: const dom.div(<Widget>[]),
-      );
-    }
-    return McStage(
-      controller: _stage,
-      overlay: overlay,
-      controls: controls,
-      label: huiText('Hologram stage preview'),
+        RowAction(
+          huiText('Zoom in'),
+          () => _zoomBy(0.8),
+          icon: ArcaneIcon.zoomIn(),
+          iconOnly: true,
+        ),
+        RowAction(
+          huiText('Block grid'),
+          _toggleGrid,
+          icon: ArcaneIcon.grid3x3(),
+          iconOnly: true,
+          pressed: _showGrid,
+        ),
+      ],
+      onReset: _stage.resetCamera,
+      status: _status(plane),
+      statusTip: hologramBillboardNote(doc.style.billboard),
+      child: const dom.div(<Widget>[]),
     );
   }
 
@@ -647,7 +589,6 @@ class _HologramViewState extends State<HologramView> {
         ? 1
         : doc.style.scaleX / doc.style.scaleY;
     return dom.div(
-      classes: 'hui-hologram-scaled',
       styles: const dom.Styles(
         raw: <String, String>{
           'position': 'relative',
@@ -686,25 +627,21 @@ class _HologramViewState extends State<HologramView> {
                 },
               ),
               <Widget>[
-                for (final String row in glossHologramLineText(
-                  line.source,
-                ).split('\n'))
+                for (final GlossLineRender row in glossDisplayLines(
+                  renderGlossLine(
+                    glossHologramLineText(line.source),
+                    animations: animations,
+                    emoji: _store.workspaceEmoji,
+                    nowMs: nowMs,
+                    richText: true,
+                  ),
+                ))
                   dom.div(
                     classes: 'hui-hologram-line',
                     styles: dom.Styles(
                       raw: <String, String>{'min-height': '${linePx}px'},
                     ),
-                    <Widget>[
-                      GlossTextLine(
-                        render: renderGlossLine(
-                          row,
-                          animations: animations,
-                          emoji: _store.workspaceEmoji,
-                          nowMs: nowMs,
-                          richText: true,
-                        ),
-                      ),
-                    ],
+                    <Widget>[GlossTextLine(render: row)],
                   ),
               ],
             );
@@ -751,60 +688,21 @@ class _HologramViewState extends State<HologramView> {
     <Widget>[],
   );
 
-  Widget _readout(GlossHologramDoc doc, HologramPlaneTransform plane) {
-    final List<double> position = doc.anchor.position;
-    return dom.span(classes: 'hui-mc-readout', <Widget>[
-      Text(
+  /// What this one camera cannot show about the stack, or null: seen
+  /// edge-on it draws as nothing, from behind it reads mirrored, and without
+  /// WebGL2 the world is a still.
+  String? _status(HologramPlaneTransform plane) {
+    final List<String> parts = <String>[
+      if (plane.isEdgeOn)
+        huiText('Edge-on from here, so it draws as nothing in game too.')
+      else if (plane.isMirrored)
+        huiText('Read from behind from here.'),
+      if (!_stage.webGlAvailable)
         huiText(
-          '{world} {x}, {y}, {z} · TextDisplay · {billboard}{viewNote} · '
-          'drag to orbit, wheel or controls to zoom',
-          <String, Object?>{
-            'world': doc.anchor.world.isEmpty
-                ? huiText('(no world)')
-                : doc.anchor.world,
-            'x': position[0].toStringAsFixed(2),
-            'y': position[1].toStringAsFixed(2),
-            'z': position[2].toStringAsFixed(2),
-            'billboard': hologramBillboardNote(doc.style.billboard),
-            'viewNote': plane.isEdgeOn
-                ? huiText(
-                    ' · edge-on from here, so it draws as nothing — '
-                    'in game too',
-                  )
-                : plane.isMirrored
-                ? huiText(' · reading it from behind now')
-                : '',
-          },
+          'No WebGL2 in this browser: the world is a still and models are '
+          'sprites',
         ),
-      ),
-      if (!_stage.webGlAvailable) Text(' · ${_noWebGlNote()}'),
-    ]);
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
   }
-
-  /// Appended to the readout when the stage fell back to the still.
-  String _noWebGlNote() => huiText(
-    'No WebGL2 in this browser: the world is a still and models are '
-    'sprites',
-  );
-
-  /// [pressed] makes it a toggle: the state reads out of the button, not out
-  /// of the stage.
-  Widget _cameraAction({
-    required String label,
-    required ArcaneGlyph icon,
-    required void Function() onPressed,
-    bool? pressed,
-  }) => Button(
-    variant: (pressed ?? false)
-        ? ButtonVariant.secondary
-        : ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: onPressed,
-    attributes: <String, String>{
-      'aria-label': label,
-      'title': label,
-      if (pressed != null) 'aria-pressed': '$pressed',
-    },
-    icon: icon,
-  );
 }

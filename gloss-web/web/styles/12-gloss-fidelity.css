@@ -1,19 +1,9 @@
-/* Gloss preview fidelity: the vanilla text drop shadow, and the shared
-   game-screen frame the Gloss surfaces mount into under `gameContext`.
+/* The shared game screen and the client's own chrome: text shadow, HUD,
+   anchors, chat, boss bar and title. Same in either page theme. */
 
-   Loaded after 10-gloss.css so these rules layer over the surfaces rather
-   than replacing them. Nothing here is theme-dependent: a Minecraft frame is
-   a Minecraft frame in either page theme. */
-
-/* --- vanilla text shadow -------------------------------------------------
-   The client draws HUD and world text with a one-pixel offset shadow at
-   roughly a quarter brightness. Every Gloss pipeline line is a
-   `.hui-gloss-line`, so one rule covers the scoreboard, tab list, MOTD,
-   bubbles, holograms, animation frames and the inspector line previews.
-   The MC-font text the CLIENT draws around them — the score column, the
-   server row's name and player count, the emoji chat sample — is not a
-   pipeline line and is listed explicitly. */
-
+/* The client draws HUD and world text with a one-pixel shadow at about a
+   quarter brightness: every pipeline line, and the MC-font text the client
+   draws around them. */
 .hui-gloss-line,
 .hui-scoreboard-score,
 .hui-motd-server-name,
@@ -23,26 +13,59 @@
   text-shadow: 1px 1px 0 rgb(0 0 0 / 0.55);
 }
 
-/* text-shadow inherits, so the editor's own badges inside a pipeline line
-   must switch it back off: a chip is UI chrome, not in-game text, and the
-   shadow reads as a rendering fault on one. */
+/* text-shadow inherits, so editor chips inside a line switch it off: a chip
+   is editor chrome, and a shadow on it reads as a rendering fault. */
 .hui-gloss-chip,
 .hui-motd-line.is-blank,
-.hui-animation-strip-index {
+.hui-inventory-title .hui-gloss-line {
   text-shadow: none;
 }
 
-/* --- shared game-screen frame -------------------------------------------- */
+/* --- shared game-screen frame --------------------------------------------
+   GUI chrome is sized in GUI pixels (`--gui`, CSS px per GUI px): scale 2,
+   or 1 under the 640x480 the client needs for 2. Fixed-size windows sit in
+   a fit box that scales them to their anchor's room. */
+
+.hui-game-frame {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 18rem;
+  padding: 0.5rem;
+}
+
+/* Preview inputs over the screen, then the screen takes the rest. */
+.hui-game-body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.hui-game-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  align-items: center;
+  gap: var(--ui-gap);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.hui-game-inputs > .is-wide { grid-column: 1 / -1; }
 
 .hui-gloss-game {
   position: relative;
-  width: 100%;
-  height: 100%;
+  min-height: 10rem;
   overflow: hidden;
-  container-type: inline-size;
+  container-type: size;
   font-family: var(--hui-mc-font);
   color: #ffffff;
   user-select: none;
+}
+
+.hui-gloss-game > * { --gui: 2px; }
+
+@container (max-width: 639px) or (max-height: 479px) {
+  .hui-gloss-game > * { --gui: 1px; }
 }
 
 /* The world behind the HUD: a live stage at the client's own eye. */
@@ -50,8 +73,6 @@
   position: absolute;
   inset: 0;
 }
-
-.hui-gloss-game-world .hui-mc-stage { min-height: 0; }
 
 /* A GUI screen darkens and blurs the world behind it. */
 .hui-gloss-game.is-screen .hui-gloss-game-world {
@@ -62,10 +83,10 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 30px;
-  height: 30px;
+  width: calc(15 * var(--gui));
+  height: calc(15 * var(--gui));
   transform: translate(-50%, -50%);
-  background: url('../assets/mc/26.2/hud/crosshair.png') center / 30px 30px no-repeat;
+  background: url('../assets/mc/26.2/hud/crosshair.png') center / 100% 100% no-repeat;
   image-rendering: pixelated;
   mix-blend-mode: difference;
   pointer-events: none;
@@ -76,8 +97,6 @@
 .hui-gloss-game-anchor {
   position: absolute;
   display: flex;
-  min-width: 0;
-  max-width: 100%;
   pointer-events: none;
 }
 
@@ -85,36 +104,39 @@
 
 /* Sidebar: right edge, vertically centred. */
 .hui-gloss-game.is-sidebar .hui-gloss-game-anchor {
+  top: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  max-width: 46%;
+  bottom: 0;
+  width: 50%;
   justify-content: flex-end;
+  align-items: center;
 }
 
-/* Tab list: top centre, held open while the key is down. */
+/* Tab list: top centre, over everything while the key is down. */
 .hui-gloss-game.is-tab-overlay .hui-gloss-game-anchor {
-  left: 50%;
-  top: 2%;
-  transform: translateX(-50%);
-  width: min(78cqi, 100%);
+  inset: calc(5 * var(--gui)) 2% 2%;
   justify-content: center;
+  align-items: flex-start;
 }
 
-/* Chat: lower left, above the hotbar. */
-.hui-gloss-game.is-chat .hui-gloss-game-anchor {
-  left: 12px;
-  bottom: 86px;
-  width: min(62cqi, calc(100% - 24px));
+/* Chat: lower left, above the HUD. The idle scrollback stops short of the
+   centre column, where the action bar and bubbles draw. */
+.hui-gloss-game.is-chat .hui-gloss-game-anchor,
+.hui-gloss-game-chat {
+  left: calc(2 * var(--gui));
+  bottom: calc(62 * var(--gui));
+  width: min(calc(320 * var(--gui)), calc(100% - 4 * var(--gui)));
+}
+
+.hui-gloss-game-chat {
+  width: min(calc(320 * var(--gui)), calc(50% - 95 * var(--gui)));
 }
 
 /* HUD: the client's own overlay region. The surface places itself inside it,
    because one document can claim the action bar, a boss bar or the title. */
-.hui-gloss-game.is-hud .hui-gloss-game-anchor {
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 112px;
+.hui-gloss-game.is-hud .hui-gloss-game-anchor,
+.hui-gloss-game.is-over-player .hui-gloss-game-anchor {
+  inset: 0 0 calc(62 * var(--gui));
 }
 
 .hui-gloss-game.is-hud .hui-gloss-game-anchor > * {
@@ -124,84 +146,43 @@
 
 /* Bubbles: centred over the player, growing upward from its head. */
 .hui-gloss-game.is-over-player .hui-gloss-game-anchor {
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 112px;
   justify-content: center;
   align-items: flex-end;
 }
 
-/* In-world surfaces draw their own scene and fill the viewport. */
+/* In-world surfaces draw their own scene and fill the viewport; a fitted
+   window (the animation frame) is centred in it. */
 .hui-gloss-game.is-world .hui-gloss-game-anchor {
   inset: 0;
   align-items: center;
   justify-content: center;
 }
 
-.hui-gloss-game.is-world .hui-gloss-game-anchor > * {
+.hui-gloss-game.is-world .hui-gloss-game-anchor > :not([data-window-fit]) {
   width: 100%;
   height: 100%;
-}
-
-/* The animation frame has no scene of its own — centre it in the world. */
-.hui-gloss-game.is-world .hui-gloss-game-anchor > .hui-animation-frame-large {
-  width: auto;
-  height: auto;
-  align-self: center;
 }
 
 /* GUI screen: the server list, centred. */
 .hui-gloss-game.is-screen .hui-gloss-game-anchor {
-  inset: 0;
+  inset: 4cqi;
   align-items: center;
   justify-content: center;
-  padding: 4cqi;
 }
 
-.hui-gloss-game.is-screen .hui-motd-screen {
-  width: min(760px, 92cqi);
-  background: none;
-  padding: 0;
-}
-
-/* GUI screen: the container-preview card, drawn on the screen the container
-   opens. `preview_card_viewport.dart` hands the frame its artboard alone —
-   no toolbar, no hint row — so the wrapper is a single full-height track and
-   the stage loses the editor's panel fill and border. The artboard keeps its
-   own pointer handling: pan, zoom and drag work inside the frame. */
-.hui-gloss-game.is-screen .hui-preview-card-game {
-  width: 100%;
-  height: 100%;
-}
-
+/* GUI screen: the container-preview card, on the screen the container
+   opens; the artboard keeps its own pan, zoom and drag. */
 .hui-preview-card-game {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
+  width: 100%;
   min-height: 0;
   height: 100%;
 }
 
-.hui-preview-card-game .hui-canvas-stage {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-/* The emoji sample IS a chat line in game, so it loses its editor card and
-   takes the chat region's own row treatment. The raw "before" line and the
-   authoring note are editor commentary and drop out. */
-.hui-gloss-game.is-chat .hui-emoji-chat {
-  gap: 1px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  font-size: 12px;
-}
-
-.hui-gloss-game.is-chat .hui-emoji-chat-line.is-raw,
-.hui-gloss-game.is-chat .hui-emoji-chat-meta {
+/* The emoji sample is a chat line in game: the chat region's row treatment,
+   and the raw "before" line drops out. */
+.hui-gloss-game.is-chat .hui-emoji-chat-line.is-raw {
   display: none;
 }
 
@@ -214,9 +195,6 @@
 
 .hui-gloss-game-chat {
   position: absolute;
-  left: 12px;
-  bottom: 86px;
-  width: min(62cqi, calc(100% - 24px));
   font-size: 12px;
   line-height: 1.5;
   pointer-events: none;
@@ -235,14 +213,14 @@
 .hui-gloss-game-chat-line:nth-child(2) { opacity: 0.55; }
 .hui-gloss-game-chat-line:nth-child(3) { opacity: 0.78; }
 
-/* --- bottom HUD: the client's sprites at GUI scale 2 -------------------- */
+/* --- bottom HUD: the client's sprites, in GUI pixels ---------------------- */
 
 .hui-gloss-game-hud {
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 364px;
-  height: 120px;
+  width: calc(182 * var(--gui));
+  height: calc(60 * var(--gui));
   transform: translateX(-50%);
   pointer-events: none;
   image-rendering: pixelated;
@@ -250,26 +228,24 @@
 
 .hui-gloss-game-sprite {
   position: absolute;
-  display: block;
   background-repeat: no-repeat;
   background-size: 100% 100%;
-  image-rendering: pixelated;
 }
 
-.hui-gloss-game-sprite.is-hotbar { left: 0; bottom: 0; width: 364px; height: 44px; background-image: url('../assets/mc/26.2/hud/hotbar.png'); }
-.hui-gloss-game-sprite.is-hotbar-selection { left: -2px; top: -2px; width: 48px; height: 46px; background-image: url('../assets/mc/26.2/hud/hotbar_selection.png'); }
-.hui-gloss-game-sprite.is-xp-background { left: 0; bottom: 58px; width: 364px; height: 10px; background-image: url('../assets/mc/26.2/hud/xp_background.png'); }
-.hui-gloss-game-sprite.is-xp-progress { left: 0; top: 0; width: 62%; height: 10px; background-image: url('../assets/mc/26.2/hud/xp_progress.png'); background-size: 364px 10px; }
+.hui-gloss-game-sprite.is-hotbar { left: 0; bottom: 0; width: calc(182 * var(--gui)); height: calc(22 * var(--gui)); background-image: url('../assets/mc/26.2/hud/hotbar.png'); }
+.hui-gloss-game-sprite.is-hotbar-selection { left: calc(-1 * var(--gui)); top: calc(-1 * var(--gui)); width: calc(24 * var(--gui)); height: calc(23 * var(--gui)); background-image: url('../assets/mc/26.2/hud/hotbar_selection.png'); }
+.hui-gloss-game-sprite.is-xp-background { left: 0; bottom: calc(29 * var(--gui)); width: calc(182 * var(--gui)); height: calc(5 * var(--gui)); background-image: url('../assets/mc/26.2/hud/xp_background.png'); }
+.hui-gloss-game-sprite.is-xp-progress { left: 0; top: 0; width: 62%; height: calc(5 * var(--gui)); background-image: url('../assets/mc/26.2/hud/xp_progress.png'); background-size: calc(182 * var(--gui)) calc(5 * var(--gui)); }
 
 .hui-gloss-game-hearts, .hui-gloss-game-food, .hui-gloss-game-armor { position: absolute; display: flex; gap: 0; }
-.hui-gloss-game-hearts { left: 0; bottom: 78px; }
-.hui-gloss-game-food { right: 0; bottom: 78px; flex-direction: row-reverse; }
-.hui-gloss-game-armor { left: 0; bottom: 98px; }
+.hui-gloss-game-hearts { left: 0; bottom: calc(39 * var(--gui)); }
+.hui-gloss-game-food { right: 0; bottom: calc(39 * var(--gui)); flex-direction: row-reverse; }
+.hui-gloss-game-armor { left: 0; bottom: calc(49 * var(--gui)); }
 
 .hui-gloss-game-hearts > .hui-gloss-game-sprite,
 .hui-gloss-game-food > .hui-gloss-game-sprite,
-.hui-gloss-game-armor > .hui-gloss-game-sprite { position: relative; width: 18px; height: 18px; margin-right: -2px; }
-.hui-gloss-game-food > .hui-gloss-game-sprite { margin-right: 0; margin-left: -2px; }
+.hui-gloss-game-armor > .hui-gloss-game-sprite { position: relative; width: calc(9 * var(--gui)); height: calc(9 * var(--gui)); margin-right: calc(-1 * var(--gui)); }
+.hui-gloss-game-food > .hui-gloss-game-sprite { margin-right: 0; margin-left: calc(-1 * var(--gui)); }
 .hui-gloss-game-sprite.is-heart-container { background-image: url('../assets/mc/26.2/hud/heart_container.png'); }
 .hui-gloss-game-sprite.is-heart-full { inset: 0; background-image: url('../assets/mc/26.2/hud/heart_full.png'); }
 .hui-gloss-game-sprite.is-heart-half { inset: 0; background-image: url('../assets/mc/26.2/hud/heart_half.png'); }
@@ -279,222 +255,12 @@
 .hui-gloss-game-sprite.is-armor-empty { background-image: url('../assets/mc/26.2/hud/armor_empty.png'); }
 .hui-gloss-game-sprite.is-armor-full { background-image: url('../assets/mc/26.2/hud/armor_full.png'); }
 
-/* Narrow frames draw the HUD at GUI scale 1 — every rule below is the scale-2
-   rule above, halved. */
-@media (max-width: 700px) {
-  .hui-gloss-game-hud { width: 182px; height: 60px; }
-
-  .hui-gloss-game-sprite.is-hotbar { width: 182px; height: 22px; }
-  .hui-gloss-game-sprite.is-hotbar-selection { left: -1px; top: -1px; width: 24px; height: 24px; }
-  .hui-gloss-game-sprite.is-xp-background { bottom: 29px; width: 182px; height: 5px; }
-  .hui-gloss-game-sprite.is-xp-progress { height: 5px; background-size: 182px 5px; }
-
-  .hui-gloss-game-hearts { bottom: 39px; }
-  .hui-gloss-game-food { bottom: 39px; }
-  .hui-gloss-game-armor { bottom: 49px; }
-
-  .hui-gloss-game-hearts > .hui-gloss-game-sprite,
-  .hui-gloss-game-food > .hui-gloss-game-sprite,
-  .hui-gloss-game-armor > .hui-gloss-game-sprite { width: 9px; height: 9px; margin-right: -1px; }
-  .hui-gloss-game-food > .hui-gloss-game-sprite { margin-right: 0; margin-left: -1px; }
-}
-
-/* --- editor affordances over the frame ------------------------------------ */
-
-.hui-gloss-game-controls {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  max-width: calc(100% - 24px);
-  padding: 8px;
-  border: 1px solid var(--hui-border);
-  border-radius: 6px;
-  background: var(--hui-panel);
-  color: var(--hui-text);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  text-shadow: none;
-}
-
-.hui-gloss-game-controls :is(button, input, select),
-.hui-identity-rules :is(button, input, select) {
-  color: var(--hui-text);
-}
-
-.hui-gloss-game-controls :is(button, input, select):focus-visible,
-.hui-identity-rules :is(button, input, select):focus-visible {
-  outline: 2px solid var(--hui-text);
-  outline-offset: 2px;
-}
-
-/* --- scoreboard: preview controls and the selection simulator ------------- */
-
-.hui-scoreboard-view-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hui-tablist-view-controls {
-  position: absolute;
-  left: 12px;
-  top: 12px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hui-scoreboard-sim {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-top: 1px solid var(--color-border);
-  padding: 12px 14px 14px;
-  max-height: 38%;
-  overflow-y: auto;
-}
-
-.hui-scoreboard-sim-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.hui-scoreboard-sim-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.hui-scoreboard-sim-verdict {
-  font-size: 11px;
-  color: var(--color-primary);
-}
-
-.hui-scoreboard-sim-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-}
-
-.hui-scoreboard-sim-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.hui-scoreboard-sim-label {
-  font-size: 11px;
-  color: var(--color-muted-foreground);
-  white-space: nowrap;
-}
-
-.hui-scoreboard-sim-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.hui-scoreboard-sim-row {
-  display: grid;
-  grid-template-columns: minmax(96px, auto) 1fr auto;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 0;
-  padding: 5px 9px;
-  font-size: 11px;
-}
-
-.hui-scoreboard-sim-row.is-winner {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.hui-scoreboard-sim-row.is-hidden-from-viewer { opacity: 0.5; }
-
-.hui-scoreboard-sim-id {
-  font-family: var(--font-mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hui-scoreboard-sim-row.is-open .hui-scoreboard-sim-id {
-  font-weight: 700;
-}
-
-.hui-scoreboard-sim-flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 0;
-}
-
-.hui-scoreboard-sim-flag {
-  padding: 0 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 0;
-  font-size: 10px;
-  color: var(--color-muted-foreground);
-  white-space: nowrap;
-}
-
-.hui-scoreboard-sim-flag.is-match {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.hui-scoreboard-sim-state {
-  font-size: 10px;
-  color: var(--color-muted-foreground);
-  white-space: nowrap;
-}
-
-.hui-scoreboard-sim-empty,
-.hui-scoreboard-sim-note {
-  margin: 0;
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--color-muted-foreground);
-}
-
 /* --- connection messages -------------------------------------------------- */
-
-.hui-connections-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  min-height: 0;
-}
-
-.hui-connections-screen {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.55);
-  font-family: var(--hui-mc-font);
-  color: #ffffff;
-}
 
 .hui-connections-chat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  width: 100%;
 }
 
 .hui-connections-line {
@@ -502,111 +268,32 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-}
-
-.hui-gloss-game .hui-connections-chat {
-  gap: 0;
-  width: 100%;
-}
-
-.hui-gloss-game .hui-connections-line {
   padding: 2px 4px;
   background: rgba(0, 0, 0, 0.5);
   overflow-wrap: anywhere;
 }
 
-.hui-gloss-game .hui-connections-line > * {
+.hui-connections-line > * {
   min-width: 0;
-}
-
-.hui-connections-line.is-silent {
-  color: rgba(255, 255, 255, 0.45);
-  text-shadow: none;
-  font-style: italic;
-}
-
-.hui-connections-event {
-  flex: none;
-  min-width: 44px;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-  text-shadow: none;
-}
-
-.hui-connections-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.hui-connections-reader,
-.hui-connections-readout {
-  font-size: 12px;
-  color: var(--color-muted-foreground);
-  text-shadow: none;
-}
-
-.hui-connections-variant {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-}
-
-.hui-connections-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 /* --- surfaces ------------------------------------------------------------- */
 
-.hui-surface-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  min-height: 0;
-}
-
-.hui-surface-screen {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: min(560px, 100%);
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.55);
-  font-family: var(--hui-mc-font);
-  color: #ffffff;
-}
-
 /* The HUD region itself: boss bar at the top, title card in the middle,
-   action bar immediately above the hotbar — the client's own vertical order. */
+   action bar immediately above the hotbar, the client's own vertical order. */
 .hui-surface-hud {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(48px, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 8px;
-  min-height: 150px;
+  min-height: 0;
+  padding: 10px 12px 0;
 }
 
 .hui-surface-hud.is-bossbar > .hui-surface-bossbar { grid-row: 1; }
 .hui-surface-hud.is-title > .hui-surface-title { grid-row: 2; }
 .hui-surface-hud.is-actionbar > .hui-surface-actionbar { grid-row: 3; }
 .hui-surface-hud > .hui-surface-silent { grid-row: 2; }
-.hui-surface-hud > .hui-surface-hotbar { grid-row: 4; }
-
-.hui-surface-hud.is-game {
-  grid-template-rows: auto minmax(48px, 1fr) auto;
-  height: 100%;
-  min-height: 0;
-  padding: 10px 12px 0;
-}
 
 .hui-surface-actionbar {
   display: grid;
@@ -621,7 +308,6 @@
   min-width: 0;
 }
 
-.hui-surface-lane.is-left { justify-content: flex-start; }
 .hui-surface-lane.is-center { justify-content: center; }
 .hui-surface-lane.is-right { justify-content: flex-end; }
 
@@ -689,23 +375,6 @@
 
 .hui-surface-subtitle-line { font-size: 14px; }
 
-.hui-surface-hotbar {
-  display: flex;
-  justify-content: center;
-  gap: 2px;
-}
-
-.hui-surface-hotbar-slot {
-  width: 20px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.hui-surface-hotbar-slot.is-selected {
-  border-color: rgba(255, 255, 255, 0.85);
-}
-
 .hui-surface-silent {
   display: flex;
   align-items: center;
@@ -716,31 +385,45 @@
   text-shadow: none;
 }
 
-.hui-surface-controls {
+/* --- formatted text preview (inspector) ----------------------------------- */
+
+/* Game text on a flat dark plate in either theme. Long lines wrap; the
+   preview never scrolls sideways. */
+.hui-mc-preview-surface {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  background: #1d1d20;
+  color: #ffffff;
 }
 
-.hui-surface-viewer,
-.hui-surface-readout {
-  font-size: 12px;
-  color: var(--color-muted-foreground);
+.hui-mc-line {
+  font-family: var(--hui-mc-font);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-shadow: 1px 1px 0 rgb(0 0 0 / 0.55);
+}
+
+.hui-mc-line.is-empty {
+  color: #aaaaaa;
+  font-family: inherit;
+  font-size: var(--font-size-xs);
   text-shadow: none;
 }
 
-.hui-surface-variant {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+.hui-mc-span.is-obfuscated {
+  animation: hui-mc-flicker 260ms steps(2, end) infinite alternate;
 }
 
-.hui-surface-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+@keyframes hui-mc-flicker {
+  from { opacity: 1; letter-spacing: 0; }
+  to { opacity: 0.62; letter-spacing: 0.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hui-mc-span.is-obfuscated { animation: none; opacity: 0.72; }
 }

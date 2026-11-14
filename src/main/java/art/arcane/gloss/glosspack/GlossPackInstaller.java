@@ -1,5 +1,6 @@
 package art.arcane.gloss.glosspack;
 
+import art.arcane.gloss.config.action.CommandActions;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
@@ -9,7 +10,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
@@ -374,7 +374,7 @@ public final class GlossPackInstaller {
             JsonArray array = element.getAsJsonArray();
             for (int index = array.size() - 1; index >= 0; index--) {
                 JsonElement child = array.get(index);
-                if (isServerCommand(child)) {
+                if (CommandActions.runsAsServer(child)) {
                     array.remove(index);
                     removed++;
                     continue;
@@ -389,17 +389,6 @@ public final class GlossPackInstaller {
             }
         }
         return removed;
-    }
-
-    private static boolean isServerCommand(JsonElement element) {
-        if (!element.isJsonObject()) {
-            return false;
-        }
-        JsonObject object = element.getAsJsonObject();
-        JsonElement type = object.get("type");
-        JsonElement source = object.get("source");
-        return type != null && type.isJsonPrimitive() && "command".equals(type.getAsString())
-                && source != null && source.isJsonPrimitive() && "server".equals(source.getAsString());
     }
 
     record Stripped(String source, int removed) {

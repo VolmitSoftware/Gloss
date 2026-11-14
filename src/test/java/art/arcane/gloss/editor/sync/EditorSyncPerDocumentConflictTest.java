@@ -3,7 +3,6 @@ package art.arcane.gloss.editor.sync;
 import com.google.gson.JsonObject;
 import org.junit.Test;
 
-import java.time.Instant;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -22,7 +21,7 @@ public class EditorSyncPerDocumentConflictTest {
     JsonObject base = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", ONE_BASE),
         EditorSyncTestProjects.menuDocument("two", TWO_BASE));
-    EditorSyncStoredSession session = workspaceSession(base);
+    EditorSyncPublicationValidator.Base session = workspaceSession(base);
     JsonObject server = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", ONE_BASE),
         EditorSyncTestProjects.menuDocument("two", TWO_SERVER));
@@ -32,12 +31,12 @@ public class EditorSyncPerDocumentConflictTest {
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), published),
+            new EditorSyncPublication(session.baseRevision(), published),
             1024 * 1024, server);
 
     assertEquals(List.of(new EditorSyncPublicationValidator.DocumentKey(
         EditorSyncDocumentKind.MENU, "two")), validated.conflicts());
-    assertEquals(ONE_EDITED, appliedSource(validated, "one"));
+    assertEquals("{\"components\":[],\"offset\":[0,0,1]}\n", appliedSource(validated, "one"));
     assertEquals(TWO_SERVER, appliedSource(validated, "two"));
     assertFalse(validated.noOp());
   }
@@ -46,7 +45,7 @@ public class EditorSyncPerDocumentConflictTest {
   public void aDocumentTheEditorDidNotChangeIsRefreshedSilently() {
     JsonObject base = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", ONE_BASE));
-    EditorSyncStoredSession session = workspaceSession(base);
+    EditorSyncPublicationValidator.Base session = workspaceSession(base);
     JsonObject server = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", ONE_EDITED));
     JsonObject published = EditorSyncTestProjects.workspaceProject(
@@ -54,7 +53,7 @@ public class EditorSyncPerDocumentConflictTest {
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), published),
+            new EditorSyncPublication(session.baseRevision(), published),
             1024 * 1024, server);
 
     assertTrue(validated.conflicts().isEmpty());
@@ -66,7 +65,7 @@ public class EditorSyncPerDocumentConflictTest {
   public void aDocumentCreatedOnTheServerSurvivesAWorkspaceMirrorThatNeverSawIt() {
     JsonObject base = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", ONE_BASE));
-    EditorSyncStoredSession session = workspaceSession(base);
+    EditorSyncPublicationValidator.Base session = workspaceSession(base);
     JsonObject server = EditorSyncTestProjects.workspaceProject(
         EditorSyncTestProjects.menuDocument("one", ONE_BASE),
         EditorSyncTestProjects.menuDocument("two", TWO_SERVER));
@@ -75,7 +74,7 @@ public class EditorSyncPerDocumentConflictTest {
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), published),
+            new EditorSyncPublication(session.baseRevision(), published),
             1024 * 1024, server);
 
     assertTrue(validated.conflicts().isEmpty());
@@ -89,10 +88,7 @@ public class EditorSyncPerDocumentConflictTest {
     return entry == null ? null : entry.entry().json();
   }
 
-  private static EditorSyncStoredSession workspaceSession(JsonObject project) {
-    return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
-        new EditorSyncStoredSession.Subject(EditorSyncKind.WORKSPACE, "workspace"),
-        Instant.now().plusSeconds(3600L), 0L, project, null);
+  private static EditorSyncPublicationValidator.Base workspaceSession(JsonObject project) {
+    return new EditorSyncPublicationValidator.Base(project);
   }
 }

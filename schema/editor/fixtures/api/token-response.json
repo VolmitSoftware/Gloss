@@ -1,0 +1,22 @@
+{
+  "tokenId": "tok_GNxjrcrde6yKeCH1",
+  "label": "laptop",
+  "scopes": [
+    "read",
+    "history",
+    "publish:screens",
+    "publish:hud",
+    "publish:chat",
+    "publish:world",
+    "publish:players",
+    "publish:shared",
+    "publish:images"
+  ],
+  "folders": [
+    "shop"
+  ],
+  "expiresAt": "2026-11-20T10:00:00Z",
+  "lifetimeSeconds": 604800,
+  "serverName": "Twin Peaks",
+  "fingerprint": "sha256:7aa588dcfd87124ac87c2d8317881456ab88fbc37239ccab3e01e8ee9d63316d"
+}

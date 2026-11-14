@@ -342,7 +342,6 @@ void main() {
       expect(store.previewShowDistanceSphere, isFalse);
       expect(store.previewShowGroundGrid, isTrue);
       expect(store.previewLogOpen, isTrue);
-      expect(store.previewBannerDismissed, isFalse);
       expect(store.previewCameraMode, PreviewCameraMode.orbit);
     });
 
@@ -356,7 +355,6 @@ void main() {
       first.previewShowDistanceSphere = true;
       first.previewShowGroundGrid = false;
       first.previewLogOpen = false;
-      first.previewBannerDismissed = true;
       first.previewCameraMode = PreviewCameraMode.player;
       first.view = EditorView.preview;
       first.flushAutosave();
@@ -369,7 +367,6 @@ void main() {
       expect(second.previewShowDistanceSphere, isTrue);
       expect(second.previewShowGroundGrid, isFalse);
       expect(second.previewLogOpen, isFalse);
-      expect(second.previewBannerDismissed, isTrue);
       expect(second.previewCameraMode, PreviewCameraMode.player);
       expect(second.view, EditorView.preview);
     });
@@ -385,8 +382,6 @@ void main() {
       expect(store.previewUiScale, 2.0);
       expect(store.trueRender, isTrue);
       expect(store.previewShowCenter, isTrue);
-      // A blob that predates the facing note shows it again, once.
-      expect(store.previewBannerDismissed, isFalse);
       expect(store.previewCameraMode, PreviewCameraMode.orbit);
     });
   });

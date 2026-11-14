@@ -51,6 +51,7 @@
 #   {expected}  Phiên bản sửa đổi dự kiến khi lưu
 #   {experience}  Lượng kinh nghiệm nhận được
 #   {failed}  Số thao tác thất bại
+#   {folders}  Thư mục mà mã thông báo trình chỉnh sửa được thay đổi
 #   {from}  Giá trị nguồn hoặc đầu khoảng
 #   {fuel}  Nhiên liệu còn lại trong vật chứa
 #   {group}  Danh mục của trình chỉnh sửa ngôn ngữ
@@ -69,6 +70,7 @@
 #   {labels}  Số nhãn văn bản
 #   {legacy}  Mã định danh trong nguồn nhập
 #   {level}  Cấp độ được hiển thị
+#   {lifetime}  Thời gian không dùng trước khi mã thông báo trình chỉnh sửa hết hạn
 #   {limit}  Giới hạn cho phép
 #   {line}  Số dòng trong thông báo
 #   {locale}  Mã ngôn ngữ
@@ -79,6 +81,7 @@
 #   {message}  Thông báo phản hồi hoặc chẩn đoán
 #   {migrated}  Số mục đã chuyển đổi
 #   {minimum}  Giá trị tối thiểu cho phép
+#   {minutes}  Thời gian tính bằng phút
 #   {mode}  Chế độ thao tác hoặc hiển thị đã chọn
 #   {name}  Tên đối tượng
 #   {oldBoard}  Mã định danh bảng trước đó
@@ -108,9 +111,9 @@
 #   {roll}  Góc nghiêng quanh hướng nhìn tính bằng độ
 #   {rotation}  Độ xoay phần hiển thị
 #   {scale}  Tỷ lệ hiển thị hoặc xem trước
+#   {scopes}  Thao tác mà mã thông báo trình chỉnh sửa cho phép
 #   {seconds}  Thời gian tính bằng giây
 #   {section}  Mục trong trình chỉnh sửa ngôn ngữ
-#   {session}  Mã định danh phiên chỉnh sửa
 #   {severity}  Mức độ nghiêm trọng của chẩn đoán
 #   {skipped}  Số mục đã bỏ qua
 #   {slots}  Số ô vật phẩm
@@ -118,12 +121,12 @@
 #   {special}  Số thành phần hiển thị đặc biệt
 #   {state}  Trạng thái hiện tại
 #   {style}  Kiểu hiển thị
-#   {subject}  Đối tượng của phiên chỉnh sửa web
 #   {target}  Plugin nhận lựa chọn ngôn ngữ
 #   {temporary}  Số đối tượng tạm thời
 #   {text}  Văn bản được hiển thị
 #   {title}  Tiêu đề được hiển thị
 #   {to}  Giá trị đích hoặc cuối khoảng
+#   {token}  ID mã thông báo trình chỉnh sửa
 #   {total}  Tổng số mục
 #   {type}  Loại giá trị hoặc đối tượng dự kiến
 #   {updated}  Thông báo được thay đổi bởi bản cập nhật ngôn ngữ
@@ -295,16 +298,11 @@ preview = "Công cụ tài liệu xem trước"
 "preview.dump" = "Dựng một tài liệu xem trước một lần và in số lượng phần tử của nó"
 "preview.list" = "Liệt kê tài liệu xem trước và quy tắc khớp của chúng"
 "preview.reset" = "Khôi phục mặc định xem trước đi kèm (không xóa tài liệu người dùng bổ sung có thể che khuất chúng)"
-web = "Mở và quản lý trình chỉnh sửa web Gloss"
-"web.open" = "Mở trình chỉnh sửa Gloss trống được lưu trữ trên web"
-"web.edit" = "Mở một tài liệu Gloss đang đồng bộ trực tiếp"
-"web.edit.document" = "Mở tài liệu đang đồng bộ này trong trình chỉnh sửa web"
-"web.workspace" = "Mở toàn bộ không gian làm việc Gloss đang đồng bộ trực tiếp"
-"web.sessions" = "Quản lý các phiên trình chỉnh sửa web đang hoạt động"
-"web.sessions.list" = "Liệt kê các phiên trình chỉnh sửa web đang hoạt động"
-"web.sessions.pull" = "Kiểm tra cập nhật của một phiên trình chỉnh sửa web ngay"
-"web.sessions.revoke" = "Thu hồi quyền truy cập trình chỉnh sửa web"
-"web.sessions.status" = "Hiển thị một phiên trình chỉnh sửa web"
+editor = "Ghép nối trình chỉnh sửa web với máy chủ này"
+"editor.pair" = "Tạo liên kết dùng một lần để ghép nối trình duyệt"
+"editor.status" = "Hiện cổng lắng nghe, máy chủ chuyển tiếp và dấu vân tay của trình chỉnh sửa"
+"editor.tokens" = "Liệt kê các trình duyệt đã ghép nối"
+"editor.revoke" = "Kết thúc ghép nối hoặc hủy liên kết"
 language = "Chọn ngôn ngữ của bạn hoặc ngôn ngữ mặc định của máy chủ"
 
 "import.mode" = "preview hoặc apply"
@@ -334,7 +332,6 @@ panel_y = "Y tuyệt đối hoặc ~tương đối"
 panel_yaw = "Yaw tuyệt đối hoặc ~tương đối"
 panel_z = "Z tuyệt đối hoặc ~tương đối"
 content_menu = "ID menu đã nạp"
-web_subject = "ID tài liệu Gloss đang đồng bộ trực tiếp"
 hologram_id = "ID của hologram mới và menu gốc"
 hologram_text = "Văn bản MiniMessage tùy chọn"
 image_path = "Tệp nằm trong thư mục hình ảnh của Gloss"
@@ -355,7 +352,11 @@ row_x = "X của hàng, tuyệt đối hoặc ~tương đối"
 row_y = "Y của hàng, tuyệt đối hoặc ~tương đối"
 row_z = "Z của hàng, tuyệt đối hoặc ~tương đối"
 source_menu = "ID menu nguồn đã nạp"
-web_session = "ID phiên của trình chỉnh sửa web"
+editor_label = "Tên hiển thị trong danh sách mã thông báo"
+editor_scopes = "Những việc trình chỉnh sửa được làm, phân tách bằng dấu phẩy"
+editor_folders = "Giới hạn ở các thư mục này, phân tách bằng dấu phẩy"
+editor_expires = "Thời hạn khi không dùng, ví dụ 7d, 12h hoặc 30m"
+editor_token = "ID mã thông báo, hoặc all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cBạn không có quyền."
@@ -391,6 +392,7 @@ lines = "{count} dòng"
 header = "&8[&dGloss&8] &d{id} &7tại &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8tỷ lệ &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7nằm trong thế giới &f{world}&7, thế giới này chưa được tải."
 
 [command.board]
 exists = "&8[&dGloss&8] &cBảng điểm '&f{id}&c' đã tồn tại."
@@ -505,13 +507,12 @@ execution_failed = "Không thể thực thi lệnh {command}: {reason}"
 menu_name_required = "Tên menu không được để trống"
 hologram_id_required = "ID hologram không được để trống"
 panel_id_required = "ID panel không được để trống"
-web_subject_required = "ID tài liệu của trình chỉnh sửa web không được để trống"
-web_session_required = "ID phiên của trình chỉnh sửa web không được để trống"
 panel_player_required = "Người chơi đích không được để trống"
 row_icon_type_required = "Loại biểu tượng không được để trống"
 row_style_property_required = "Thuộc tính kiểu không được để trống"
 import_source_required = "Nguồn nhập dữ liệu cũ không được để trống"
 import_source_unknown = "Nguồn nhập dữ liệu cũ không xác định: {source}"
+editor_token_required = "Hãy nhập ID mã thông báo, hoặc all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cBạn không có quyền &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cThao tác với nội dung menu &f{menu}&c thất b�
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cLệnh này chỉ dành cho người chơi."
 
-[gloss.message.web]
-header = "Trình chỉnh sửa web"
-open_hover = "Nhấp để mở trình chỉnh sửa web Gloss."
-open = "&8[&dGloss&8]: &7Trình chỉnh sửa web: &f{url}"
-preparing = "&8[&dGloss&8]: &7Đang chuẩn bị phiên đồng bộ trình chỉnh sửa bảo mật cho &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cKhông thể chỉnh sửa trực tiếp qua web. Hãy kiểm tra cấu hình đồng bộ trình chỉnh sửa và kết nối đến máy chủ chuyển tiếp."
-open_failed = "&8[&dGloss&8]: &cKhông thể mở &f{kind}={subject}&c trong trình chỉnh sửa web trực tiếp: {reason}"
-open_console = "&8[&dGloss&8]: &7Liên kết cấp quyền chỉnh sửa cho &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eURL này cho phép đưa thay đổi lên máy chủ cho đến khi bị thu hồi hoặc hết hạn. Hãy giữ bí mật liên kết."
+[gloss.message.editor]
+link_ready = "Liên kết đã sẵn sàng. Hãy mở trong vòng {minutes} phút"
+link_console = "&8[&dGloss&8]: &aLiên kết đã sẵn sàng. Hãy mở trong vòng {minutes} phút: &f{url}"
+link_details = "&8[&dGloss&8]: &7Quyền {scopes}; {folders}; hết hạn sau {lifetime} không dùng; mã thông báo {token}"
+all_folders = "mọi thư mục"
+some_folders = "thư mục {folders}"
 open_label = "Mở trình chỉnh sửa"
-copy_label = "Sao chép liên kết"
-revoke_label = "Thu hồi quyền"
-link_hover = "Mở trình chỉnh sửa, sao chép liên kết cấp quyền hoặc thu hồi phiên {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Không có phiên đồng bộ trình chỉnh sửa nào đang hoạt động."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7hết hạn sau=&f{seconds} giây &7bản đã phát hành=&f{revision} &7đang chờ=&f{pending}"
-revoked = "&8[&dGloss&8]: &aĐã thu hồi phiên đồng bộ trình chỉnh sửa &f{session}&a."
-pulled = "&8[&dGloss&8]: &aĐã kiểm tra cập nhật của phiên đồng bộ trình chỉnh sửa &f{session}&a."
-unknown = "&8[&dGloss&8]: &cPhiên đồng bộ trình chỉnh sửa &f{session}&c không xác định hoặc đã hết hạn."
-failed = "&8[&dGloss&8]: &cThao tác đồng bộ trình chỉnh sửa cho phiên &f{session}&c thất bại: {reason}"
+open_hover = "Mở trong trình duyệt"
+copy_label = "Sao chép"
+copy_hover = "Sao chép liên kết"
+revoke_label = "Thu hồi"
+revoke_hover = "Hủy liên kết này, hoặc ngắt trình chỉnh sửa đã ghép nối qua nó"
+details_label = "Chi tiết"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cTrình chỉnh sửa chưa chạy; đặt [editor] enabled = true trong gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7Không có mã thông báo trình chỉnh sửa."
+unknown_token = "&8[&dGloss&8]: &cKhông có mã thông báo &f{token}&c."
+revoked_one = "&8[&dGloss&8]: &aĐã thu hồi 1 mã thông báo; các kết nối của nó đã đóng."
+revoked_many = "&8[&dGloss&8]: &aĐã thu hồi {count} mã thông báo; các kết nối của chúng đã đóng."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Đang quét &f{source}&7 để xem trước việc chuyển đổi mà không thay đổi dữ liệu..."

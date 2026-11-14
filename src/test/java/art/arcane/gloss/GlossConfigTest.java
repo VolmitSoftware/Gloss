@@ -1,6 +1,7 @@
 package art.arcane.gloss;
 
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.editor.EditorSettings;
 import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentHashes;
@@ -118,10 +119,7 @@ class GlossConfigTest {
         assertFalse(snapshot.motd().enabled());
         assertEquals(1.0F, snapshot.menus().uiScale());
         assertTrue(snapshot.previews().enabled());
-        assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, snapshot.editorSync().builderUrl());
-        assertEquals(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT, snapshot.editorSync().endpoint());
-        assertEquals("", snapshot.editorSync().createToken());
-        assertEquals(60, snapshot.editorSync().sessionMinutes());
+        assertEquals(EditorSettings.DEFAULT, snapshot.editor());
         assertFalse(snapshot.debug().hitbox());
         assertFalse(snapshot.debug().position());
         assertFalse(snapshot.debug().animator());
@@ -166,6 +164,11 @@ class GlossConfigTest {
             maxAnimationFps = 9999
             animationPacketBudget = 1
 
+            [editor]
+            tokenDays = 999
+            relayUrl = "ws://relay.example.com"
+            allowedOrigins = ["https://gloss.example.com", "http://example.com", "https://gloss.example.com/path"]
+
             [editor.sync]
             sessionMinutes = 1
 
@@ -184,7 +187,9 @@ class GlossConfigTest {
         assertFalse(loaded.holograms.interpolatedMotion);
         assertEquals(240, loaded.holograms.maxAnimationFps);
         assertEquals(100, loaded.holograms.animationPacketBudget);
-        assertEquals(5, loaded.editor.sync.sessionMinutes);
+        assertEquals(365, loaded.editor.tokenDays);
+        assertEquals(EditorSettings.RELAY_URL, loaded.editor.relayUrl);
+        assertEquals(List.of("https://gloss.example.com"), loaded.editor.allowedOrigins);
         assertEquals(0.25D, loaded.menus.uiScale);
         assertEquals(List.of("oraxen", "nexo"), loaded.items.customItemProviders);
 
@@ -194,7 +199,8 @@ class GlossConfigTest {
         assertTrue(rewritten.contains("interpolatedMotion = false"));
         assertTrue(rewritten.contains("maxAnimationFps = 240"));
         assertTrue(rewritten.contains("animationPacketBudget = 100"));
-        assertTrue(rewritten.contains("sessionMinutes = 5"));
+        assertTrue(rewritten.contains("tokenDays = 365"));
+        assertFalse(rewritten.contains("sessionMinutes"));
         assertTrue(rewritten.contains("uiScale = 0.25"));
         assertTrue(rewritten.contains("customItemProviders = [\"oraxen\", \"nexo\"]"));
     }
@@ -411,33 +417,39 @@ class GlossConfigTest {
     }
 
     @Test
-    void syncEndpointSanitizerFallsBackOnUnsafeValues() {
-        assertEquals("https://relay.example.net/custom/v3",
-            GlossConfigFile.sanitizeSyncEndpoint("HTTPS://relay.example.net/custom/v3/"));
-        assertEquals("http://localhost:8080/v3",
-            GlossConfigFile.sanitizeSyncEndpoint("http://localhost:8080/v3"));
-        assertEquals("http://[::1]:8080/v3",
-            GlossConfigFile.sanitizeSyncEndpoint("http://[::1]:8080/v3"));
+    void relayUrlSanitizerAcceptsSecureOrLoopbackSocketsOnly() {
+        assertEquals("wss://relay.example.net/gloss", GlossConfigFile.sanitizeRelayUrl(" wss://relay.example.net/gloss/ "));
+        assertEquals("ws://127.0.0.1:9801", GlossConfigFile.sanitizeRelayUrl("ws://127.0.0.1:9801"));
+        assertEquals("ws://localhost:9801", GlossConfigFile.sanitizeRelayUrl("ws://localhost:9801"));
 
-        String fallback = GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT;
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("http://relay.example.net/v3"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://trusted@evil.example/v3"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/api"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v3?token=x"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v3#fragment"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint(" https://relay.example/v3"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint(
-            "https://relay.example/" + "a".repeat(1100) + "/v3"));
+        String fallback = EditorSettings.RELAY_URL;
+        assertEquals(fallback, GlossConfigFile.sanitizeRelayUrl("ws://relay.example.net"));
+        assertEquals(fallback, GlossConfigFile.sanitizeRelayUrl("https://relay.example.net"));
+        assertEquals(fallback, GlossConfigFile.sanitizeRelayUrl("wss://user@relay.example.net"));
+        assertEquals(fallback, GlossConfigFile.sanitizeRelayUrl("wss://relay.example.net/?token=x"));
+        assertEquals(fallback, GlossConfigFile.sanitizeRelayUrl(""));
     }
 
     @Test
-    void syncCreateTokenSanitizerEnforcesCharsetAndLength() {
-        assertEquals("a".repeat(22), GlossConfigFile.sanitizeSyncCreateToken("a".repeat(22)));
-        assertEquals("A_b-9".repeat(20), GlossConfigFile.sanitizeSyncCreateToken("A_b-9".repeat(20)));
-        assertEquals("", GlossConfigFile.sanitizeSyncCreateToken("short"));
-        assertEquals("", GlossConfigFile.sanitizeSyncCreateToken("a".repeat(129)));
-        assertEquals("", GlossConfigFile.sanitizeSyncCreateToken("a".repeat(21) + "/"));
-        assertEquals("", GlossConfigFile.sanitizeSyncCreateToken(" " + "a".repeat(22)));
+    void allowedOriginsKeepOnlyExactSecureOrLoopbackOrigins() {
+        assertEquals(List.of("https://gloss.example.com", "http://127.0.0.1:8800", "http://localhost:8800"),
+            GlossConfigFile.sanitizeOrigins(List.of("https://gloss.example.com", "http://127.0.0.1:8800",
+                "http://localhost:8800", "http://gloss.example.com", "https://gloss.example.com/editor",
+                "https://gloss.example.com", "not a url", "")));
+    }
+
+    @Test
+    void allowedOriginsIgnoreTheCaseOfSchemeAndHostAndTheDefaultPort() {
+        assertEquals(List.of("https://gloss.example.com", "http://localhost:8800"),
+            GlossConfigFile.sanitizeOrigins(List.of("HTTPS://Gloss.Example.com", "https://gloss.example.com:443",
+                "http://LOCALHOST:8800")));
+    }
+
+    @Test
+    void trustedProxiesKeepOnlyAddressLiterals() {
+        assertEquals(List.of("127.0.0.1", "::1", "10.1.2.3"),
+            GlossConfigFile.sanitizeProxies(List.of("127.0.0.1", " ::1 ", "[::1]", "proxy.example", "10.0.0.0/8",
+                "", "127.0.0.1", "10.1.2.3")));
     }
 
     @Test

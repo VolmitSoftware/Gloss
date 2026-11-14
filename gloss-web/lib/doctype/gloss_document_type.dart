@@ -52,9 +52,6 @@ abstract class GlossDocumentTypeAdapter extends DocumentTypeAdapter {
   bool get undoable => true;
 
   @override
-  bool get sourcePreserving => false;
-
-  @override
   void createNew(EditorStore store, {String? folderId, String? runtimeId}) =>
       store.newGlossDocument(
         this,
@@ -90,9 +87,6 @@ abstract class GlossDocumentTypeAdapter extends DocumentTypeAdapter {
 
   @override
   String exportJson(DocumentStateView state) => snapshot(state);
-
-  @override
-  String formattedJson(DocumentStateView state) => snapshot(state);
 
   @override
   MenuRenameRewrite rewriteForMenuRename(
@@ -177,7 +171,7 @@ abstract class GlossDocumentTypeAdapter extends DocumentTypeAdapter {
           'The saved document "{title}" was unreadable ({error}) and was replaced with a blank marker.',
           arguments,
         ),
-        WorkspaceDocKind.presets || WorkspaceDocKind.names || WorkspaceDocKind.strings || WorkspaceDocKind.waypoint || WorkspaceDocKind.glyph || WorkspaceDocKind.behavior => '$noun: $title ($resolvedError)',
+        WorkspaceDocKind.presets || WorkspaceDocKind.names || WorkspaceDocKind.strings || WorkspaceDocKind.waypoint || WorkspaceDocKind.glyph || WorkspaceDocKind.behavior || WorkspaceDocKind.leaderboard => '$noun: $title ($resolvedError)',
         WorkspaceDocKind.menu ||
         WorkspaceDocKind.containerPreview ||
         WorkspaceDocKind.panel => throw StateError(
@@ -251,7 +245,7 @@ abstract class GlossDocumentTypeAdapter extends DocumentTypeAdapter {
         'The saved document "{title}" was unreadable and was replaced with a blank marker.',
         arguments,
       ),
-      WorkspaceDocKind.presets || WorkspaceDocKind.names || WorkspaceDocKind.strings || WorkspaceDocKind.waypoint || WorkspaceDocKind.glyph || WorkspaceDocKind.behavior => '$noun: $title',
+      WorkspaceDocKind.presets || WorkspaceDocKind.names || WorkspaceDocKind.strings || WorkspaceDocKind.waypoint || WorkspaceDocKind.glyph || WorkspaceDocKind.behavior || WorkspaceDocKind.leaderboard => '$noun: $title',
       WorkspaceDocKind.menu ||
       WorkspaceDocKind.containerPreview ||
       WorkspaceDocKind.panel => throw StateError(

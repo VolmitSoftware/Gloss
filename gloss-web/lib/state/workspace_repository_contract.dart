@@ -4,11 +4,15 @@ import 'dart:async';
 
 import '../l10n/hui_localizations.dart';
 import '../services/storage_service.dart';
+import 'workspace_records.dart';
+
+export 'workspace_records.dart' show WorkspaceDelta, WorkspaceRecordSet;
 
 typedef WorkspaceStorageReader = String? Function(String key);
 typedef WorkspaceStorageWriter = bool Function(String key, String value);
-typedef WorkspaceRepositoryNoticeListener =
-    void Function(WorkspaceRepositoryNotice notice);
+typedef WorkspaceRepositoryNoticeListener = void Function(
+  WorkspaceRepositoryNotice notice,
+);
 
 enum WorkspaceRepositoryNoticeKind { changed, cleared }
 
@@ -59,6 +63,16 @@ abstract interface class ObservableWorkspaceRepository {
 
 abstract interface class WorkspaceMaintenanceRepository {
   FutureOr<bool> clear();
+}
+
+/// A store that keeps a workspace as records ([WorkspaceRecordSet]) and
+/// takes a save as the records that changed. [WorkspaceRepository.read]
+/// still answers the whole workspace, and [WorkspaceRepository.write] still
+/// takes one, replacing every record.
+abstract interface class IncrementalWorkspaceRepository {
+  /// Writes [delta] in one transaction. False when nothing was written,
+  /// including when the store does not hold [key] as records yet.
+  FutureOr<bool> writeDelta(String key, WorkspaceDelta delta);
 }
 
 final class CallbackWorkspaceRepository implements WorkspaceRepository {

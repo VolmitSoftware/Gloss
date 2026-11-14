@@ -16,8 +16,6 @@ final class StringsDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('Strings');
   @override
-  String get createLabel => huiText('Strings');
-  @override
   String get pluralLabel => huiText('Strings');
   @override
   int get tabOrder => 180;

@@ -1,6 +1,7 @@
 package art.arcane.gloss.util;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.editor.EditorSettings;
 import art.arcane.volmlib.util.plugin.SplashScreenSupport;
 import org.bukkit.Bukkit;
 import net.md_5.bungee.api.ChatColor;
@@ -21,15 +22,20 @@ public final class SplashScreen {
     private SplashScreen() {
     }
 
-    public static void print(Gloss plugin, boolean success) {
+    /** The editor the banner names: the configured {@code editorUrl}, else the hosted one. */
+    static String editorAddress(String editorUrl) {
+        return editorUrl == null || editorUrl.isBlank() ? EditorSettings.EDITOR_URL : editorUrl;
+    }
+
+    public static void print(Gloss plugin, boolean success, String editorUrl) {
         try {
-            printSplash(plugin, success);
+            printSplash(plugin, success, editorAddress(editorUrl));
         } catch (RuntimeException failure) {
             Gloss.logExceptionStack(false, failure, "Splash screen failed to render.");
         }
     }
 
-    private static void printSplash(Gloss plugin, boolean success) {
+    private static void printSplash(Gloss plugin, boolean success, String editor) {
         ChatColor fill = ChatColor.of("#2a1245");
         ChatColor edge = ChatColor.of("#8a2be2");
         ChatColor meta = ChatColor.of("#9a86c9");
@@ -45,7 +51,7 @@ public final class SplashScreen {
             "",
             accent + "   Gloss, " + meta + "Server Polish & Display Suite " + ChatColor.LIGHT_PURPLE + "[" + releaseTrain + " RELEASE]",
             meta + "   Version: " + accent + pluginVersion,
-            meta + "   By: " + accent + "Volmit Software (Arcane Arts)" + meta + " | Web Editor: " + accent + "https://gloss.volmitsoftware.com" + meta + " | Startup: " + statusColor + status,
+            meta + "   By: " + accent + "Volmit Software (Arcane Arts)" + meta + " | Web Editor: " + accent + editor + meta + " | Startup: " + statusColor + status,
             meta + "   Server: " + accent + serverVersion + meta + " | MC Support: " + accent + SUPPORTED_MC_VERSION,
             meta + "   Java: " + accent + SplashScreenSupport.javaMajorVersion() + meta + " | Date: " + accent + startupDate
         };

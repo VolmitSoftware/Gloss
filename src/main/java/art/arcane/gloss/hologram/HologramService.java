@@ -260,6 +260,12 @@ public final class HologramService implements RegistryOwner {
         return id != null && holograms.containsKey(id);
     }
 
+    /** The world a hologram's document names, loaded or not, or an empty string for an unknown id. */
+    public String worldName(String id) {
+        PersistentHologram hologram = id == null ? null : holograms.get(id);
+        return hologram == null ? "" : hologram.worldName();
+    }
+
     public void delete(String id) {
         String safeId = requireSafeId(id);
         PersistentHologram[] removedHolder = new PersistentHologram[1];
@@ -794,11 +800,19 @@ public final class HologramService implements RegistryOwner {
     }
 
     String renderStaticLines(List<String> lines) {
+        return renderStaticLines(plugin.text(), lines);
+    }
+
+    /**
+     * One display's legacy text. The lines are rendered, joined and converted as one string, so a
+     * style or an open tag carries into the next line the way the client reads one text display.
+     */
+    public static String renderStaticLines(TextPipeline text, List<String> lines) {
         List<String> rendered = new ArrayList<>(lines.size());
         for (String line : lines) {
-            rendered.add(TextUtils.renderLegacy(plugin.text().renderParticleText(null, line).text()));
+            rendered.add(text.renderParticleText(null, line).text());
         }
-        return TextUtils.joinLegacyLines(rendered);
+        return TextUtils.renderLegacy(String.join("\n", rendered));
     }
 
     private void startTasks() {

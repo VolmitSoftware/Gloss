@@ -22,6 +22,7 @@ const int glossBubblePreviewMessageGapMs = 1800;
 
 final class GlossBubblePreviewBubble {
   const GlossBubblePreviewBubble({
+    required this.message,
     required this.text,
     required this.lineCount,
     required this.stackY,
@@ -30,6 +31,10 @@ final class GlossBubblePreviewBubble {
     required this.shimmerBandIndex,
   });
 
+  /// The chat message as sent, before the prefix and format wrap it.
+  final String message;
+
+  /// The wrapped block with the prefix rendered as it stands at spawn.
   final String text;
   final int lineCount;
   final double stackY;
@@ -46,20 +51,22 @@ final class GlossBubblePreviewTimeline {
       _maxPerSender = style.maxPerSender.clamp(1, 64),
       _rejectNew = style.overflow.trim().toLowerCase() == 'reject-new',
       _maxAliveMs = style.effectiveMaxAliveMs,
-      _prefix = style.effectivePrefix,
       _motion = _compileMotion(style.motion),
       _shimmer = style.shimmer.copy() {
     int cursor = 0;
     int sequence = 0;
     for (final String message in glossBubblePreviewMessages) {
-      final String text = glossBubbleWrap(
-        style.format.replaceAll('{message}', message),
+      final String text = glossBubbleTextBlock(
+        style.effectivePrefix,
+        style.format,
+        message,
         style.effectiveWordWrapChars,
       );
       final int lineCount = glossBubbleWrappedLineCount(text);
       if (lineCount > 0) {
         _spawns.add((
           at: cursor,
+          message: message,
           text: text,
           lineCount: lineCount,
           seed: _previewSeed(text, sequence),
@@ -82,7 +89,6 @@ final class GlossBubblePreviewTimeline {
   final int _maxAliveMs;
   final int _maxPerSender;
   final bool _rejectNew;
-  final String _prefix;
   final GlossBubbleMotionProgram? _motion;
   final GlossBubbleShimmer _shimmer;
   late final int _periodMs;
@@ -148,6 +154,7 @@ final class GlossBubblePreviewTimeline {
       }
     }
     return GlossBubblePreviewBubble(
+      message: spawn.message,
       text: spawn.text,
       lineCount: spawn.lineCount,
       stackY: stackY,
@@ -155,7 +162,7 @@ final class GlossBubblePreviewTimeline {
       motion: frame,
       shimmerBandIndex: glossBubbleShimmerBandIndex(
         _shimmer,
-        input: _prefix + spawn.text,
+        input: spawn.text,
         ageMs: ageMs,
         lifetimeMs: _maxAliveMs,
       ),
@@ -171,6 +178,34 @@ final class GlossBubblePreviewTimeline {
   }
 }
 
+/// `ChatBubblesService.renderTextBlock`: the prefix and the format run through
+/// the pipeline and back to legacy codes, the chat message replaces
+/// `{message}`, and the block wraps as a whole, so the prefix counts toward the
+/// wrap width. Codes in the prefix and format style the message; the message
+/// itself only honours legacy codes.
+String glossBubbleTextBlock(
+  String prefix,
+  String format,
+  String message,
+  int wrapChars, {
+  GlossAnimationResolver animations = const GlossNoAnimations(),
+  GlossEmojiResolver emoji = const GlossNoEmoji(),
+  int nowMs = 0,
+}) {
+  const String marker = '\uE000';
+  return glossBubbleWrap(
+    glossRenderLegacy(
+      glossRenderMenuText(
+        prefix + format.replaceAll('{message}', marker),
+        animations: animations,
+        emoji: emoji,
+        nowMs: nowMs,
+      ),
+    ).replaceAll(marker, message),
+    wrapChars,
+  );
+}
+
 GlossLineRender renderGlossBubblePreviewText(
   GlossBubbleStyleDoc style,
   GlossBubblePreviewBubble bubble, {
@@ -178,21 +213,27 @@ GlossLineRender renderGlossBubblePreviewText(
   GlossEmojiResolver emoji = const GlossNoEmoji(),
   required int nowMs,
 }) {
-  final String renderedPrefix = glossRenderMenuText(
+  final String block = glossBubbleTextBlock(
     style.effectivePrefix,
+    style.format,
+    bubble.message,
+    style.effectiveWordWrapChars,
     animations: animations,
     emoji: emoji,
     nowMs: nowMs,
   );
-  final String shimmered = glossBubbleApplyShimmer(
-    glossRichPrefixLegacy(renderedPrefix) + bubble.text,
-    style.shimmer,
-    bubble.shimmerBandIndex,
+  return renderGlossLiteralLine(
+    glossBubbleApplyShimmer(block, style.shimmer, bubble.shimmerBandIndex),
   );
-  return renderGlossLiteralLine(shimmered);
 }
 
-typedef _BubbleSpawn = ({int at, String text, int lineCount, double seed});
+typedef _BubbleSpawn = ({
+  int at,
+  String message,
+  String text,
+  int lineCount,
+  double seed,
+});
 
 double _previewSeed(String text, int sequence) {
   int hash = 0x811C9DC5 ^ sequence;

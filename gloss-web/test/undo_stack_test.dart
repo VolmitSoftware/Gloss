@@ -918,13 +918,31 @@ void main() {
       store.dispose();
     });
 
-    test('deleting the last document leaves a usable default document', () {
+    test('a first visit opens the sample document', () {
+      final EditorStore store = _store(_FakeStorage());
+      expect(store.workspace.docs.length, 1);
+      expect(store.hasActiveDocument, isTrue);
+      expect(store.menu.components.length, 1);
+      store.dispose();
+    });
+
+    test('deleting the last document leaves the workspace empty', () {
       final _FakeStorage storage = _FakeStorage();
       final EditorStore store = _store(storage);
       store.deleteDocument(store.workspace.activeId!);
-      expect(store.workspace.docs.length, 1);
-      expect(store.menu.components.length, 1);
+      expect(store.workspace.docs, isEmpty);
+      expect(store.hasActiveDocument, isFalse);
+      expect(store.menu.components, isEmpty);
+      store.flushAutosave();
       store.dispose();
+
+      final EditorStore reopened = _store(storage);
+      expect(reopened.workspace.docs, isEmpty);
+      expect(reopened.hasActiveDocument, isFalse);
+      expect(reopened.newDocument(), isTrue);
+      expect(reopened.hasActiveDocument, isTrue);
+      expect(reopened.workspace.docs.length, 1);
+      reopened.dispose();
     });
 
     test('view flags persist across boots', () {

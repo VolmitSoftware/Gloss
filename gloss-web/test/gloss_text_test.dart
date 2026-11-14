@@ -33,7 +33,7 @@ List<McSpan> _spans(GlossLineRender render) => <McSpan>[
 void main() {
   test('rich tags render around placeholders, animation output and lines', () {
     final GlossLineRender rendered = renderGlossLine(
-      '<strikethrough>&6Title</strikethrough> <bold>%player_name%</bold>\n<red>Second</red>',
+      '&6<strikethrough>Title</strikethrough> <bold>%player_name%</bold>\n<red>Second</red>',
       richText: true,
     );
     expect(rendered.plainText, 'Title %player_name%\nSecond');

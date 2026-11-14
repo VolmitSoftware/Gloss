@@ -26,8 +26,6 @@ final class ScoreboardDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('scoreboard');
 
-  @override
-  String get createLabel => huiText('New scoreboard');
 
   @override
   String get pluralLabel => huiText('Scoreboards');

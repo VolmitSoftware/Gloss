@@ -18,6 +18,7 @@ import 'package:arcane_jaspr/arcane_jaspr.dart' show ArcaneGlyph;
 
 import '../l10n/hui_localizations.dart';
 import '../logic/canvas_scene.dart';
+import '../logic/document_presets.dart';
 import '../logic/gloss_text.dart'
     show GlossAnimationResolver, GlossEmojiResolver;
 import '../logic/validation.dart' show HuiIssue;
@@ -55,10 +56,6 @@ abstract interface class DocumentStateView {
   /// workspace's emoji documents layered over it by id.
   GlossEmojiResolver get workspaceEmoji;
 
-  /// The byte-exact source the active menu document was decoded from, kept
-  /// until the first semantic edit. Null for every other kind.
-  String? get preservedMenuSource;
-
   HuiCatalogs get catalogs;
 
   ImageLibrary? get images;
@@ -74,7 +71,6 @@ final class AdoptedDocument {
   const AdoptedDocument({
     required this.editorId,
     this.model,
-    this.preservedSource,
     this.failureResolver,
   });
 
@@ -84,9 +80,6 @@ final class AdoptedDocument {
   /// The id the editor works under: the sanitized runtime id for kinds that
   /// have one, the document title otherwise.
   final String editorId;
-
-  /// Byte-exact source to preserve for round-trips, when the kind keeps one.
-  final String? preservedSource;
 
   /// User-facing message when the stored JSON was unreadable and [model] is a
   /// replacement default instead.
@@ -178,6 +171,7 @@ enum DocumentSurface {
   glyph,
   behavior,
   presets,
+  leaderboard,
 }
 
 /// One heading-plus-grid section of a kind's template tab.
@@ -210,9 +204,6 @@ abstract class DocumentTypeAdapter {
   /// Position in the mode tab strip and the library-rail create row. Spaced by
   /// tens so a new kind can land between two without renumbering the rest.
   int get tabOrder;
-
-  /// Library-rail create-button label.
-  String get createLabel;
 
   /// What this kind's [EditorView.visual] mode draws into.
   DocumentSurface get surface;
@@ -274,11 +265,19 @@ abstract class DocumentTypeAdapter {
   /// Whether edits run through the store's snapshot-driven undo stack.
   bool get undoable;
 
-  /// Whether the byte-exact imported source is preserved until the first
-  /// semantic edit.
-  bool get sourcePreserving;
-
   String? get syncWireKind;
+
+  /// The file the plugin keeps document [id] in, relative to its data folder,
+  /// as `EditorSyncDocumentKind.path` writes it. A kind whose fixed id is its
+  /// collection name is one file (names.json); presets, the only kind
+  /// without a preset collection, is named by its wire kind.
+  String? dataPath(String id) {
+    final String? wireKind = syncWireKind;
+    if (wireKind == null) return null;
+    final String collection = DocumentPresets.collection(wireKind) ?? wireKind;
+    if (fixedRuntimeId == collection) return '$collection.json';
+    return '$collection/${fixedRuntimeId ?? id}.json';
+  }
 
   /// Library-rail document icon.
   ArcaneGlyph railIcon();
@@ -312,10 +311,6 @@ abstract class DocumentTypeAdapter {
   /// The active document's runtime JSON for export, byte-preserved where the
   /// kind supports it. Throws [StateError] for non-[transferable] kinds.
   String exportJson(DocumentStateView state);
-
-  /// The active document canonically re-encoded, discarding preserved
-  /// formatting. Throws [StateError] for non-[transferable] kinds.
-  String formattedJson(DocumentStateView state);
 
   /// Validation issues for the active document. Never throws.
   List<HuiIssue> validate(DocumentStateView state);

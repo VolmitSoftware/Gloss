@@ -51,6 +51,7 @@
 #   {expected}  儲存編輯時的預期修訂版本
 #   {experience}  獲得的經驗值
 #   {failed}  失敗的操作數量
+#   {folders}  編輯器權杖可修改的資料夾
 #   {from}  來源值或範圍起點
 #   {fuel}  容器內剩餘燃料
 #   {group}  語言編輯器類別
@@ -69,6 +70,7 @@
 #   {labels}  文字標籤數量
 #   {legacy}  匯入來源中的識別碼
 #   {level}  顯示等級
+#   {lifetime}  編輯器權杖失效前的閒置時間
 #   {limit}  允許的限制
 #   {line}  訊息內的行號
 #   {locale}  語言代碼
@@ -79,6 +81,7 @@
 #   {message}  回饋或診斷訊息
 #   {migrated}  已轉換項目數量
 #   {minimum}  允許的最小值
+#   {minutes}  時間（分鐘）
 #   {mode}  所選操作或顯示模式
 #   {name}  物件名稱
 #   {oldBoard}  先前的看板識別碼
@@ -108,9 +111,9 @@
 #   {roll}  翻滾角度
 #   {rotation}  顯示旋轉
 #   {scale}  顯示或預覽縮放比例
+#   {scopes}  編輯器權杖允許的操作
 #   {seconds}  時間（秒）
 #   {section}  語言編輯器區段
-#   {session}  編輯工作階段識別碼
 #   {severity}  診斷嚴重程度
 #   {skipped}  已略過項目數量
 #   {slots}  物品欄位數量
@@ -118,12 +121,12 @@
 #   {special}  特殊顯示元素數量
 #   {state}  目前狀態
 #   {style}  顯示樣式
-#   {subject}  網頁編輯工作階段的物件
 #   {target}  套用語言選擇的外掛
 #   {temporary}  暫存物件數量
 #   {text}  顯示文字
 #   {title}  顯示標題
 #   {to}  目標值或範圍終點
+#   {token}  編輯器權杖 ID
 #   {total}  項目總數
 #   {type}  預期的值或物件類型
 #   {updated}  語言更新中變更的訊息數
@@ -295,16 +298,11 @@ preview = "預覽文件工具"
 "preview.dump" = "建置一次預覽文件並輸出其元素數量"
 "preview.list" = "列出預覽文件及其符合規則"
 "preview.reset" = "還原內建的預覽預設值(不會移除可能覆蓋它們的額外使用者文件)"
-web = "開啟並管理 Gloss 網頁編輯器"
-"web.open" = "開啟代管的空白 Gloss 編輯器"
-"web.edit" = "開啟一個即時 Gloss 文件"
-"web.edit.document" = "在網頁編輯器中開啟此即時文件"
-"web.workspace" = "開啟完整的即時 Gloss 工作區"
-"web.sessions" = "管理使用中的網頁編輯器工作階段"
-"web.sessions.list" = "列出使用中的網頁編輯器工作階段"
-"web.sessions.pull" = "立即查詢網頁編輯器工作階段的更新"
-"web.sessions.revoke" = "撤銷網頁編輯授權"
-"web.sessions.status" = "顯示一個網頁編輯器工作階段"
+editor = "將網頁編輯器與此伺服器配對"
+"editor.pair" = "產生用於配對瀏覽器的一次性連結"
+"editor.status" = "顯示編輯器的監聽器、中繼伺服器和指紋"
+"editor.tokens" = "列出已配對的瀏覽器"
+"editor.revoke" = "結束配對或取消連結"
 language = "選擇你的語言或伺服器預設語言"
 
 "import.mode" = "preview 或 apply"
@@ -334,7 +332,6 @@ panel_y = "絕對或 ~相對 Y"
 panel_yaw = "絕對或 ~相對偏航角"
 panel_z = "絕對或 ~相對 Z"
 content_menu = "已載入的選單 ID"
-web_subject = "即時 Gloss 文件 ID"
 hologram_id = "新全像圖及其根選單的 ID"
 hologram_text = "選用的 MiniMessage 文字"
 image_path = "Gloss 圖片資料夾內的檔案"
@@ -355,7 +352,11 @@ row_x = "絕對或 ~相對的列 X"
 row_y = "絕對或 ~相對的列 Y"
 row_z = "絕對或 ~相對的列 Z"
 source_menu = "已載入的來源選單 ID"
-web_session = "網頁編輯器工作階段 ID"
+editor_label = "權杖清單中顯示的名稱"
+editor_scopes = "編輯器可執行的操作，以逗號分隔"
+editor_folders = "限定的資料夾，以逗號分隔"
+editor_expires = "未使用時的有效期，例如 7d、12h 或 30m"
+editor_token = "權杖 ID 或 all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &c你沒有權限。"
@@ -391,6 +392,7 @@ lines = "{count} 行"
 header = "&8[&dGloss&8] &d{id} &7位於 &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8縮放 &f{scale} &8廣告牌 &f{billboard} &8偏航角 &f{yaw} &8俯仰角 &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7位於未載入的世界 &f{world}&7。"
 
 [command.board]
 exists = "&8[&dGloss&8] &c計分板 '&f{id}&c' 已存在。"
@@ -505,13 +507,12 @@ execution_failed = "執行指令 {command} 失敗: {reason}"
 menu_name_required = "選單名稱不能為空"
 hologram_id_required = "全像圖 ID 不能為空"
 panel_id_required = "面板 ID 不得留空"
-web_subject_required = "網頁編輯器文件 ID 不得留空"
-web_session_required = "網頁編輯器工作階段 ID 不得留空"
 panel_player_required = "目標玩家不得留空"
 row_icon_type_required = "圖示類型不得留空"
 row_style_property_required = "樣式屬性不得留空"
 import_source_required = "舊版資料匯入來源不得留空"
 import_source_unknown = "未知的舊版資料匯入來源：{source}"
+editor_token_required = "請指定權杖 ID 或 all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &c你沒有權限 &f{permission}&c。"
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &c選單 &f{menu}&c 的內容操作失敗：{reason}"
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &c此指令僅供玩家使用。"
 
-[gloss.message.web]
-header = "網頁編輯器"
-open_hover = "點選開啟 Gloss 網頁編輯器。"
-open = "&8[&dGloss&8]: &7網頁編輯器：&f{url}"
-preparing = "&8[&dGloss&8]: &7正在為 &f{subject}&7 準備安全的編輯器同步工作階段..."
-unavailable = "&8[&dGloss&8]: &c無法使用即時網頁編輯。請檢查編輯器同步設定及與中繼伺服器的連線。"
-open_failed = "&8[&dGloss&8]: &c無法在即時網頁編輯器中開啟 &f{kind}={subject}&c：{reason}"
-open_console = "&8[&dGloss&8]: &7編輯授權連結（&f{subject}&7）：&f{url}"
-capability_warning = "&8[&dGloss&8]: &e此 URL 可在授權遭撤銷或到期前將變更發布至伺服器。請妥善保密。"
+[gloss.message.editor]
+link_ready = "連結已就緒。請在 {minutes} 分鐘內開啟"
+link_console = "&8[&dGloss&8]: &a連結已就緒。請在 {minutes} 分鐘內開啟：&f{url}"
+link_details = "&8[&dGloss&8]: &7權限範圍 {scopes}；{folders}；閒置 {lifetime} 後失效；權杖 {token}"
+all_folders = "所有資料夾"
+some_folders = "資料夾 {folders}"
 open_label = "開啟編輯器"
-copy_label = "複製連結"
-revoke_label = "撤銷授權"
-link_hover = "開啟編輯器、複製編輯授權連結，或撤銷工作階段 {session}。"
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7沒有使用中的編輯器同步工作階段。"
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7距離到期=&f{seconds}秒 &7已發布修訂編號=&f{revision} &7待處理=&f{pending}"
-revoked = "&8[&dGloss&8]: &a已撤銷編輯器同步工作階段 &f{session}&a。"
-pulled = "&8[&dGloss&8]: &a已查詢編輯器同步工作階段 &f{session}&a 的更新。"
-unknown = "&8[&dGloss&8]: &c編輯器同步工作階段 &f{session}&c 不存在或已到期。"
-failed = "&8[&dGloss&8]: &c編輯器同步工作階段 &f{session}&c 的操作失敗：{reason}"
+open_hover = "在瀏覽器中開啟"
+copy_label = "複製"
+copy_hover = "複製連結"
+revoke_label = "撤銷"
+revoke_hover = "取消此連結，或中斷透過它配對的編輯器"
+details_label = "詳細資料"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &c編輯器未執行；請在 gloss.toml 中設定 [editor] enabled = true"
+tokens_empty = "&8[&dGloss&8]: &7沒有編輯器權杖。"
+unknown_token = "&8[&dGloss&8]: &c權杖 &f{token}&c 不存在。"
+revoked_one = "&8[&dGloss&8]: &a已撤銷 1 個權杖，其連線已關閉。"
+revoked_many = "&8[&dGloss&8]: &a已撤銷 {count} 個權杖，其連線已關閉。"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7正在掃描 &f{source}&7 以預覽移轉結果，不會變更現有資料..."

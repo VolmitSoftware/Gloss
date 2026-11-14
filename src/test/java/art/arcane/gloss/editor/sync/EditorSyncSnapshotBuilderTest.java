@@ -44,22 +44,6 @@ public class EditorSyncSnapshotBuilderTest {
   }
 
   @Test
-  public void fileBackedIconDiscoveryCoversStaticAndAnimatedFormsAtAnyDepth() {
-    Set<String> paths = new HashSet<>();
-    EditorSyncSnapshotBuilder.collectImagePaths(JsonParser.parseString("""
-        {
-          "components": [
-            {"data":{"icon":{"type":"textImage","path":"boards/logo.png"}}},
-            {"data":{"trueIcon":{"type":"animatedTextImage","source":["a.png","b.gif"]},
-                     "falseIcon":{"type":"animatedTextImage","source":"single.webp"}}}
-          ]
-        }
-        """), paths);
-
-    assertEquals(Set.of("boards/logo.png", "a.png", "b.gif", "single.webp"), paths);
-  }
-
-  @Test
   public void imageUsageDiscoveryPreservesDuplicateRuntimeOccurrences() {
     List<String> paths = new ArrayList<>();
     EditorSyncSnapshotBuilder.collectImageUsages(JsonParser.parseString("""
@@ -68,15 +52,6 @@ public class EditorSyncSnapshotBuilderTest {
         """), paths);
 
     assertEquals(List.of("same.png", "same.png", "same.png"), paths);
-  }
-
-  @Test
-  public void decodedImagesAreLimitedToSixteenPixelsPerDimension() throws Exception {
-    EditorSyncSnapshotBuilder.ValidatedImage valid = EditorSyncSnapshotBuilder.validateImage(
-        "valid.png", png(16, 16));
-    assertEquals(256L, valid.pixels());
-    assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncSnapshotBuilder.validateImage("wide.png", png(17, 1)));
   }
 
   @Test
@@ -115,17 +90,6 @@ public class EditorSyncSnapshotBuilderTest {
   }
 
   @Test
-  public void invalidAnimatedFramesAndTraversalPathsAreNeverCollected() {
-    Set<String> paths = new HashSet<>();
-    EditorSyncSnapshotBuilder.collectImagePaths(JsonParser.parseString("""
-        [{"type":"animatedTextImage","source":["ok.png","../escape.png",null,""]},
-         {"type":"textImage","path":".hidden.png"}]
-        """), paths);
-
-    assertEquals(Set.of("ok.png"), paths);
-  }
-
-  @Test
   public void mediaDetectionUsesMagicAndRejectsArbitraryBytes() {
     assertEquals("image/png", EditorSyncSnapshotBuilder.detectMediaType(
         new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}));
@@ -138,27 +102,6 @@ public class EditorSyncSnapshotBuilderTest {
     assertEquals("image/bmp", EditorSyncSnapshotBuilder.detectMediaType(new byte[]{'B', 'M'}));
     assertThrows(IllegalArgumentException.class,
         () -> EditorSyncSnapshotBuilder.detectMediaType(new byte[]{1, 2, 3}));
-  }
-
-  @Test
-  public void confinedResolutionRejectsSymbolicAncestors() throws Exception {
-    Path root = Files.createTempDirectory("gloss-sync-images");
-    Path outside = Files.createTempDirectory("gloss-sync-outside");
-    try {
-      Path link = root.resolve("linked");
-      try {
-        Files.createSymbolicLink(link, outside);
-      } catch (UnsupportedOperationException | java.io.IOException failure) {
-        org.junit.Assume.assumeNoException(failure);
-      }
-      assertThrows(java.io.IOException.class,
-          () -> EditorSyncSnapshotBuilder.resolveConfinedFile(root, "linked/image.png", false));
-      assertTrue(Files.notExists(outside.resolve("image.png")));
-    } finally {
-      Files.deleteIfExists(root.resolve("linked"));
-      Files.deleteIfExists(root);
-      Files.deleteIfExists(outside);
-    }
   }
 
   private static byte[] png(int width, int height) throws Exception {

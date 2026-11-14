@@ -51,6 +51,7 @@
 #   {expected}  הגרסה הצפויה בשמירת העריכה
 #   {experience}  כמות הניסיון שהתקבלה
 #   {failed}  מספר הפעולות שנכשלו
+#   {folders}  תיקיות שאסימון עורך רשאי לשנות
 #   {from}  ערך המקור או תחילת הטווח
 #   {fuel}  הדלק שנותר במכל
 #   {group}  קטגוריית עורך השפות
@@ -69,6 +70,7 @@
 #   {labels}  מספר תוויות הטקסט
 #   {legacy}  מזהה במקור הייבוא
 #   {level}  הרמה המוצגת
+#   {lifetime}  זמן ללא שימוש עד שתוקף אסימון העורך פג
 #   {limit}  הגבול המותר
 #   {line}  מספר השורה בהודעה
 #   {locale}  קוד השפה
@@ -79,6 +81,7 @@
 #   {message}  הודעת משוב או אבחון
 #   {migrated}  מספר הרשומות שהומרו
 #   {minimum}  הערך המזערי המותר
+#   {minutes}  זמן בדקות
 #   {mode}  מצב הפעולה או התצוגה הנבחר
 #   {name}  שם העצם
 #   {oldBoard}  מזהה הפאנל הקודם
@@ -108,9 +111,9 @@
 #   {roll}  זווית גלגול במעלות
 #   {rotation}  סיבוב התצוגה
 #   {scale}  קנה המידה של התצוגה או התצוגה המקדימה
+#   {scopes}  פעולות שאסימון עורך מתיר
 #   {seconds}  משך בשניות
 #   {section}  מקטע בעורך השפות
-#   {session}  מזהה הפעלת העורך
 #   {severity}  חומרת האבחון
 #   {skipped}  מספר הרשומות שדולגו
 #   {slots}  מספר משבצות הפריטים
@@ -118,12 +121,12 @@
 #   {special}  מספר רכיבי התצוגה המיוחדים
 #   {state}  המצב הנוכחי
 #   {style}  סגנון התצוגה
-#   {subject}  העצם הנערך בהפעלת עורך הרשת
 #   {target}  התוסף שמקבל את בחירת השפה
 #   {temporary}  מספר העצמים הזמניים
 #   {text}  הטקסט המוצג
 #   {title}  הכותרת המוצגת
 #   {to}  ערך היעד או סוף הטווח
+#   {token}  מזהה אסימון העורך
 #   {total}  מספר הרשומות הכולל
 #   {type}  סוג הערך או העצם הצפוי
 #   {updated}  הודעות ששונו בעדכון שפה
@@ -295,16 +298,11 @@ preview = "כלי מסמכי תצוגה מקדימה"
 "preview.dump" = "בניית מסמך תצוגה מקדימה פעם אחת והדפסת ספירות הרכיבים שלו"
 "preview.list" = "הצגת מסמכי התצוגה המקדימה וכללי ההתאמה שלהם"
 "preview.reset" = "שחזור ברירות המחדל המובנות של התצוגה המקדימה (לא מסיר מסמכי משתמש נוספים שעלולים להאפיל עליהן)"
-web = "פתיחה וניהול של עורך האינטרנט של Gloss"
-"web.open" = "פתיחת עורך Gloss מקוון ריק"
-"web.edit" = "פתיחת מסמך Gloss אחד בסנכרון חי"
-"web.edit.document" = "פתיחת המסמך החי הזה בעורך האינטרנט"
-"web.workspace" = "פתיחת כל סביבת העבודה החיה של Gloss"
-"web.sessions" = "ניהול הפעלות פעילות של עורך האינטרנט"
-"web.sessions.list" = "הצגת הפעלות פעילות של עורך האינטרנט"
-"web.sessions.pull" = "בדיקת עדכונים של הפעלת עורך אינטרנט כעת"
-"web.sessions.revoke" = "ביטול הרשאת גישה לעורך האינטרנט"
-"web.sessions.status" = "הצגת הפעלה אחת של עורך האינטרנט"
+editor = "צימוד עורך האינטרנט לשרת זה"
+"editor.pair" = "יצירת קישור חד-פעמי לצימוד דפדפן"
+"editor.status" = "הצגת המאזין, שרת הממסר וטביעת האצבע של העורך"
+"editor.tokens" = "הצגת הדפדפנים המצומדים"
+"editor.revoke" = "סיום צימוד או ביטול קישור"
 language = "בחירת השפה שלך או שפת ברירת המחדל של השרת"
 
 "import.mode" = "preview או apply"
@@ -334,7 +332,6 @@ panel_y = "Y מוחלט או ~יחסי"
 panel_yaw = "yaw מוחלט או ~יחסי"
 panel_z = "Z מוחלט או ~יחסי"
 content_menu = "מזהה תפריט טעון"
-web_subject = "מזהה מסמך Gloss בסנכרון חי"
 hologram_id = "המזהה של ההולוגרמה החדשה ושל תפריט השורש"
 hologram_text = "טקסט MiniMessage אופציונלי"
 image_path = "קובץ בתוך תיקיית התמונות של Gloss"
@@ -355,7 +352,11 @@ row_x = "X של השורה, מוחלט או ~יחסי"
 row_y = "Y של השורה, מוחלט או ~יחסי"
 row_z = "Z של השורה, מוחלט או ~יחסי"
 source_menu = "מזהה תפריט המקור הטעון"
-web_session = "מזהה הפעלה של עורך האינטרנט"
+editor_label = "השם המוצג ברשימת האסימונים"
+editor_scopes = "מה מותר לעורך לעשות, מופרד בפסיקים"
+editor_folders = "הגבלה לתיקיות אלה, מופרדות בפסיקים"
+editor_expires = "תוקף ללא שימוש, למשל 7d, 12h או 30m"
+editor_token = "מזהה אסימון, או all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cאין לך הרשאה."
@@ -391,6 +392,7 @@ lines = "{count} שורות"
 header = "&8[&dGloss&8] &d{id} &7ב-&f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8גודל &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7נמצא בעולם &f{world}&7, שאינו טעון."
 
 [command.board]
 exists = "&8[&dGloss&8] &cהלוח '&f{id}&c' כבר קיים."
@@ -505,13 +507,12 @@ execution_failed = "הפעלת הפקודה {command} נכשלה: {reason}"
 menu_name_required = "שם התפריט לא יכול להיות ריק"
 hologram_id_required = "מזהה ההולוגרמה אינו יכול להיות ריק"
 panel_id_required = "מזהה הפאנל אינו יכול להיות ריק"
-web_subject_required = "מזהה המסמך בעורך האינטרנט אינו יכול להיות ריק"
-web_session_required = "מזהה ההפעלה של עורך האינטרנט אינו יכול להיות ריק"
 panel_player_required = "יש לציין שחקן יעד"
 row_icon_type_required = "יש לציין סוג סמל"
 row_style_property_required = "יש לציין מאפיין עיצוב"
 import_source_required = "יש לציין מקור לייבוא הנתונים הישנים"
 import_source_unknown = "מקור לא מוכר לייבוא נתונים ישנים: {source}"
+editor_token_required = "יש לציין מזהה אסימון, או all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cאין לך את ההרשאה &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cהפעולה בתוכן התפריט &f{menu}&c נכ�
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cפקודה זו זמינה רק לשחקנים."
 
-[gloss.message.web]
-header = "עורך אינטרנט"
-open_hover = "לחצו כדי לפתוח את עורך האינטרנט של Gloss."
-open = "&8[&dGloss&8]: &7עורך האינטרנט: &f{url}"
-preparing = "&8[&dGloss&8]: &7מתבצעת הכנה של הפעלת סנכרון מאובטחת לעורך עבור &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cעריכה חיה באינטרנט אינה זמינה. יש לבדוק את הגדרות סנכרון העורך ואת החיבור לשרת הממסר."
-open_failed = "&8[&dGloss&8]: &cלא ניתן לפתוח את &f{kind}={subject}&c בעורך האינטרנט החי: {reason}"
-open_console = "&8[&dGloss&8]: &7קישור עם הרשאת עריכה עבור &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eכתובת זו מאפשרת לפרסם שינויים בשרת עד לביטול ההרשאה או לתפוגתה. יש לשמור אותה בסוד."
+[gloss.message.editor]
+link_ready = "הקישור מוכן. פתחו אותו בתוך {minutes} דקות"
+link_console = "&8[&dGloss&8]: &aהקישור מוכן. פתחו אותו בתוך {minutes} דקות: &f{url}"
+link_details = "&8[&dGloss&8]: &7הרשאות {scopes}; {folders}; פג תוקף אחרי {lifetime} ללא שימוש; אסימון {token}"
+all_folders = "כל התיקיות"
+some_folders = "התיקיות {folders}"
 open_label = "פתיחת העורך"
-copy_label = "העתקת קישור"
-revoke_label = "ביטול הרשאה"
-link_hover = "פתחו את העורך, העתיקו את קישור ההרשאה שלו או בטלו את ההפעלה {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7אין הפעלות סנכרון פעילות של העורך."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7תפוגה=&f{seconds} שניות &7גרסה שפורסמה=&f{revision} &7בהמתנה=&f{pending}"
-revoked = "&8[&dGloss&8]: &aבוטלה הרשאת הפעלת סנכרון העורך &f{session}&a."
-pulled = "&8[&dGloss&8]: &aבוצעה בדיקת עדכונים עבור הפעלת סנכרון העורך &f{session}&a."
-unknown = "&8[&dGloss&8]: &cהפעלת סנכרון העורך &f{session}&c אינה מוכרת או שפג תוקפה."
-failed = "&8[&dGloss&8]: &cפעולת סנכרון העורך עבור &f{session}&c נכשלה: {reason}"
+open_hover = "פתיחה בדפדפן"
+copy_label = "העתקה"
+copy_hover = "העתקת הקישור"
+revoke_label = "ביטול"
+revoke_hover = "ביטול הקישור הזה, או ניתוק העורך שצומד באמצעותו"
+details_label = "פרטים"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cהעורך אינו פועל; יש להגדיר [editor] enabled = true בקובץ gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7אין אסימוני עורך."
+unknown_token = "&8[&dGloss&8]: &cאין אסימון &f{token}&c."
+revoked_one = "&8[&dGloss&8]: &aבוטל אסימון אחד; החיבורים שלו נסגרו."
+revoked_many = "&8[&dGloss&8]: &aבוטלו {count} אסימונים; החיבורים שלהם נסגרו."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7מתבצעת סריקה של &f{source}&7 לתצוגה מקדימה של ההעברה ללא שינוי הנתונים..."

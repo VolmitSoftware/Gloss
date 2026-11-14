@@ -1,0 +1,7 @@
+{
+  "type": "event",
+  "event": {
+    "type": "closing",
+    "reason": "limit"
+  }
+}

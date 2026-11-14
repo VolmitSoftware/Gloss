@@ -1,5 +1,7 @@
 package art.arcane.gloss.inventory;
 
+import art.arcane.gloss.text.ClientTextLines;
+import art.arcane.gloss.text.ClientTextLines.Run;
 import art.arcane.gloss.util.common.TextUtils;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
@@ -15,6 +17,7 @@ import com.github.retrooper.packetevents.protocol.item.ItemStack;
 import com.github.retrooper.packetevents.protocol.item.type.ItemTypes;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class InventoryItemTextTest {
+    private static final int WHITE = NamedTextColor.WHITE.value();
+    private static final int RED = NamedTextColor.RED.value();
+    private static final int GOLD = NamedTextColor.GOLD.value();
+    private static final int GRAY = NamedTextColor.GRAY.value();
+    private static final int DARK_PURPLE = NamedTextColor.DARK_PURPLE.value();
+
     @BeforeEach
     void install() {
         PacketEvents.setAPI(new ItemApi());
@@ -59,6 +68,35 @@ class InventoryItemTextTest {
         assertEquals("Kept", TextUtils.content(item.getComponent(ComponentTypes.CUSTOM_NAME).orElseThrow()));
         assertEquals("Kept lore", TextUtils.content(item.getComponent(ComponentTypes.LORE).orElseThrow().getLines().getFirst()));
     }
+
+    @Test
+    void aColourCodeClearsTheItemItalicBesideMiniMessageLines() {
+        ItemStack item = ItemStack.builder().type(ItemTypes.DIAMOND_SWORD).build();
+        InventoryItemText.apply(item, "&cSword", List.of("<gold>Title", "&7Info"));
+
+        assertEquals(List.of(List.of(Run.plain("Sword", RED))), name(item));
+        assertEquals(List.of(List.of(Run.italic("Title", GOLD)), List.of(Run.plain("Info", GRAY))), lore(item));
+    }
+
+    @Test
+    void aResetReturnsToTheItemDefault() {
+        ItemStack item = ItemStack.builder().type(ItemTypes.PAPER).build();
+        InventoryItemText.apply(item, "&cA&rB", List.of("&cA&rB", "&lC&cD"));
+
+        assertEquals(List.of(List.of(Run.plain("A", RED), Run.italic("B", WHITE))), name(item));
+        assertEquals(List.of(
+            List.of(Run.plain("A", RED), Run.italic("B", DARK_PURPLE)),
+            List.of(new Run("C", DARK_PURPLE, true, true, false, false, false), Run.plain("D", RED))), lore(item));
+    }
+
+    private static List<List<Run>> name(ItemStack item) {
+        return ClientTextLines.customName(item.getComponent(ComponentTypes.CUSTOM_NAME).orElseThrow());
+    }
+
+    private static List<List<Run>> lore(ItemStack item) {
+        return ClientTextLines.loreLines(item.getComponent(ComponentTypes.LORE).orElseThrow().getLines());
+    }
+
     private static final class ItemApi extends PacketEventsAPI<Object> {
         @Override
         public boolean isLoaded() {

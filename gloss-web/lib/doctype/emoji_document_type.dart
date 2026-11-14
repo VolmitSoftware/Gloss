@@ -26,8 +26,6 @@ final class EmojiDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('emoji');
 
-  @override
-  String get createLabel => huiText('New emoji');
 
   @override
   String get pluralLabel => huiText('Emoji');

@@ -6,18 +6,16 @@
 /// visible-character wrap, and motion expressions drive translation, scale,
 /// rotation and opacity from the same lifetime and stack inputs as runtime.
 ///
-/// The player is the client's own rig on an [McStage], and every bubble is a
-/// CSS-3D anchor over its head at a world position, so the stack keeps its
-/// place under the camera the same way a chat bubble keeps its place in game.
-/// With `gameContext` the stage becomes the game frame's world; without it the
-/// surface keeps its editor stage and readout.
+/// The player is the client's own rig in the game frame's world, and every
+/// bubble is a CSS-3D anchor over its head at a world position, so the stack
+/// keeps its place under the camera the same way a chat bubble keeps its place
+/// in game.
 ///
 /// Pause freezes the clock offset; resume rejoins where it left off. Owns one
 /// repaint driver only while playing and mounted: an animation-frame loop when
 /// the style has a shine band, the 50 ms motion timer otherwise.
 library;
 
-import '../gloss/gloss_display_text.dart';
 import 'dart:async';
 import 'dart:js_interop';
 
@@ -35,13 +33,14 @@ import '../../mc/scene/mc_scene.dart';
 import '../../model/model.dart';
 import '../../preview/projection.dart' show huiPreviewPxPerBlock;
 import '../../state/editor_store.dart';
+import '../../ui/action_row.dart';
+import '../gloss/gloss_display_text.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_particle_overlay.dart';
 import '../gloss/gloss_text_line.dart';
 import '../mc/mc_dom_layer.dart';
-import '../mc/mc_stage.dart';
 import '../mc/mc_stage_controller.dart';
-import '../scoreboard/scoreboard_selection.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// Repaint period for motion alone. The stack eases every poll in game; 50 ms
@@ -53,26 +52,21 @@ import 'package:gloss_editor/l10n/hui_localizations.dart';
 const Duration _tickPeriod = Duration(milliseconds: 50);
 
 class BubbleView extends StatefulWidget {
-  const BubbleView({required this.store, this.gameContext = false, super.key});
+  const BubbleView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the bubble stack inside the shared Minecraft game-screen frame
-  /// instead of the editor stage. False renders exactly the editor surface.
-  final bool gameContext;
 
   @override
   State<BubbleView> createState() => _BubbleViewState();
 }
 
 class _BubbleViewState extends State<BubbleView> {
-  /// The world the player stands in and the camera over it. The pivot is the
-  /// rig's eye line, so the home framing looks the speaker in the face; the
-  /// game frame stands at the client's own eye there and does not orbit.
+  /// The world the player stands in and the camera over it: the game frame
+  /// stands at the client's own eye and does not orbit.
   late final McStageController _stage = McStageController(
-    kind: component.gameContext ? McStageKind.frame : McStageKind.bubbles,
+    kind: McStageKind.frame,
     homePivot: const McVec3(0.5, mcCameraEyeHeight, 0.5),
-    freeCamera: !component.gameContext,
+    freeCamera: false,
   );
 
   /// The rig's crown: 32.5 model pixels at the 0.9375 player scale.
@@ -122,7 +116,8 @@ class _BubbleViewState extends State<BubbleView> {
   }
 
   /// The no-WebGL sprite for a node, off the catalogs the store holds now.
-  String? _spriteFor(McSceneNode node) => mcCatalogSpriteFor(_store.catalogs, node);
+  String? _spriteFor(McSceneNode node) =>
+      mcCatalogSpriteFor(_store.catalogs, node);
 
   @override
   void didUpdateWidget(covariant BubbleView oldComponent) {
@@ -246,75 +241,29 @@ class _BubbleViewState extends State<BubbleView> {
     if (doc == null) {
       _ticker?.cancel();
       _ticker = null;
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.overPlayer,
-          label: huiText('Chat bubbles in game'),
-        );
-      }
-      return const dom.div(classes: 'hui-bubble-stage is-empty', <Widget>[]);
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.overPlayer,
+        label: huiText('Chat bubbles in game'),
+      );
     }
     _syncTicker(doc);
     final GlossBubblePreviewTimeline timeline = _timelineFor(doc);
     final int nowMs = _nowMs();
     final List<GlossBubblePreviewBubble> bubbles = timeline.bubblesAt(nowMs);
     final List<double> offset = doc.offset;
-    final GlossBubbleSelect? select = doc.select;
-    final ({bool matches, String? error})? selection = select == null
-        ? null
-        : glossConditionMatches(
-            select.when,
-            GlossConditionContext(
-              variables: const <String, Object?>{
-                'viewer.world': 'world',
-                'viewer.health': 20.0,
-                'viewer.maxHealth': 20.0,
-                'viewer.healthPercent': 100.0,
-                'viewer.gameMode': 'SURVIVAL',
-              },
-              groups: const <String>{'player'},
-            ),
-          );
     _syncStage(nowMs);
 
-    final List<Widget> anchored = <Widget>[
-      for (final GlossBubblePreviewBubble bubble in bubbles)
-        _bubble(doc, bubble, offset, nowMs),
-    ];
-
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.overPlayer,
-        label: huiText('Chat bubbles in game'),
-        controls: <Widget>[_playPause()],
-        world: _stage,
-        worldOverlay: anchored,
-        child: const dom.div(<Widget>[]),
-      );
-    }
-
-    return dom.div(classes: 'hui-bubble-stage', <Widget>[
-      McStage(
-        controller: _stage,
-        overlay: anchored,
-        label: huiText('Chat bubble preview'),
-      ),
-      dom.div(classes: 'hui-bubble-controls', <Widget>[
-        _playPause(),
-        _resetView(),
-        dom.span(classes: 'hui-bubble-readout-inline', <Widget>[
-          Text(_readout(doc, selection)),
-        ]),
-        dom.span(classes: 'hui-bubble-readout-inline', <Widget>[
-          Text(
-            huiText(
-              'Click the stage: drag orbits, WASD walks, space and shift lift, '
-              'wheel dollies',
-            ),
-          ),
-        ]),
-      ]),
-    ]);
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.overPlayer,
+      label: huiText('Chat bubbles in game'),
+      actions: <RowAction>[_playPause()],
+      world: _stage,
+      worldOverlay: <Widget>[
+        for (final GlossBubblePreviewBubble bubble in bubbles)
+          _bubble(doc, bubble, offset, nowMs),
+      ],
+      child: const dom.div(<Widget>[]),
+    );
   }
 
   Widget _bubble(
@@ -382,75 +331,10 @@ class _BubbleViewState extends State<BubbleView> {
   /// Freezes the preview clock. Local, not the store toggle: this surface
   /// replays a canned conversation on its own timeline, so pausing it must
   /// hold that instant rather than only stopping animation frames.
-  Widget _playPause() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _togglePlaying,
-    attributes: <String, String>{
-      'aria-label': _playing ? huiText('Pause') : huiText('Play'),
-      'title': _playing ? huiText('Pause') : huiText('Play'),
-    },
-    icon: _playing
-        ? ArcaneIcon.pause(size: IconSize.sm)
-        : ArcaneIcon.play(size: IconSize.sm),
+  RowAction _playPause() => RowAction(
+    _playing ? huiText('Pause') : huiText('Play'),
+    _togglePlaying,
+    icon: _playing ? ArcaneIcon.pause() : ArcaneIcon.play(),
+    iconOnly: true,
   );
-
-  /// The camera is the zoom now, so the one framing affordance left is putting
-  /// it back where it started.
-  Widget _resetView() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: _stage.resetCamera,
-    disabled: _stage.isHome,
-    attributes: <String, String>{
-      'aria-label': huiText('Reset view'),
-      'title': huiText('Reset view'),
-    },
-    icon: ArcaneIcon.maximize(size: IconSize.sm),
-  );
-
-  String _readout(
-    GlossBubbleStyleDoc doc,
-    ({bool matches, String? error})? selection,
-  ) {
-    final List<String> parts = <String>[
-      huiPlural(
-        'bubble.readout.wrap',
-        doc.effectiveWordWrapChars,
-        oneEnglish: 'wrap {count} character',
-        otherEnglish: 'wrap {count} characters',
-      ),
-      huiText('offset {offset}', <String, Object?>{
-        'offset': doc.offset
-            .map((double value) => value.toStringAsFixed(1))
-            .join(', '),
-      }),
-      huiText('alive {duration} ms', <String, Object?>{
-        'duration': doc.effectiveMaxAliveMs,
-      }),
-      huiText('expression motion'),
-      if (doc.shimmer.spawn || doc.shimmer.flyAway)
-        huiText('shine {duration} ms sweep', <String, Object?>{
-          'duration': doc.shimmer.effectiveDurationMs,
-        }),
-      doc.followPlayer
-          ? huiText('follows the player')
-          : huiText('anchored where sent'),
-      if (doc.hideOwn) huiText('hidden from the sender'),
-      if (selection == null)
-        huiText('manual or default selection')
-      else if (selection.error != null)
-        huiText('selection condition error')
-      else if (selection.matches)
-        huiText('matches preview player')
-      else
-        huiText('does not match preview player'),
-      if (!_stage.webGlAvailable)
-        huiText(
-          'No WebGL2 in this browser: the world is a still and models are '
-          'sprites',
-        ),
-    ];
-    return parts.join(' · ');
-  }
 }

@@ -1,0 +1,18 @@
+{
+  "type": "open",
+  "tokenId": "tok_sMd7fHJT3J59544e",
+  "expiresAt": "2026-11-20T10:00:00Z",
+  "scopes": [
+    "read",
+    "history",
+    "publish:screens",
+    "publish:hud",
+    "publish:chat",
+    "publish:world",
+    "publish:players",
+    "publish:shared",
+    "publish:images"
+  ],
+  "metaHash": "sha256:17320c77a80af47809522c8d926ce811e3d2a0500ce191c7292247d2425485d3",
+  "notesHash": "sha256:627a1549381fce7d72c9dc6fb506c542482d12cec70f0bb0ce490e01ca232d91"
+}

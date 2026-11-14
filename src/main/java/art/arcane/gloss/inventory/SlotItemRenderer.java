@@ -21,7 +21,6 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,37 +54,12 @@ public final class SlotItemRenderer {
         stack.setAmount(Math.max(1, slot.amount()));
         String name = slot.name();
         List<String> lore = slot.lore();
-        if (name == null && lore.isEmpty()) {
+        if ((name == null && lore.isEmpty()) || stack.getType().isAir()) {
             return stack;
         }
-        if (hasMarkup(name, lore)) {
-            return SpigotConversionUtil.toBukkitItemStack(InventoryItemText.apply(
-                    SpigotConversionUtil.fromBukkitItemStack(stack), name, lore));
-        }
-        ItemMeta meta = stack.getItemMeta();
-        if (meta == null) {
-            return stack;
-        }
-        if (name != null) {
-            meta.setDisplayName(name);
-        }
-        if (!lore.isEmpty()) {
-            meta.setLore(lore);
-        }
-        stack.setItemMeta(meta);
-        return stack;
-    }
-
-    private static boolean hasMarkup(String name, List<String> lore) {
-        if (name != null && name.indexOf('<') >= 0) {
-            return true;
-        }
-        for (String line : lore) {
-            if (line.indexOf('<') >= 0) {
-                return true;
-            }
-        }
-        return false;
+        // Bukkit's legacy string setters make &r upright, so all item text goes through components.
+        return SpigotConversionUtil.toBukkitItemStack(InventoryItemText.apply(
+                SpigotConversionUtil.fromBukkitItemStack(stack), name, lore));
     }
 
     /**

@@ -9,4 +9,6 @@ bool isApplePlatform() => false;
 
 bool huiArcaneOverlayOpen() => false;
 
+bool huiArcaneMenuOpen() => false;
+
 bool huiMobilePaneOpen() => false;

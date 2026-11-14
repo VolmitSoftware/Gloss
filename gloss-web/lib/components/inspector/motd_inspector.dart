@@ -11,22 +11,35 @@ library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
+import '../../logic/gloss_show.dart';
 import '../../logic/gloss_text.dart';
+import '../../logic/mc_text.dart';
 import '../../logic/validation.dart';
 import '../../model/model.dart';
+import '../../services/image_library.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/badge.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/section.dart';
+import '../../ui/technical_input.dart';
+import '../../ui/toggle_choice.dart';
+import '../../ui/tone.dart';
 import '../gloss/gloss_text_line.dart';
 import 'animation_reference_picker.dart';
-import 'field_help.dart';
-import 'image_picker_grid.dart';
-import '../../services/image_library.dart';
-import 'inspector_widgets.dart';
 import 'gloss_visibility_editor.dart';
-import '../../logic/gloss_show.dart';
+import 'image_picker_grid.dart';
 import 'line_list_section.dart';
 import 'motd_policy_editor.dart';
+import 'preview_expr_field.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class MotdInspector extends StatefulWidget {
@@ -47,9 +60,12 @@ class _MotdInspectorState extends State<MotdInspector> {
 
   GlossMotdDoc? get _doc => _store.motdDoc;
 
-  /// Issues under [path], minus the [except] subtrees — the entry card shows
-  /// the favicon, sample and ping-extra issues next to their own fields, so
-  /// its catch-all row must not repeat them.
+  /// Control size, read under the inspector's dense scope in [_build].
+  ComponentSize _size = ComponentSize.sm;
+
+  /// Issues under [path], minus the [except] subtrees: the entry section
+  /// shows the favicon, sample and ping-extra issues next to their own
+  /// fields, so its catch-all lines must not repeat them.
   List<HuiIssue> _issuesFor(
     String path, {
     List<String> except = const <String>[],
@@ -63,71 +79,68 @@ class _MotdInspectorState extends State<MotdInspector> {
 
   /// Issues on [path] itself. A link that names neither a type nor a label is
   /// reported on the link rather than on a field, so the row that chooses
-  /// between them shows it — without swallowing the type's own issue, which
+  /// between them shows it, without swallowing the type's own issue, which
   /// its own field already shows.
   List<HuiIssue> _issuesAt(String path) =>
       _store.issues.where((HuiIssue issue) => issue.path == path).toList();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      DensityScope.dense(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
+    _size = controlSize(DensityScope.of(context));
     final GlossMotdDoc? doc = _doc;
     if (doc == null) return const dom.div(<Widget>[]);
-    return dom.div(classes: 'hui-inspector-body is-motd', <Widget>[
-      _header(doc),
-      _favicon(doc),
-      MotdDocumentPolicies(store: _store),
-      GlossVisibilityEditor(
-        raw: doc.extras['show'],
-        sectionKey: 'motd.visibility',
-        issues: _store.issues
-            .where((HuiIssue issue) => issue.path == r'$.show')
-            .toList(),
-        onChanged: (Object? value) => _store.mutateMotd(
-          'visibility',
-          (GlossMotdDoc edited) => setGlossShow(edited.extras, value),
+    return DenseBox(
+      classes: 'hui-inspector-body is-motd',
+      children: <Widget>[
+        PaneHeader(
+          kind: huiText('MOTD'),
+          title: _store.menuId,
+          tip: huiText(
+            'Each status request selects an eligible entry using the response policy.',
+          ),
+          status: AdvancedOnly(
+            child: StatusBadge(
+              huiText('revision {revision}', <String, Object?>{
+                'revision': doc.revision,
+              }),
+            ),
+          ),
         ),
-      ),
-      _links(doc),
-      _entries(doc),
-    ]);
+        _favicon(doc),
+        AdvancedOnly(child: MotdDocumentPolicies(store: _store)),
+        GlossVisibilityEditor(
+          raw: doc.extras['show'],
+          sectionKey: 'motd.visibility',
+          issues: _store.issues
+              .where((HuiIssue issue) => issue.path == r'$.show')
+              .toList(),
+          onChanged: (Object? value) => _store.mutateMotd(
+            'visibility',
+            (GlossMotdDoc edited) => setGlossShow(edited.extras, value),
+          ),
+        ),
+        _links(doc),
+        _entries(doc),
+      ],
+    );
   }
-
-  Widget _header(
-    GlossMotdDoc doc,
-  ) => dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-    dom.div(classes: 'hui-inspector-header is-motd', <Widget>[
-      HuiEyebrow(huiText('MOTD')),
-      dom.div(classes: 'hui-inspector-title-row', <Widget>[
-        dom.h2(classes: 'hui-inspector-title hui-ltr', <Widget>[
-          Text(_store.menuId),
-        ]),
-        const HuiFieldHelp('motd.id'),
-      ]),
-    ]),
-    dom.p(classes: 'hui-inspector-lede', <Widget>[
-      Text(
-        huiText(
-          'Each status request selects an eligible entry using the response policy.',
-        ),
-      ),
-    ]),
-    HuiRevisionRow(revision: doc.revision),
-  ]);
 
   /// The document-wide server-list icon. A path under
   /// `plugins/Gloss/images/`, the same library every menu image comes from,
   /// so the field is the plain path editor the icon inspector uses.
-  Widget _favicon(GlossMotdDoc doc) => HuiField(
+  Widget _favicon(GlossMotdDoc doc) => Field(
     label: huiText('Server icon'),
-    trailing: const HuiFieldHelp('motd.favicon'),
-    help: huiText(
-      'The 64x64 server-list icon under plugins/Gloss/images/, used by '
-      'every entry. Blank keeps the vanilla one.',
-    ),
-    control: dom.div(<Widget>[
+    forId: 'motd-favicon',
+    docKey: 'motd.favicon',
+    problems: _issuesFor(r'$.favicon'),
+    child: Component.fragment(<Widget>[
       TextInput(
+        id: 'motd-favicon',
         value: doc.favicon ?? '',
-        size: ComponentSize.sm,
+        size: _size,
         fullWidth: true,
         placeholder: huiText('server.png'),
         onChanged: (String value) => _store.mutateMotd(
@@ -135,11 +148,8 @@ class _MotdInspectorState extends State<MotdInspector> {
           (GlossMotdDoc edited) =>
               edited.favicon = value.isEmpty ? null : value,
         ),
-        attributes: const <String, String>{
-          'autocomplete': 'off',
-          'spellcheck': 'false',
-          'dir': 'ltr',
-        },
+        styles: technicalInputStyles,
+        attributes: technicalInputAttributes,
       ),
       _faviconUpload(
         'motd-favicon-upload',
@@ -148,7 +158,6 @@ class _MotdInspectorState extends State<MotdInspector> {
           (GlossMotdDoc edited) => edited.favicon = path,
         ),
       ),
-      HuiInlineIssues(_issuesFor(r'$.favicon')),
     ]),
   );
 
@@ -173,55 +182,53 @@ class _MotdInspectorState extends State<MotdInspector> {
 
   /// Per-entry override of [_favicon]: the random pick changes the picture
   /// with the text.
-  Widget _entryFavicon(GlossMotdEntry entry, int index) => HuiField(
-    label: huiText('Icon override'),
-    trailing: const HuiFieldHelp('motd.entries.favicon'),
-    help: huiText('Replaces the document icon for this entry only.'),
-    control: dom.div(<Widget>[
-      TextInput(
-        value: entry.favicon ?? '',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: huiText('event.png'),
-        onChanged: (String value) =>
-            _store.mutateMotd('entry icon', (GlossMotdDoc edited) {
-              if (index < edited.entries.length) {
-                edited.entries[index].favicon = value.isEmpty ? null : value;
-              }
-            }),
-        attributes: const <String, String>{
-          'autocomplete': 'off',
-          'spellcheck': 'false',
-          'dir': 'ltr',
-        },
-      ),
-      _faviconUpload(
-        'motd-entry-favicon-upload-$index',
-        (String path) => _store.mutateMotd('entry icon', (GlossMotdDoc edited) {
-          if (index < edited.entries.length) {
-            edited.entries[index].favicon = path;
-          }
-        }),
-      ),
-      HuiInlineIssues(_issuesFor('entries[$index].favicon')),
-    ]),
-  );
+  Widget _entryFavicon(GlossMotdEntry entry, int index) {
+    final String id = 'motd-entry-$index-favicon';
+    return Field(
+      label: huiText('Icon override'),
+      forId: id,
+      docKey: 'motd.entries.favicon',
+      problems: _issuesFor('entries[$index].favicon'),
+      child: Component.fragment(<Widget>[
+        TextInput(
+          id: id,
+          value: entry.favicon ?? '',
+          size: _size,
+          fullWidth: true,
+          placeholder: huiText('event.png'),
+          onChanged: (String value) =>
+              _store.mutateMotd('entry icon', (GlossMotdDoc edited) {
+                if (index < edited.entries.length) {
+                  edited.entries[index].favicon = value.isEmpty ? null : value;
+                }
+              }),
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+        ),
+        _faviconUpload(
+          'motd-entry-favicon-upload-$index',
+          (String path) =>
+              _store.mutateMotd('entry icon', (GlossMotdDoc edited) {
+                if (index < edited.entries.length) {
+                  edited.entries[index].favicon = path;
+                }
+              }),
+        ),
+      ]),
+    );
+  }
 
   /// The pause-menu server links. Published once per document revision
   /// (`MotdService.publishLinks`), not per ping, so the order here is the
-  /// order the client lists — which is why this list reorders and the entry
-  /// list does not.
-  Widget _links(GlossMotdDoc doc) => HuiLineListSection(
+  /// order the client lists, which is why each link moves up and down and
+  /// the entries do not.
+  Widget _links(GlossMotdDoc doc) => LineListSection(
     title: huiText('Server links'),
     docKey: 'motd.links',
     sectionKey: 'motd.links',
     addLabel: huiText('Add link'),
     itemCount: doc.links.length,
     issues: _issuesFor(r'$.links'),
-    description: huiText(
-      'Up to {maximum} pause-menu links, refreshed for connected players. Independent server links take precedence when configured.',
-      <String, Object?>{'maximum': glossMotdMaxLinks},
-    ),
     emptyBody: huiText(
       'The pause menu shows no Gloss links, which is what a server without '
       'this key does. Add one to publish it.',
@@ -231,117 +238,137 @@ class _MotdInspectorState extends State<MotdInspector> {
       (GlossMotdDoc edited) =>
           edited.links.add(GlossMotdLink(type: 'website', url: '')),
     ),
-    onReorder: (int from, int to) =>
-        _store.mutateMotd('reorder links', (GlossMotdDoc edited) {
-          if (from >= edited.links.length) return;
-          edited.links.insert(to, edited.links.removeAt(from));
-        }),
-    itemBuilder: (int index) => _linkCard(doc, index),
+    itemBuilder: (int index) => _link(doc, index),
   );
 
-  Widget _linkCard(GlossMotdDoc doc, int index) {
+  void _moveLink(int from, int to) =>
+      _store.mutateMotd('reorder links', (GlossMotdDoc edited) {
+        if (from >= edited.links.length) return;
+        edited.links.insert(to, edited.links.removeAt(from));
+      });
+
+  Widget _link(GlossMotdDoc doc, int index) {
     final GlossMotdLink link = doc.links[index];
     final String path = 'links[$index]';
-    return dom.div(classes: 'hui-motd-link-card', <Widget>[
-      dom.div(classes: 'hui-motd-entry-head', <Widget>[
-        dom.span(classes: 'hui-motd-entry-label', <Widget>[
-          Text(huiText("Link {value}", <String, Object?>{'value': index + 1})),
-        ]),
-        HuiIconButton(
-          label: huiText('Delete link'),
-          icon: ArcaneIcon.trash2(size: IconSize.sm),
-          onPressed: () =>
-              _store.mutateMotd('delete link', (GlossMotdDoc edited) {
-                if (index < edited.links.length) edited.links.removeAt(index);
-              }),
-        ),
-      ]),
-      HuiField(
-        label: huiText('Wording'),
-        trailing: const HuiFieldHelp('motd.links.type'),
-        help: huiText(
-          'A type uses the client\'s own wording in the player\'s language; a '
-          'label publishes yours. A link needs one or the other.',
-        ),
-        control: dom.div(<Widget>[
-          HuiSegmented(
-            value: link.isLabelled ? 'label' : 'type',
-            segments: <HuiSegment>[
-              HuiSegment(value: 'type', label: huiText('Client label')),
-              HuiSegment(value: 'label', label: huiText('My own label')),
-            ],
-            onChanged: (String value) =>
-                _store.mutateMotd('link wording', (GlossMotdDoc edited) {
-                  if (index >= edited.links.length) return;
-                  final GlossMotdLink edit = edited.links[index];
-                  if (value == 'type') {
-                    edit.type = 'website';
-                    edit.label = null;
-                  } else {
-                    edit.type = null;
-                    edit.label = '';
-                  }
+    return FieldOwner(
+      name: huiText('Link {value}', <String, Object?>{'value': index + 1}),
+      child: AppSection(
+        title: huiText("Link {value}", <String, Object?>{'value': index + 1}),
+        memoryKey: 'motd.link.$index',
+        actions: <Widget>[
+          AppIconButton(
+            icon: ArcaneIcon.arrowUp(),
+            label: huiText('Move up'),
+            onPressed: index == 0 ? null : () => _moveLink(index, index - 1),
+          ),
+          AppIconButton(
+            icon: ArcaneIcon.arrowDown(),
+            label: huiText('Move down'),
+            onPressed: index + 1 >= doc.links.length
+                ? null
+                : () => _moveLink(index, index + 1),
+          ),
+          AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText('Delete link'),
+            onPressed: () =>
+                _store.mutateMotd('delete link', (GlossMotdDoc edited) {
+                  if (index < edited.links.length) edited.links.removeAt(index);
                 }),
           ),
-          HuiInlineIssues(_issuesAt(path)),
-        ]),
-      ),
-      if (link.isLabelled)
-        _linkLabel(link, index, path)
-      else
-        _linkType(link, index, path),
-      HuiField(
-        label: huiText('Address'),
-        trailing: const HuiFieldHelp('motd.links.url'),
-        control: dom.div(<Widget>[
-          TextInput(
-            value: link.url,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            placeholder: huiText('https://example.net'),
-            onChanged: (String value) =>
-                _store.mutateMotd('link address', (GlossMotdDoc edited) {
-                  if (index < edited.links.length) {
-                    edited.links[index].url = value;
-                  }
-                }),
-            styles: huiTechnicalInputStyles,
-            attributes: huiTechnicalInputAttributes,
+        ],
+        children: <Widget>[
+          Field(
+            label: huiText('Wording'),
+            tip: huiText(
+              'A type uses the client\'s own wording in the player\'s language; a '
+              'label publishes yours. A link needs one or the other.',
+            ),
+            problems: _issuesAt(path),
+            child: ToggleChoice<String>(
+              label: huiText('Wording'),
+              value: link.isLabelled ? 'label' : 'type',
+              options: <ChoiceOption<String>>[
+                ChoiceOption<String>('type', huiText('Client label')),
+                ChoiceOption<String>('label', huiText('My own label')),
+              ],
+              onChanged: (String value) =>
+                  _store.mutateMotd('link wording', (GlossMotdDoc edited) {
+                    if (index >= edited.links.length) return;
+                    final GlossMotdLink edit = edited.links[index];
+                    if (value == 'type') {
+                      edit.type = 'website';
+                      edit.label = null;
+                    } else {
+                      edit.type = null;
+                      edit.label = '';
+                    }
+                  }),
+            ),
           ),
-          HuiInlineIssues(_issuesFor('$path.url')),
-        ]),
+          if (link.isLabelled)
+            _linkLabel(link, index, path)
+          else
+            _linkType(link, index, path),
+          Field(
+            label: huiText('Address'),
+            forId: 'motd-link-$index-url',
+            docKey: 'motd.links.url',
+            problems: _issuesFor('$path.url'),
+            child: TextInput(
+              id: 'motd-link-$index-url',
+              value: link.url,
+              size: _size,
+              fullWidth: true,
+              placeholder: huiText('https://example.net'),
+              onChanged: (String value) =>
+                  _store.mutateMotd('link address', (GlossMotdDoc edited) {
+                    if (index < edited.links.length) {
+                      edited.links[index].url = value;
+                    }
+                  }),
+              styles: technicalInputStyles,
+              attributes: technicalInputAttributes,
+            ),
+          ),
+        ],
       ),
-    ]);
+    );
   }
 
-  Widget _linkType(GlossMotdLink link, int index, String path) => HuiField(
+  Widget _linkType(GlossMotdLink link, int index, String path) => Field(
     label: huiText('Type'),
-    trailing: const HuiFieldHelp('motd.links.type'),
-    control: dom.div(<Widget>[
-      ArcaneSelect(
-        value: link.type ?? '',
-        options: <ArcaneSelectOption>[
-          for (final String type in glossMotdLinkTypes)
-            ArcaneSelectOption(value: type, label: type),
-        ],
-        onChanged: (String value) =>
-            _store.mutateMotd('link type', (GlossMotdDoc edited) {
-              if (index < edited.links.length) {
-                edited.links[index].type = value;
-              }
-            }),
-      ),
-      HuiInlineIssues(_issuesFor('$path.type')),
-    ]),
+    forId: 'motd-link-$index-type',
+    docKey: 'motd.links.type',
+    problems: _issuesFor('$path.type'),
+    child: ArcaneSelect(
+      id: 'motd-link-$index-type',
+      value: link.type ?? '',
+      size: _size,
+      fullWidth: true,
+      options: <ArcaneSelectOption>[
+        for (final String type in glossMotdLinkTypes)
+          ArcaneSelectOption(value: type, label: type),
+      ],
+      onChanged: (String value) =>
+          _store.mutateMotd('link type', (GlossMotdDoc edited) {
+            if (index < edited.links.length) {
+              edited.links[index].type = value;
+            }
+          }),
+    ),
   );
 
-  Widget _linkLabel(GlossMotdLink link, int index, String path) => HuiField(
+  Widget _linkLabel(GlossMotdLink link, int index, String path) => Field(
     label: huiText('Label'),
-    trailing: const HuiFieldHelp('motd.links.label'),
-    control: dom.div(<Widget>[
+    forId: 'motd-link-$index-label',
+    docKey: 'motd.links.label',
+    problems: _issuesFor('$path.label'),
+    child: Component.fragment(<Widget>[
       TextInput(
+        id: 'motd-link-$index-label',
         value: link.label ?? '',
-        size: ComponentSize.sm,
+        size: _size,
         fullWidth: true,
         placeholder: huiText('&bStore'),
         onChanged: (String value) =>
@@ -355,50 +382,62 @@ class _MotdInspectorState extends State<MotdInspector> {
           'spellcheck': 'false',
         },
       ),
-      GlossTextLine(
-        render: renderGlossLine(
-          link.label ?? '',
-          animations: _store.workspaceAnimations,
-          emoji: _store.workspaceEmoji,
-        ),
-      ),
-      HuiInlineIssues(_issuesFor('$path.label')),
+      if ((link.label ?? '').isNotEmpty)
+        dom.div(classes: 'hui-line-row-preview', <Widget>[
+          GlossTextLine(
+            render: renderGlossLine(
+              link.label ?? '',
+              animations: _store.workspaceAnimations,
+              emoji: _store.workspaceEmoji,
+            ),
+          ),
+        ]),
     ]),
   );
 
   /// The hover list under the player count. Same rows as the entry lines,
-  /// because it is the same pipeline — only the limit differs.
-  Widget _sample(GlossMotdEntry entry, int index) => HuiLineListSection(
-    title: huiText('Hover sample'),
+  /// because it is the same pipeline; only the limit differs.
+  Widget _sample(GlossMotdEntry entry, int index) => Field(
+    label: huiText('Hover sample'),
     docKey: 'motd.entries.sample',
-    sectionKey: 'motd.entries.sample',
-    addLabel: huiText('Add sample line'),
-    itemCount: entry.sample.length,
-    issues: _issuesFor('entries[$index].sample'),
-    emptyBody: huiText(
-      'The count keeps the vanilla hover list of real player names. Add a '
-      'line to replace it.',
+    problems: _issuesFor('entries[$index].sample'),
+    trailing: AppIconButton(
+      icon: ArcaneIcon.plus(),
+      label: huiText('Add sample line'),
+      onPressed: () =>
+          _store.mutateMotd('add sample line', (GlossMotdDoc edited) {
+            if (index < edited.entries.length) {
+              edited.entries[index].sample.add('');
+            }
+          }),
     ),
-    onAdd: () => _store.mutateMotd('add sample line', (GlossMotdDoc edited) {
-      if (index < edited.entries.length) {
-        edited.entries[index].sample.add('');
-      }
-    }),
-    onReorder: (int from, int to) =>
-        _store.mutateMotd('reorder sample lines', (GlossMotdDoc edited) {
-          if (index >= edited.entries.length) return;
-          final List<String> sample = edited.entries[index].sample;
-          if (from >= sample.length) return;
-          sample.insert(to, sample.removeAt(from));
-        }),
-    itemBuilder: (int line) => _sampleRow(entry, index, line),
+    child: entry.sample.isEmpty
+        ? const Component.fragment(<Widget>[])
+        : ReorderList(
+            label: huiText('Hover sample'),
+            itemCount: entry.sample.length,
+            onReorder: (int from, int to) => _store.mutateMotd(
+              'reorder sample lines',
+              (GlossMotdDoc edited) {
+                if (index >= edited.entries.length) return;
+                final List<String> sample = edited.entries[index].sample;
+                if (from >= sample.length) return;
+                sample.insert(to, sample.removeAt(from));
+              },
+            ),
+            itemBuilder: (int line) => _sampleRow(entry, index, line),
+          ),
   );
 
   Widget _sampleRow(GlossMotdEntry entry, int index, int line) {
     final String text = entry.sample[line];
-    return HuiLineRow(
+    return LineRow(
       value: text,
       placeholder: huiText('&7Now playing'),
+      label: huiText('Sample line {line} of entry {entry}', <String, Object?>{
+        'line': line + 1,
+        'entry': index + 1,
+      }),
       removeLabel: huiText(
         'Delete sample line {line} of entry {entry}',
         <String, Object?>{'line': line + 1, 'entry': index + 1},
@@ -426,14 +465,13 @@ class _MotdInspectorState extends State<MotdInspector> {
           where: 'in the server list',
         ),
         if (line >= glossMotdMaxSampleLines)
-          dom.span(classes: 'hui-gloss-chip is-missing', <Widget>[
-            Text(
-              huiText(
-                'past line {maximum} — Gloss rejects this file',
-                <String, Object?>{'maximum': glossMotdMaxSampleLines},
-              ),
+          StatusBadge(
+            huiText(
+              'Past line {maximum}: Gloss rejects this file',
+              <String, Object?>{'maximum': glossMotdMaxSampleLines},
             ),
-          ]),
+            tone: BadgeTone.error,
+          ),
       ],
       onRemove: () =>
           _store.mutateMotd('delete sample line', (GlossMotdDoc edited) {
@@ -446,104 +484,97 @@ class _MotdInspectorState extends State<MotdInspector> {
   }
 
   /// The three fields `applyExtras` sends beside the text. `max` is plain
-  /// Bukkit; the other two need Paper's ping event, which the help says.
-  Widget _pingExtras(GlossMotdEntry entry, int index) =>
-      dom.div(classes: 'hui-motd-ping-extras', <Widget>[
-        _pingField(
-          label: huiText('Online count'),
-          docKey: 'motd.entries.online',
-          help: huiText(
-            'Text that has to render to a number. Blank keeps the real count. '
-            'Needs Paper.',
-          ),
-          placeholder: huiText('{{ server.online }}'),
-          value: entry.online,
-          path: 'entries[$index].online',
-          historyLabel: 'online count',
-          apply: (GlossMotdDoc edited, String? value) =>
-              edited.entries[index].online = value,
-          index: index,
-        ),
-        _pingField(
-          label: huiText('Max players'),
-          docKey: 'motd.entries.max',
-          help: huiText(
-            'Text that has to render to a number. Blank keeps the real slot '
-            'count. Works on Spigot too.',
-          ),
-          placeholder: huiText('{{ server.maxPlayers }}'),
-          value: entry.max,
-          path: 'entries[$index].max',
-          historyLabel: 'max players',
-          apply: (GlossMotdDoc edited, String? value) =>
-              edited.entries[index].max = value,
-          index: index,
-        ),
-        _pingField(
-          label: huiText('Version label'),
-          docKey: 'motd.entries.version',
-          help: huiText(
-            'Shown only to clients with an incompatible protocol. '
-            'Does not replace ping bars or change compatibility. Needs Paper.',
-          ),
-          placeholder: huiText('&cOutdated'),
-          value: entry.version,
-          path: 'entries[$index].version',
-          historyLabel: 'version label',
-          apply: (GlossMotdDoc edited, String? value) =>
-              edited.entries[index].version = value,
-          index: index,
-        ),
-      ]);
+  /// Bukkit; the other two need Paper's ping event, which their docs say.
+  List<Widget> _pingExtras(GlossMotdEntry entry, int index) => <Widget>[
+    _pingField(
+      label: huiText('Online count'),
+      docKey: 'motd.entries.online',
+      placeholder: huiText('{{ server.online }}'),
+      value: entry.online,
+      path: 'entries[$index].online',
+      historyLabel: 'online count',
+      apply: (GlossMotdDoc edited, String? value) =>
+          edited.entries[index].online = value,
+      index: index,
+    ),
+    _pingField(
+      label: huiText('Max players'),
+      docKey: 'motd.entries.max',
+      placeholder: huiText('{{ server.maxPlayers }}'),
+      value: entry.max,
+      path: 'entries[$index].max',
+      historyLabel: 'max players',
+      apply: (GlossMotdDoc edited, String? value) =>
+          edited.entries[index].max = value,
+      index: index,
+    ),
+    _pingField(
+      label: huiText('Version label'),
+      docKey: 'motd.entries.version',
+      placeholder: huiText('&cOutdated'),
+      value: entry.version,
+      path: 'entries[$index].version',
+      historyLabel: 'version label',
+      apply: (GlossMotdDoc edited, String? value) =>
+          edited.entries[index].version = value,
+      index: index,
+    ),
+  ];
 
   Widget _pingField({
     required String label,
     required String docKey,
-    required String help,
     required String placeholder,
     required String? value,
     required String path,
     required String historyLabel,
     required void Function(GlossMotdDoc edited, String? value) apply,
     required int index,
-  }) => HuiField(
-    label: label,
-    trailing: HuiFieldHelp(docKey),
-    help: help,
-    control: dom.div(<Widget>[
-      TextInput(
-        value: value ?? '',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: placeholder,
-        onChanged: (String next) =>
-            _store.mutateMotd(historyLabel, (GlossMotdDoc edited) {
-              if (index < edited.entries.length) {
-                apply(edited, next.isEmpty ? null : next);
-              }
-            }),
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
-      ),
-      GlossTextLine(
-        render: renderGlossLine(
-          value ?? '',
-          animations: _store.workspaceAnimations,
-          emoji: _store.workspaceEmoji,
-          viewerAware: false,
+  }) {
+    final String id = 'motd-${path.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-')}';
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: Component.fragment(<Widget>[
+        TextInput(
+          id: id,
+          value: value ?? '',
+          size: _size,
+          fullWidth: true,
+          placeholder: placeholder,
+          onChanged: (String next) =>
+              _store.mutateMotd(historyLabel, (GlossMotdDoc edited) {
+                if (index < edited.entries.length) {
+                  apply(edited, next.isEmpty ? null : next);
+                }
+              }),
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
         ),
-      ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+        if ((value ?? '').isNotEmpty)
+          dom.div(classes: 'hui-line-row-preview', <Widget>[
+            GlossTextLine(
+              render: renderGlossLine(
+                value ?? '',
+                animations: _store.workspaceAnimations,
+                emoji: _store.workspaceEmoji,
+                viewerAware: false,
+              ),
+            ),
+          ]),
+      ]),
+    );
+  }
 
-  Widget _entries(GlossMotdDoc doc) => HuiLineListSection(
+  Widget _entries(GlossMotdDoc doc) => LineListSection(
     title: huiText('Entries'),
     docKey: 'motd.entries',
+    sectionKey: 'motd.entries',
     addLabel: huiText('Add entry'),
     itemCount: doc.entries.length,
     issues: _issuesFor(r'$.entries'),
-    emptyTone: HuiNoteTone.danger,
     emptyBody: huiText(
       'Gloss rejects a MOTD file with no entries, so the server list '
       'falls back to the vanilla line. Add one to make the document '
@@ -564,113 +595,149 @@ class _MotdInspectorState extends State<MotdInspector> {
     tools: <Widget>[AnimationReferencePicker(store: _store, onPicked: _insert)],
     // Entries are picked at random, so their order carries no meaning and a
     // drag handle would imply one.
-    itemBuilder: (int index) => _entryCard(doc, index),
+    itemBuilder: (int index) => _entry(doc, index),
   );
 
-  Widget _entryCard(GlossMotdDoc doc, int index) {
+  Widget _entry(GlossMotdDoc doc, int index) {
     final GlossMotdEntry entry = doc.entries[index];
-    return dom.div(classes: 'hui-motd-entry-card', <Widget>[
-      dom.div(classes: 'hui-motd-entry-head', <Widget>[
-        dom.span(classes: 'hui-motd-entry-label', <Widget>[
-          Text(huiText("Entry {value}", <String, Object?>{'value': index + 1})),
-        ]),
-        dom.span(classes: 'hui-motd-entry-actions', <Widget>[
-          const HuiFieldHelp('motd.lines'),
-          HuiIconButton(
-            label: huiText('Duplicate entry'),
-            icon: ArcaneIcon.copy(size: IconSize.sm),
-            onPressed: () => _store.mutateMotd('duplicate entry', (
-              GlossMotdDoc edited,
-            ) {
-              if (index < edited.entries.length) {
-                edited.entries.insert(index + 1, edited.entries[index].copy());
-              }
-            }),
-          ),
-          HuiIconButton(
-            label: huiText('Delete entry'),
-            icon: ArcaneIcon.trash2(size: IconSize.sm),
-            onPressed: () =>
-                _store.mutateMotd('delete entry', (GlossMotdDoc edited) {
-                  if (index < edited.entries.length) {
-                    edited.entries.removeAt(index);
-                  }
-                }),
-          ),
-        ]),
-      ]),
-      for (int line = 0; line < entry.lines.length; line++)
-        _lineRow(entry, index, line),
-      if (entry.lines.length < glossMotdMaxLinesPerEntry)
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          icon: ArcaneIcon.plus(size: IconSize.sm),
-          onPressed: () => _store.mutateMotd('add line', (GlossMotdDoc edited) {
+    final String path = 'entries[$index]';
+    final List<String> rare = <String>[
+      '$path.favicon',
+      '$path.sample',
+      '$path.online',
+      '$path.max',
+      '$path.version',
+    ];
+    final bool rareProblems = rare.any(
+      (String prefix) => _issuesFor(prefix).isNotEmpty,
+    );
+    return AppSection(
+      title: huiText("Entry {value}", <String, Object?>{'value': index + 1}),
+      memoryKey: 'motd.entry.$index',
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.copy(),
+          label: huiText('Duplicate entry'),
+          onPressed: () => _store.mutateMotd('duplicate entry', (
+            GlossMotdDoc edited,
+          ) {
             if (index < edited.entries.length) {
-              edited.entries[index].lines.add('');
+              edited.entries.insert(index + 1, edited.entries[index].copy());
             }
           }),
-          label: huiText('Add second line'),
         ),
-      GlossVisibilityEditor(
-        raw: entry.show,
-        sectionKey: 'motd.entries.$index.visibility',
-        issues: _issuesFor('entries[$index].show'),
-        onChanged: (Object? value) => _store.mutateMotd(
-          'entry visibility',
-          (GlossMotdDoc edited) => edited.entries[index].show = value,
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
+          label: huiText('Delete entry'),
+          onPressed: () =>
+              _store.mutateMotd('delete entry', (GlossMotdDoc edited) {
+                if (index < edited.entries.length) {
+                  edited.entries.removeAt(index);
+                }
+              }),
         ),
-      ),
-      HuiField(
-        label: huiText('Weight'),
-        help: huiText(
-          'Relative chance among entries whose visibility condition passes.',
+      ],
+      children: <Widget>[
+        Field(
+          label: huiText('Lines'),
+          docKey: 'motd.lines',
+          problems: _issuesFor('$path.lines'),
+          trailing: entry.lines.length < glossMotdMaxLinesPerEntry
+              ? AppIconButton(
+                  icon: ArcaneIcon.plus(),
+                  label: huiText('Add second line'),
+                  onPressed: () =>
+                      _store.mutateMotd('add line', (GlossMotdDoc edited) {
+                        if (index < edited.entries.length) {
+                          edited.entries[index].lines.add('');
+                        }
+                      }),
+                )
+              : null,
+          child: dom.div(classes: 'hui-line-list', <Widget>[
+            for (int line = 0; line < entry.lines.length; line++)
+              _lineRow(entry, index, line),
+          ]),
         ),
-        control: TextInput(
-          value: entry.weight.toString(),
-          size: ComponentSize.sm,
-          fullWidth: true,
-          onChanged: (String value) {
-            final int? weight = int.tryParse(value);
-            if (weight != null) {
+        Field(
+          label: huiText('Weight'),
+          forId: 'motd-entry-$index-weight',
+          tip: huiText(
+            'Relative chance among entries whose visibility condition passes.',
+          ),
+          problems: _issuesFor('$path.weight'),
+          child: NumberField(
+            id: 'motd-entry-$index-weight',
+            value: entry.weight.toDouble(),
+            integer: true,
+            step: 1,
+            onChanged: (double value) {
+              final int weight = value.round();
               _store.mutateMotd(
                 'entry weight',
                 (GlossMotdDoc edited) => edited.entries[index].weight = weight,
               );
-            }
-          },
-          attributes: const <String, String>{
-            'inputmode': 'numeric',
-            'aria-label': 'Entry weight',
-          },
+            },
+          ),
         ),
-      ),
-      MotdEntryPolicies(store: _store, index: index),
-      _entryFavicon(entry, index),
-      _sample(entry, index),
-      _pingExtras(entry, index),
-      HuiInlineIssues(
-        _issuesFor(
-          'entries[$index]',
-          except: <String>[
-            'entries[$index].favicon',
-            'entries[$index].sample',
-            'entries[$index].online',
-            'entries[$index].max',
-            'entries[$index].version',
+        AdvancedOnly(
+          child: PreviewExprField(
+            label: huiText('Show condition'),
+            raw: entry.show,
+            kind: PreviewExprKind.boolean,
+            showCondition: true,
+            scope: glossShowVariables.toSet(),
+            categoryVariableNames: glossShowVariables,
+            help: huiText('Boolean or expression. Leave blank to always show.'),
+            issues: _issuesFor('$path.show'),
+            onChanged: (Object? value) => _store.mutateMotd(
+              'entry visibility',
+              (GlossMotdDoc edited) => edited.entries[index].show = value,
+            ),
+          ),
+        ),
+        MoreFields(
+          memoryKey: 'motd.entry.$index.more',
+          open: rareProblems,
+          children: <Widget>[
+            _entryFavicon(entry, index),
+            _sample(entry, index),
+            ..._pingExtras(entry, index),
+            AdvancedOnly(
+              child: MotdEntryPolicies(store: _store, index: index),
+            ),
           ],
         ),
-      ),
-    ]);
+        for (final HuiIssue issue in distinctIssues(
+          _issuesFor(
+            path,
+            except: <String>[
+              ...rare,
+              '$path.lines',
+              '$path.weight',
+              '$path.show',
+              '$path.select',
+              '$path.icons',
+              '$path.counts',
+              '$path.sampleMode',
+            ],
+          ),
+        ))
+          issueNote(issue),
+      ],
+    );
   }
 
   Widget _lineRow(GlossMotdEntry entry, int entryIndex, int lineIndex) {
     final String line = entry.lines[lineIndex];
     final bool beyondRender = lineIndex >= glossMotdMaxLinesPerEntry;
-    return HuiLineRow(
+    return LineRow(
       value: line,
       placeholder: huiText('&dA glossy server'),
+      label: huiText('Line {line} of entry {entry}', <String, Object?>{
+        'line': lineIndex + 1,
+        'entry': entryIndex + 1,
+      }),
       removeLabel: huiText(
         'Delete line {line} of entry {entry}',
         <String, Object?>{'line': lineIndex + 1, 'entry': entryIndex + 1},
@@ -682,10 +749,16 @@ class _MotdInspectorState extends State<MotdInspector> {
         _focusedLine = lineIndex;
       },
       preview: GlossTextLine(
-        render: renderGlossLine(
-          line,
-          animations: _store.workspaceAnimations,
-          emoji: _store.workspaceEmoji,
+        // Both lines are one description, so this line continues the style
+        // the lines above it leave open.
+        render: glossDisplayTail(
+          renderGlossLine(
+            entry.lines.take(lineIndex + 1).join('\n'),
+            defaultColor: mcMotdTextColor,
+            animations: _store.workspaceAnimations,
+            emoji: _store.workspaceEmoji,
+          ),
+          line.split('\n').length,
         ),
       ),
       chips: <Widget>[
@@ -695,9 +768,10 @@ class _MotdInspectorState extends State<MotdInspector> {
           where: 'in the server list',
         ),
         if (beyondRender)
-          dom.span(classes: 'hui-gloss-chip is-missing', <Widget>[
-            Text(huiText('past line 2 — Gloss rejects this entry')),
-          ]),
+          StatusBadge(
+            huiText('Past line 2: Gloss rejects this entry'),
+            tone: BadgeTone.error,
+          ),
       ],
       onRemove: () => _store.mutateMotd('delete line', (GlossMotdDoc edited) {
         if (entryIndex < edited.entries.length &&

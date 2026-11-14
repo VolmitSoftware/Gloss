@@ -15,6 +15,7 @@ import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.editor.EditorSettings;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.hologram.DisplayRefresh;
 import art.arcane.gloss.service.BudgetedVisibilityGovernor;
@@ -52,7 +53,7 @@ public record GlossConfig(
     Menus menus,
     Panels panels,
     Previews previews,
-    EditorSync editorSync,
+    EditorSettings editor,
     Debug debug,
     CustomItems customItems,
     PlayerHeads playerHeads,
@@ -68,7 +69,7 @@ public record GlossConfig(
     public GlossConfig withLanguage(String locale) {
         return new GlossConfig(locale, metrics, updateNotifications, splashScreen, holograms, particles, boards, tablist,
             emoji, animations, chat, text, bubbles, indicators, drops, realDrops, motd, groups,
-            hotload, commands, menus, panels, previews, editorSync, debug, customItems, playerHeads, integration,
+            hotload, commands, menus, panels, previews, editor, debug, customItems, playerHeads, integration,
             modules, visibility, images, teams, imports);
     }
 
@@ -617,17 +618,6 @@ public record GlossConfig(
     public record Previews(boolean enabled) {
     }
 
-    public record EditorSync(
-        String builderUrl,
-        boolean enabled,
-        String endpoint,
-        String createToken,
-        int sessionMinutes,
-        int pollSeconds,
-        int maxProjectMiB
-    ) {
-    }
-
     public record Debug(
         boolean hitbox,
         boolean position,
@@ -752,14 +742,32 @@ public record GlossConfig(
             new Previews(
                 source.features.previews
             ),
-            new EditorSync(
-                source.editor.builderUrl,
-                source.editor.sync.enabled,
-                source.editor.sync.endpoint,
-                source.editor.sync.createToken,
-                source.editor.sync.sessionMinutes,
-                source.editor.sync.pollSeconds,
-                source.editor.sync.maxProjectMiB
+            new EditorSettings(
+                source.editor.enabled,
+                source.editor.serverName,
+                source.editor.editorUrl,
+                source.editor.listenerEnabled,
+                source.editor.listenAddress,
+                source.editor.port,
+                source.editor.advertisedUrl,
+                List.copyOf(source.editor.trustedProxies),
+                source.editor.tlsCertificate,
+                source.editor.tlsPrivateKey,
+                List.copyOf(source.editor.allowedOrigins),
+                source.editor.tokenDays,
+                source.editor.requestBodyBytes,
+                source.editor.concurrentRequestsPerToken,
+                source.editor.requestsPerSecond,
+                source.editor.pairAttemptsPerMinute,
+                source.editor.openConnections,
+                source.editor.eventFramesPerSecond,
+                source.editor.maxProjectMiB,
+                source.editor.relayEnabled,
+                source.editor.relayUrl,
+                source.editor.relayReconnectMinSeconds,
+                source.editor.relayReconnectMaxSeconds,
+                source.editor.relayFrameBytes,
+                source.editor.relayConcurrentRequests
             ),
             new Debug(
                 source.debug.hitbox,

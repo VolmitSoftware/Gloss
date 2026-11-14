@@ -2,341 +2,150 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-/// The top bar sheds one cluster per rung of the give-way ladder, and each rung
-/// shows its own overflow menu. Two things have to stay true for that to work,
-/// and neither is visible from a unit test of the widget: a tier's menu must
-/// carry every action the rungs above it folded (nothing becomes unreachable),
-/// and it must carry nothing that is still on the bar at that width (no width
-/// offers two routes to one command). Both are properties of the source, so
-/// they are checked here.
+/// Every top-bar action has exactly one home (plus the command palette), the
+/// bar is one row, and it folds through the kit's ActionRow rather than a
+/// CSS breakpoint ladder. These are properties of the source, so they are
+/// checked here; the browser checks measure the result.
 void main() {
-  final String topBar = File(
-    'lib/components/shell/top_bar.dart',
-  ).readAsStringSync();
-  final String barMenu = File(
-    'lib/components/shell/bar_menu.dart',
-  ).readAsStringSync();
-  final String foundationsCss = File(
-    'web/styles/01-foundations.css',
-  ).readAsStringSync();
+  final String topBar = File('lib/components/shell/top_bar.dart')
+      .readAsStringSync();
+  final String rail = File('lib/components/panels/editor_rail.dart')
+      .readAsStringSync();
+  final String settings = File('lib/components/dialogs/settings_dialog.dart')
+      .readAsStringSync();
+  final String foundationsCss = File('web/styles/01-foundations.css')
+      .readAsStringSync();
   final String shellCss = File('web/styles/02-shell.css').readAsStringSync();
 
-  /// The four rungs, widest first, as `(tier, actions that rung folds)`.
-  const Map<int, List<String>> foldedAtTier = <int, List<String>>{
-    1: <String>[
-      "label: huiText('Templates')",
-      "label: huiText('Command palette')",
-      "label: huiText('Settings')",
-      "label: huiText('Help')",
-    ],
-    2: <String>["label: huiText('Images')"],
-    3: <String>[
-      "label: huiText('Import JSON')",
-      "label: huiText('Export {document} JSON'",
-      "label: huiText('Copy {document} JSON'",
-    ],
-    4: <String>["label: huiText('Undo')", "label: huiText('Redo')"],
-  };
+  int count(String source, String needle) => needle.allMatches(source).length;
 
-  /// The menu one tier actually renders: the entry list with every region
-  /// guarded by a higher tier removed. A guard opens either a spread block
-  /// (`...<BarMenuEntry>[ … ]`) or a single entry (`BarMenuAction( … )`), and
-  /// both are closed by counting brackets rather than by matching indentation.
-  String entriesFor(int tier) {
-    final String body = _between(
+  test('the top bar is one row with one File menu and one Help menu', () {
+    expect(count(topBar, "id: 'hui-file-menu'"), 1);
+    expect(count(topBar, "id: 'hui-help-menu'"), 1);
+    for (final String gone in <String>[
+      'hui-bar-primary',
+      'hui-bar-context',
+      '_overflowTiers',
+      'BarMenu',
+      'ViewSwitcher',
+      'hui-kind-picker',
+    ]) {
+      expect(topBar, isNot(contains(gone)), reason: gone);
+      expect(shellCss, isNot(contains(gone)), reason: gone);
+    }
+    expect(File('lib/components/shell/bar_menu.dart').existsSync(), isFalse);
+    expect(
+      File('lib/components/shell/view_switcher.dart').existsSync(),
+      isFalse,
+    );
+  });
+
+  test('File holds the document and workspace actions, each once', () {
+    final String file = _between(
       topBar,
-      'List<BarMenuEntry> _overflowEntries(int tier)',
-      'Widget _mobilePaneControls()',
+      'List<AppMenuEntry> _fileEntries()',
+      'List<AppMenuEntry> _helpEntries()',
     );
-    final RegExp guard = RegExp(r'if \(tier >= (\d)\)\s*');
-    final StringBuffer kept = StringBuffer();
-    int cursor = 0;
-    while (true) {
-      final Match? match = guard.firstMatch(body.substring(cursor));
-      if (match == null) {
-        kept.write(body.substring(cursor));
-        return kept.toString();
-      }
-      final int start = cursor + match.start;
-      final int bodyStart = cursor + match.end;
-      final int end = _regionEnd(body, bodyStart);
-      kept.write(body.substring(cursor, start));
-      if (int.parse(match.group(1)!) <= tier) {
-        kept.write(body.substring(bodyStart, end));
-      }
-      cursor = end;
-    }
-  }
-
-  test('each overflow tier carries every action the rungs above it folded', () {
-    for (int tier = 1; tier <= 4; tier++) {
-      final String menu = entriesFor(tier);
-      for (int rung = 1; rung <= tier; rung++) {
-        for (final String action in foldedAtTier[rung]!) {
-          expect(
-            menu,
-            contains(action),
-            reason: 'tier $tier must carry $action, folded at rung $rung',
-          );
-        }
-      }
+    for (final String label in <String>[
+      "huiText('New document')",
+      "huiText('Templates')",
+      "huiText('Import JSON')",
+      "huiText('Export {document} JSON'",
+      "huiText('Copy {document} JSON'",
+      "huiText('Images')",
+      "huiText('Import workspace bundle')",
+      "huiText('Export workspace bundle')",
+      "huiText('Erase all local data')",
+    ]) {
+      expect(count(file, label), 1, reason: label);
+      expect(count(topBar, label), 1, reason: '$label has a second route');
     }
   });
 
-  test('no overflow tier lists an action still on the bar at its width', () {
-    for (int tier = 1; tier <= 4; tier++) {
-      final String menu = entriesFor(tier);
-      for (int rung = tier + 1; rung <= 4; rung++) {
-        for (final String action in foldedAtTier[rung]!) {
-          expect(
-            menu,
-            isNot(contains(action)),
-            reason: 'tier $tier must not duplicate $action, still on the bar',
-          );
-        }
-      }
+  test('Help holds help, shortcuts, the tour, settings and the theme', () {
+    final String help = _between(
+      topBar,
+      'List<AppMenuEntry> _helpEntries()',
+      'Widget _brand()',
+    );
+    for (final String label in <String>[
+      "huiText('Help')",
+      "huiText('Keyboard shortcuts')",
+      "huiText('Guided tour')",
+      "huiText('Settings')",
+      "huiText('Dark theme')",
+    ]) {
+      expect(count(help, label), 1, reason: label);
     }
+    expect(topBar, isNot(contains("huiText('Light theme')")));
   });
 
-  test('every mounted overflow tier has a breakpoint that shows it', () {
-    expect(topBar, contains('const int _overflowTiers = 4;'));
-    for (int tier = 1; tier <= 4; tier++) {
-      expect(
-        shellCss,
-        contains('.hui-bar-overflow.is-tier$tier { display: flex; }'),
-        reason: 'tier $tier is mounted but never shown',
-      );
+  test('workspace actions and the theme are not repeated elsewhere', () {
+    for (final String label in <String>[
+      'Import workspace bundle',
+      'Export workspace bundle',
+      'Erase all local data',
+    ]) {
+      expect(rail, isNot(contains(label)), reason: 'rail repeats $label');
+      expect(settings, isNot(contains(label)), reason: 'settings: $label');
     }
-    // Tier 1 is the permanent desktop menu. Tiers 1..3 hand over to the next
-    // one as a complete action cluster leaves the row; tier 4 is the floor.
-    final String topBarRules = _between(
+    expect(settings, isNot(contains('onToggleTheme')));
+    expect(settings, isNot(contains('Reset local data')));
+  });
+
+  test('the bar folds through ActionRow, never a breakpoint ladder', () {
+    expect(topBar, contains('ActionRow('));
+    expect(topBar, contains("moreId: 'hui-bar-fold'"));
+    expect(topBar, contains("id: 'hui-bar-more'"), reason: 'one `...` for what the bar folds, before Help');
+    for (final String width in <String>['1400px', '1150px']) {
+      expect(shellCss, isNot(contains(width)), reason: width);
+    }
+    final String barRules = _between(
       shellCss,
       '/* ---- Top bar',
       '/* ---- Status bar',
     );
-    expect(
-      topBarRules,
-      contains('.hui-bar-overflow.is-tier1 { display: flex; }'),
-    );
-    for (int tier = 1; tier <= 3; tier++) {
-      expect(
-        shellCss,
-        contains('.hui-bar-overflow.is-tier$tier { display: none; }'),
-        reason: 'tier $tier is never handed over to tier ${tier + 1}',
-      );
-    }
-  });
-
-  test('the ladder folds clusters in the documented order', () {
-    // Widest first: the breakpoints must descend, or a narrower viewport would
-    // show more of the bar than a wider one.
-    const List<int> rungs = <int>[1400, 1150, 1100, 1024, 700, 430];
-    int previous = 1 << 30;
-    for (final int rung in rungs) {
-      expect(
-        shellCss,
-        contains('@media (max-width: ${rung}px)'),
-        reason: 'missing the ${rung}px rung',
-      );
-      expect(rung, lessThan(previous));
-      previous = rung;
-    }
-    // Kind and view are permanent stateful selectors, not a scrollable icon
-    // wall that changes shape at an arbitrary breakpoint.
-    expect(topBar, isNot(contains('_kindTabs()')));
-    expect(topBar, isNot(contains('hui-kind-tabs')));
-    expect(topBar, isNot(contains('hui-bar-views')));
-    expect(shellCss, isNot(contains('.hui-kind-tabs')));
-    expect(shellCss, isNot(contains('.hui-bar-views')));
-    expect(shellCss, contains('.hui-kind-picker { display: flex; }'));
-    expect(shellCss, contains('.hui-bar-view-picker { display: flex; }'));
-    expect(topBar, contains('_kindPicker(),'));
-    expect(topBar, contains('_viewPicker()'));
-  });
-
-  test('the header owns no horizontal scrolling primitive', () {
-    final String topBarRules = _between(
-      shellCss,
-      '/* ---- Top bar',
-      '/* ---- Status bar',
-    );
-    expect(
-      topBarRules,
-      isNot(matches(RegExp(r'overflow(?:-x)?\s*:\s*(?:auto|scroll)'))),
-    );
-    expect(topBarRules, isNot(contains('scrollbar-width')));
-    expect(
-      topBarRules,
-      isNot(matches(RegExp(r'^\s*scroll-behavior\s*:', multiLine: true))),
-    );
+    expect(barRules, isNot(contains('overflow-x')));
+    expect(barRules, isNot(contains('scrollbar-width')));
     expect(topBar, isNot(contains('scrollLeft')));
     expect(topBar, isNot(contains('querySelector')));
   });
 
-  test('header menus cannot focus-scroll or escape a short viewport', () {
-    expect(
-      shellCss,
-      contains('max-height: calc(100dvh - var(--hui-command-height) - 12px);'),
-    );
-    expect(shellCss, contains('.hui-bar-menu-panel {'));
-    expect(shellCss, contains('overflow-y: auto;'));
-    expect(
-      shellCss,
-      contains(
-        '100dvh - var(--hui-command-height) - '
-        'var(--hui-context-height) - 12px',
-      ),
-    );
-    expect(barMenu, contains('web.FocusOptions(preventScroll: true)'));
-    expect(topBar, contains('align: BarMenuAlign.right,'));
-    expect(shellCss, contains('#hui-doc-menu {'));
-    expect(shellCss, contains('position: fixed !important;'));
-    expect(shellCss, contains('right: 8px !important;'));
-    expect(shellCss, contains('left: 8px !important;'));
-    expect(shellCss, contains('.hui-bar-menu-item {'));
-    expect(shellCss, contains('min-height: 44px;'));
-    expect(shellCss, contains('.hui-bar-menu-item:hover:not(:disabled),'));
-  });
-
-  test('header menus expose managed keyboard and language radio semantics', () {
-    expect(barMenu, contains("if (key == 'Escape')"));
-    expect(barMenu, contains("if (key == 'Tab')"));
-    expect(barMenu, contains("'tabindex': '-1'"));
-    expect(barMenu, contains('_focusInitialItem();'));
-    expect(topBar, contains("'role': 'menuitemradio'"));
-    expect(topBar, contains("'aria-checked':"));
-    expect(topBar, contains("'data-hui-menu-initial': 'true'"));
-  });
-
-  test('danger text and filled delete actions keep accessible hierarchy', () {
-    expect(foundationsCss, contains('--hui-danger-fill: var(--destructive);'));
-    expect(foundationsCss, contains('--hui-danger: var(--destructive);'));
-    expect(
-      shellCss,
-      contains('.hui-armed > .arcane-button[data-variant="destructive"] {'),
-    );
-    expect(
-      shellCss,
-      contains('background: var(--hui-danger-fill) !important;'),
-    );
-    expect(
-      shellCss,
-      contains('border-color: var(--hui-danger-fill) !important;'),
-    );
-    expect(
-      shellCss,
-      contains(
-        'background: color-mix(in srgb, var(--hui-danger-fill) 84%, white) !important;',
-      ),
-    );
-    expect(
-      shellCss,
-      contains('color: var(--destructive-foreground) !important;'),
-    );
-  });
-
-  test('secondary commands have one permanent overflow route', () {
-    final String commandRow = _between(
+  test('the Server button carries the sync hooks', () {
+    final String server = _between(
       topBar,
-      'Widget _bar()',
-      'Widget _cluster(',
+      "status == null ? huiText('Server')",
+      ');',
     );
-    for (final String action in foldedAtTier[1]!) {
-      expect(
-        commandRow,
-        isNot(contains(action)),
-        reason: '$action must not be duplicated outside the permanent menu',
-      );
-      expect(
-        entriesFor(1),
-        contains(action),
-        reason: '$action must remain reachable from the permanent menu',
-      );
-    }
+    expect(topBar, contains("id: 'gloss-server-button'"));
+    expect(topBar, contains("'data-sync-action': 'open'"));
+    expect(server, isNotEmpty);
   });
 
-  test(
-    'the command and context rows keep actions separate from navigation',
-    () {
-      expect(topBar, contains("classes: 'hui-bar-primary'"));
-      expect(topBar, contains("classes: 'hui-bar-context'"));
-      expect(
-        shellCss,
-        contains(
-          'grid-template-rows: var(--hui-command-height) '
-          'var(--hui-context-height);',
-        ),
-      );
-      expect(shellCss, isNot(contains('--hui-bar-side')));
-      expect(shellCss, isNot(contains('button:not(.selected)')));
-      expect(topBar, contains("visibleLabel: huiText('Import')"));
-      expect(topBar, contains("visibleLabel: huiText('Export')"));
-    },
-  );
-
-  test('phone context pickers yield space to the pane controls', () {
-    final String phoneRules = _between(
-      shellCss,
-      '@media (max-width: 700px)',
-      '@media (max-width: 430px)',
+  test('the retired colour, shadow and radius tokens stay gone', () {
+    // Colours come from the shadcn tokens (--destructive, --border, ...);
+    // the --hui-* names that once aliased them must not come back.
+    final RegExp retired = RegExp(
+      r'--hui-(text|muted|accent|accent-foreground|ring|danger|danger-fill|'
+      r'warning|info|success|bg|panel|panel-soft|surface|surface-raised|'
+      r'border|border-soft|shadow-[a-z]+|radius[a-z-]*)(?![\w-])',
     );
-    expect(
-      phoneRules,
-      contains('grid-template-columns: minmax(0, 1fr) minmax(0, 2.15fr);'),
-    );
-    expect(phoneRules, contains('grid-template-columns: minmax(0, 1fr) auto;'));
-    expect(phoneRules, contains('grid-template-columns: auto auto;'));
-    expect(
-      phoneRules,
-      contains(
-        '.hui-kind-picker .hui-bar-menu,\n'
-        '  .hui-bar-view-picker .hui-bar-menu { width: 100%; }',
-      ),
-    );
-    expect(phoneRules, contains('max-width: 100%;'));
-    final String topBarRules = _between(
-      shellCss,
-      '/* ---- Top bar',
-      '/* ---- Status bar',
-    );
-    expect(topBarRules, contains('.hui-kind-picker .hui-bar-menu'));
-    expect(topBarRules, contains('.hui-bar-view-picker .hui-bar-menu'));
-    expect(
-      shellCss,
-      contains('[data-hui-picker-label="true"] {\n  min-width: 0;'),
-    );
+    final List<String> found = <String>[
+      for (final String dir in <String>['lib', 'web'])
+        for (final FileSystemEntity entity in Directory(
+          dir,
+        ).listSync(recursive: true))
+          if (entity is File &&
+              (entity.path.endsWith('.dart') ||
+                  entity.path.endsWith('.css') ||
+                  entity.path.endsWith('.js') ||
+                  entity.path.endsWith('.html')) &&
+              retired.hasMatch(entity.readAsStringSync()))
+            entity.path,
+    ];
+    expect(found, isEmpty);
+    expect(foundationsCss, isNot(contains('TEMPORARY ALIASES')));
   });
-
-  test('export footer closes without duplicating the body download action', () {
-    final String source = File(
-      'lib/components/dialogs/export_dialog.dart',
-    ).readAsStringSync();
-    final String actions = _between(
-      source,
-      'actions: <Widget>[',
-      'children: <Widget>[',
-    );
-    expect(actions, contains("label: huiText('Close')"));
-    expect(actions, isNot(contains('_downloadJson')));
-    expect(actions, isNot(contains("label: 'Download JSON'")));
-  });
-}
-
-/// Index just past the bracket group that opens at or after [from].
-int _regionEnd(String source, int from) {
-  final int open = source.indexOf(RegExp(r'[\[(]'), from);
-  if (open < 0) return source.length;
-  final String opener = source[open];
-  final String closer = opener == '[' ? ']' : ')';
-  int depth = 0;
-  for (int i = open; i < source.length; i++) {
-    if (source[i] == opener) depth++;
-    if (source[i] == closer) {
-      depth--;
-      if (depth == 0) return i + 1;
-    }
-  }
-  return source.length;
 }
 
 String _between(String source, String start, String end) {

@@ -52,7 +52,7 @@ public class EditorSyncDocumentsTest {
   @Test
   public void unsupportedProjectVersionIsRejected() {
     JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
-    project.addProperty("version", EditorSyncJson.PROTOCOL_VERSION + 1);
+    project.addProperty("version", EditorSyncJson.PROJECT_VERSION + 1);
     EditorSyncTestProjects.sign(project);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
@@ -60,20 +60,6 @@ public class EditorSyncDocumentsTest {
 
     assertTrue(failure.getMessage(),
         failure.getMessage().contains("unsupported sync project version"));
-  }
-
-  @Test
-  public void unsupportedDocumentKindsAreRejectedByName() {
-    JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
-    JsonArray documents = new JsonArray();
-    documents.add(EditorSyncTestProjects.document("unknown-kind", "fixture", "{}"));
-    project.add("documents", documents);
-    EditorSyncTestProjects.sign(project);
-
-    IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncProject.validated(project, 1024 * 1024));
-
-    assertTrue(failure.getMessage(), failure.getMessage().contains("unknown-kind"));
   }
 
   @Test
@@ -199,8 +185,8 @@ public class EditorSyncDocumentsTest {
 
     versionedDocuments.get(0).getAsJsonObject().addProperty("revision", 1L);
     EditorSyncTestProjects.sign(versionedProject);
-    assertEquals("fixture",
-        EditorSyncProject.validated(versionedProject, 1024 * 1024).subjectId());
+    assertEquals(versionedProject.get("baseRevision").getAsString(),
+        EditorSyncProject.validated(versionedProject, 1024 * 1024).baseRevision());
   }
 
   @Test

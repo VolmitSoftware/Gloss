@@ -1,21 +1,40 @@
+/// Particle layers on any in-game render: one kit section per layer, named
+/// by its id, with its move and delete buttons on the title line. The fields
+/// most layers change come first; spacing, offsets, timing details and
+/// priority sit under More. The show condition and the raw particle object
+/// are Advanced only.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
-import '../../model/particle_layer.dart';
+import '../../l10n/hui_localizations.dart';
+import '../../logic/gloss_show.dart';
 import '../../model/json_codec.dart';
+import '../../model/particle_layer.dart';
 import '../../model/vec3.dart';
-import '../common/common.dart';
-import 'inspector_widgets.dart';
+import '../../ui/color_field.dart';
+import '../../ui/color_value.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/section.dart';
+import '../../ui/technical_input.dart';
+import '../../ui/toggle_choice.dart';
+import '../../ui/vec3_field.dart';
 import 'extras_editor.dart';
-import 'package:gloss_editor/l10n/hui_localizations.dart';
+import 'preview_expr_field.dart';
 
-typedef ParticleLayersMutation =
-    void Function(
-      String label,
-      void Function(List<GlossParticleLayer> layers) edit,
-    );
+typedef ParticleLayersMutation = void Function(
+  String label,
+  void Function(List<GlossParticleLayer> layers) edit,
+);
+
+/// Characters a section key may hold that an element id should not.
+final RegExp _idUnsafe = RegExp(r'[^A-Za-z0-9_-]');
 
 class ParticleLayersEditor extends StatelessWidget {
   const ParticleLayersEditor({
@@ -32,35 +51,41 @@ class ParticleLayersEditor extends StatelessWidget {
   final bool initiallyOpen;
 
   @override
-  Widget build(BuildContext context) => InspectorSection(
-    title: huiText('Particle layers'),
-    sectionKey: sectionKey,
-    initiallyOpen: initiallyOpen,
-    trailing: Button(
-      variant: ButtonVariant.outline,
-      size: ButtonSize.sm,
-      disabled: layers.length >= glossParticleMaxLayers,
-      icon: ArcaneIcon.plus(size: IconSize.sm),
-      onPressed: layers.length >= glossParticleMaxLayers
-          ? null
-          : () => mutate(
-              'add particle layer',
-              (List<GlossParticleLayer> edited) =>
-                  edited.add(GlossParticleLayer(id: _nextId(edited))),
-            ),
-      label: huiText('Add'),
-    ),
-    children: <Widget>[
-      if (layers.isNotEmpty)
+  Widget build(BuildContext context) {
+    final bool full = layers.length >= glossParticleMaxLayers;
+    final String idBase = 'particles-${sectionKey.replaceAll(_idUnsafe, '-')}';
+    return AppSection(
+      title: huiText('Particle layers'),
+      memoryKey: sectionKey,
+      open: initiallyOpen,
+      count: layers.length,
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.plus(),
+          label: huiText('Add particle layer'),
+          disabled: full,
+          onPressed: full
+              ? null
+              : () => mutate(
+                  'add particle layer',
+                  (List<GlossParticleLayer> edited) =>
+                      edited.add(GlossParticleLayer(id: _nextId(edited))),
+                ),
+        ),
+      ],
+      children: <Widget>[
         for (int index = 0; index < layers.length; index++)
-          _ParticleLayerCard(
+          _ParticleLayerSection(
             index: index,
             layer: layers[index],
             layerCount: layers.length,
             mutate: mutate,
+            sectionKey: sectionKey,
+            idBase: '$idBase-$index',
           ),
-    ],
-  );
+      ],
+    );
+  }
 
   String _nextId(List<GlossParticleLayer> existing) {
     int suffix = existing.length + 1;
@@ -73,135 +98,132 @@ class ParticleLayersEditor extends StatelessWidget {
   }
 }
 
-class _ParticleLayerCard extends StatelessWidget {
-  const _ParticleLayerCard({
+class _ParticleLayerSection extends StatelessWidget {
+  const _ParticleLayerSection({
     required this.index,
     required this.layer,
     required this.layerCount,
     required this.mutate,
+    required this.sectionKey,
+    required this.idBase,
   });
 
   final int index;
   final GlossParticleLayer layer;
   final int layerCount;
   final ParticleLayersMutation mutate;
+  final String sectionKey;
+
+  /// Prefix of every control id in this layer, unique on the page.
+  final String idBase;
 
   void _edit(String label, void Function(GlossParticleLayer layer) edit) =>
       mutate(label, (List<GlossParticleLayer> layers) {
         if (index >= 0 && index < layers.length) edit(layers[index]);
       });
 
+  void _move(int by) =>
+      mutate('move particle layer', (List<GlossParticleLayer> layers) {
+        final GlossParticleLayer moved = layers.removeAt(index);
+        layers.insert(index + by, moved);
+      });
+
   @override
-  Widget build(BuildContext context) => dom.div(
-    classes: 'hui-particle-layer',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'display': 'flex',
-        'flex-direction': 'column',
-        'gap': '10px',
-        'padding': '10px',
-        'border': '1px solid var(--hui-border-soft, var(--border))',
-        'border-radius': 'var(--hui-radius, 6px)',
-      },
-    ),
-    <Widget>[
-      dom.div(
-        styles: const dom.Styles(
-          raw: <String, String>{
-            'display': 'flex',
-            'align-items': 'center',
-            'justify-content': 'space-between',
-            'gap': '8px',
-          },
+  Widget build(BuildContext context) {
+    final String name = layer.id.isEmpty
+        ? huiText('Layer {number}', <String, Object?>{'number': index + 1})
+        : layer.id;
+    final ComponentSize size = controlSize(DensityScope.of(context));
+    final bool first = index == 0;
+    final bool last = index >= layerCount - 1;
+    return AppSection(
+      title: name,
+      memoryKey: '$sectionKey.$index',
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.arrowUp(),
+          label: huiText('Move {label} up', <String, Object?>{'label': name}),
+          disabled: first,
+          onPressed: first ? null : () => _move(-1),
         ),
-        <Widget>[
-          HuiEyebrow(layer.id.isEmpty ? '#${index + 1}' : layer.id),
-          HuiRowTools(
-            onMoveUp: index == 0
-                ? null
-                : () => mutate('move particle layer', (
-                    List<GlossParticleLayer> layers,
-                  ) {
-                    final GlossParticleLayer moved = layers.removeAt(index);
-                    layers.insert(index - 1, moved);
-                  }),
-            onMoveDown: index >= layerCount - 1
-                ? null
-                : () => mutate('move particle layer', (
-                    List<GlossParticleLayer> layers,
-                  ) {
-                    final GlossParticleLayer moved = layers.removeAt(index);
-                    layers.insert(index + 1, moved);
-                  }),
-            onRemove: () => mutate('remove particle layer', (
-              List<GlossParticleLayer> layers,
-            ) {
-              if (index >= 0 && index < layers.length) {
-                layers.removeAt(index);
-              }
-            }),
-            removeLabel: huiText('Delete'),
+        AppIconButton(
+          icon: ArcaneIcon.arrowDown(),
+          label: huiText('Move {label} down', <String, Object?>{'label': name}),
+          disabled: last,
+          onPressed: last ? null : () => _move(1),
+        ),
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
+          label: huiText('Delete {label}', <String, Object?>{'label': name}),
+          onPressed: () => mutate('remove particle layer', (
+            List<GlossParticleLayer> layers,
+          ) {
+            if (index >= 0 && index < layers.length) {
+              layers.removeAt(index);
+            }
+          }),
+        ),
+      ],
+      children: <Widget>[
+        Field(
+          label: huiText('Id'),
+          forId: '$idBase-id',
+          required: true,
+          child: TextInput(
+            id: '$idBase-id',
+            value: layer.id,
+            size: size,
+            fullWidth: true,
+            placeholder: 'green-glow',
+            onChanged: (String value) =>
+                _edit('particle layer id', (GlossParticleLayer edited) {
+                  edited.id = value;
+                }),
+            styles: technicalInputStyles,
+            attributes: technicalInputAttributes,
           ),
-        ],
-      ),
-      HuiField(
-        label: huiText('Component id'),
-        required: true,
-        control: TextInput(
-          value: layer.id,
-          size: ComponentSize.sm,
-          fullWidth: true,
-          placeholder: 'green-glow',
-          onChanged: (String value) =>
-              _edit('particle layer id', (GlossParticleLayer edited) {
-                edited.id = value;
+        ),
+        AdvancedOnly(child: _showField()),
+        ..._targetFields(size),
+        ..._geometryFields(size),
+        _placementField(),
+        ..._particleFields(size),
+        ..._emissionFields(size),
+        MoreFields(memoryKey: '$sectionKey.more', children: _rareFields()),
+        ExtrasEditor(
+          title: huiText('Data'),
+          extensionKeys: false,
+          advancedOnly: true,
+          extras: layer.particle.toJson(),
+          onChanged: (String label, Map<String, dynamic> next) =>
+              _edit(label, (GlossParticleLayer edited) {
+                edited.particle = GlossParticleSpec.fromJson(next, 'particle');
               }),
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
         ),
-      ),
-      ExtrasEditor(
-        title: huiText('Settings'),
-        extensionKeys: false,
-        extras: <String, Object?>{'viewDistance': layer.viewDistance, 'show': layer.show},
-        onChanged: (String label, Map<String, dynamic> next) => _edit(
-          label, (GlossParticleLayer edited) {
-            edited.viewDistance = huiReadDouble(next, 'viewDistance', fallback: 48);
-            edited.show = huiDeepCopy(next['show'] ?? true);
-          },
-        ),
-      ),
-      _targetFields(),
-      _geometryFields(),
-      _placementFields(),
-      _particleFields(),
-      ExtrasEditor(title: huiText('Settings'), extensionKeys: false,
-        extras: layer.particle.toJson(),
-        onChanged: (String label, Map<String, dynamic> next) => _edit(label, (GlossParticleLayer edited) {
-          edited.particle = GlossParticleSpec.fromJson(next, 'particle');
+      ],
+    );
+  }
+
+  /// Blank is the default, always shown; `true` is stored as no key.
+  Widget _showField() => PreviewExprField(
+    label: huiText('Show condition'),
+    raw: layer.show == true ? null : layer.show,
+    kind: PreviewExprKind.boolean,
+    showCondition: true,
+    scope: glossShowVariables.toSet(),
+    categoryVariableNames: glossShowVariables,
+    help: huiText('Boolean or expression. Leave blank to always show.'),
+    onChanged: (Object? value) =>
+        _edit('particle layer show', (GlossParticleLayer edited) {
+          edited.show = huiDeepCopy(value ?? true);
         }),
-      ),
-      _emissionFields(),
-      HuiField(
-        label: huiText('Priority'),
-        control: HuiNumberField(
-          value: layer.priority.toDouble(),
-          integer: true,
-          min: -1000,
-          max: 1000,
-          onChanged: (double value) =>
-              _edit('particle layer priority', (GlossParticleLayer edited) {
-                edited.priority = value.round();
-              }),
-        ),
-      ),
-    ],
   );
 
-  Widget _targetFields() => dom.div(<Widget>[
-    HuiEyebrow(huiText('Target')),
+  List<Widget> _targetFields(ComponentSize size) => <Widget>[
     _choiceField(
-      label: huiText('Scope'),
+      size: size,
+      label: huiText('Target'),
+      id: '$idBase-target',
       value: layer.target.scope,
       values: glossParticleTargetScopes,
       labels: const <String, String>{
@@ -228,62 +250,66 @@ class _ParticleLayerCard extends StatelessWidget {
       }),
     ),
     if (layer.target.scope == 'span')
-      HuiField(
-        label: huiText('Text'),
+      Field(
+        label: huiText('Name'),
+        forId: '$idBase-span',
         required: true,
-        control: TextInput(
+        hint: '<particles:name>text</particles>',
+        child: TextInput(
+          id: '$idBase-span',
           value: layer.target.name ?? '',
-          size: ComponentSize.sm,
+          size: size,
           fullWidth: true,
           placeholder: 'highlight',
           onChanged: (String value) =>
               _edit('particle span name', (GlossParticleLayer edited) {
                 edited.target.name = value;
               }),
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
         ),
-        help: '<particles:name>text</particles>',
       ),
     if (layer.target.scope == 'component')
-      HuiField(
+      Field(
         label: huiText('Component id'),
+        forId: '$idBase-component',
         required: true,
-        control: TextInput(
+        child: TextInput(
+          id: '$idBase-component',
           value: layer.target.component ?? '',
-          size: ComponentSize.sm,
+          size: size,
           fullWidth: true,
           placeholder: 'title',
           onChanged: (String value) =>
               _edit('particle component id', (GlossParticleLayer edited) {
                 edited.target.component = value;
               }),
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
         ),
       ),
     if (layer.target.scope == 'line')
-      HuiField(
+      _numberField(
         label: huiText('Line'),
+        id: '$idBase-line',
         required: true,
-        control: HuiNumberField(
-          value: (layer.target.line ?? 1).toDouble(),
-          integer: true,
-          min: 1,
-          onChanged: (double value) =>
-              _edit('particle line target', (GlossParticleLayer edited) {
-                edited.target.line = value.round();
-              }),
-        ),
+        value: (layer.target.line ?? 1).toDouble(),
+        integer: true,
+        min: 1,
+        onChanged: (double value) =>
+            _edit('particle line target', (GlossParticleLayer edited) {
+              edited.target.line = value.round();
+            }),
       ),
-  ]);
+  ];
 
-  Widget _geometryFields() {
+  List<Widget> _geometryFields(ComponentSize size) {
     final GlossParticleGeometry geometry = layer.geometry;
-    return dom.div(<Widget>[
-      HuiEyebrow(huiText('Settings')),
+    return <Widget>[
       _choiceField(
-        label: huiText('Type'),
+        size: size,
+        label: huiText('Shape'),
+        id: '$idBase-shape',
         value: geometry.type,
         values: glossParticleGeometryTypes,
         labels: const <String, String>{
@@ -301,7 +327,8 @@ class _ParticleLayerCard extends StatelessWidget {
       ),
       if (geometry.type == 'line') ...<Widget>[
         _vectorField(
-          label: huiText('Position'),
+          label: huiText('Start'),
+          id: '$idBase-from',
           value: geometry.from ?? Vec3.zero(),
           onChanged: (Vec3 value) =>
               _edit('particle line start', (GlossParticleLayer edited) {
@@ -309,7 +336,8 @@ class _ParticleLayerCard extends StatelessWidget {
               }),
         ),
         _vectorField(
-          label: huiText('Position'),
+          label: huiText('End'),
+          id: '$idBase-to',
           value: geometry.to ?? Vec3(1, 0, 0),
           onChanged: (Vec3 value) =>
               _edit('particle line end', (GlossParticleLayer edited) {
@@ -317,7 +345,7 @@ class _ParticleLayerCard extends StatelessWidget {
               }),
         ),
       ],
-      if (geometry.type == 'polyline') _polylineFields(geometry),
+      if (geometry.type == 'polyline') _polylineField(geometry),
       if (<String>{
         'outline',
         'filledPlane',
@@ -325,6 +353,7 @@ class _ParticleLayerCard extends StatelessWidget {
       }.contains(geometry.type)) ...<Widget>[
         _optionalDimension(
           label: huiText('Width'),
+          id: '$idBase-width',
           value: geometry.width,
           suggested: 1,
           onChanged: (double? value) =>
@@ -334,6 +363,7 @@ class _ParticleLayerCard extends StatelessWidget {
         ),
         _optionalDimension(
           label: huiText('Height'),
+          id: '$idBase-height',
           value: geometry.height,
           suggested: 1,
           onChanged: (double? value) =>
@@ -343,7 +373,8 @@ class _ParticleLayerCard extends StatelessWidget {
         ),
         if (geometry.type == 'cuboid')
           _optionalDimension(
-            label: huiText('Size'),
+            label: huiText('Depth'),
+            id: '$idBase-depth',
             value: geometry.depth,
             suggested: 1,
             onChanged: (double? value) =>
@@ -352,35 +383,7 @@ class _ParticleLayerCard extends StatelessWidget {
                 }),
           ),
       ],
-      HuiField(
-        label: 'padding',
-        control: HuiNumberField(
-          value: geometry.padding,
-          min: 0,
-          max: 16,
-          step: 0.01,
-          decimals: 3,
-          onChanged: (double value) =>
-              _edit('particle geometry padding', (GlossParticleLayer edited) {
-                edited.geometry.padding = value;
-              }),
-        ),
-      ),
-      HuiField(
-        label: 'spacing',
-        control: HuiNumberField(
-          value: geometry.spacing,
-          min: 0.02,
-          max: 16,
-          step: 0.01,
-          decimals: 3,
-          onChanged: (double value) =>
-              _edit('particle geometry spacing', (GlossParticleLayer edited) {
-                edited.geometry.spacing = value;
-              }),
-        ),
-      ),
-    ]);
+    ];
   }
 
   void _setGeometryType(String value) =>
@@ -396,157 +399,131 @@ class _ParticleLayerCard extends StatelessWidget {
         }
       });
 
-  Widget _polylineFields(GlossParticleGeometry geometry) => HuiField(
-    label: huiText('Position'),
+  /// The points in order; a polyline keeps at least two, so Remove goes
+  /// away at two.
+  Widget _polylineField(GlossParticleGeometry geometry) => Field(
+    label: huiText('Points'),
     required: true,
-    control: dom.div(
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'flex',
-          'flex-direction': 'column',
-          'gap': '8px',
-        },
+    trailing: AppIconButton(
+      icon: ArcaneIcon.plus(),
+      label: huiText('Add point'),
+      onPressed: () =>
+          _edit('add particle polyline point', (GlossParticleLayer edited) {
+            final Vec3 next = edited.geometry.points.isEmpty
+                ? Vec3.zero()
+                : edited.geometry.points.last.copy();
+            edited.geometry.points.add(next);
+          }),
+    ),
+    child: ReorderList(
+      label: huiText('Points'),
+      itemCount: geometry.points.length,
+      onReorder: (int from, int to) =>
+          _edit('move particle polyline point', (GlossParticleLayer edited) {
+            final List<Vec3> points = edited.geometry.points;
+            if (from < 0 || from >= points.length) return;
+            final Vec3 moved = points.removeAt(from);
+            points.insert(to.clamp(0, points.length), moved);
+          }),
+      onRemove: geometry.points.length <= 2
+          ? null
+          : (int pointIndex) => _edit('remove particle polyline point', (
+              GlossParticleLayer edited,
+            ) {
+              if (pointIndex < edited.geometry.points.length) {
+                edited.geometry.points.removeAt(pointIndex);
+              }
+            }),
+      itemBuilder: (int pointIndex) => Vec3Field(
+        id: '$idBase-point-$pointIndex',
+        label: '${huiText('Points')} ${pointIndex + 1}',
+        value: geometry.points[pointIndex],
+        step: 0.1,
+        decimals: 3,
+        onChanged: (Vec3 value) =>
+            _edit('particle polyline point', (GlossParticleLayer edited) {
+              if (pointIndex < edited.geometry.points.length) {
+                edited.geometry.points[pointIndex] = value;
+              }
+            }),
       ),
-      <Widget>[
-        for (
-          int pointIndex = 0;
-          pointIndex < geometry.points.length;
-          pointIndex++
-        )
-          dom.div(
-            styles: const dom.Styles(
-              raw: <String, String>{
-                'display': 'grid',
-                'grid-template-columns': 'minmax(0, 1fr) auto',
-                'align-items': 'center',
-                'gap': '6px',
-              },
-            ),
-            <Widget>[
-              HuiVec3Field(
-                value: geometry.points[pointIndex],
-                step: 0.1,
-                decimals: 3,
-                onChanged: (Vec3 value) => _edit('particle polyline point', (
-                  GlossParticleLayer edited,
-                ) {
-                  if (pointIndex < edited.geometry.points.length) {
-                    edited.geometry.points[pointIndex] = value;
-                  }
-                }),
-              ),
-              HuiIconButton(
-                icon: ArcaneIcon.trash2(size: IconSize.sm),
-                label: huiText('Delete'),
-                disabled: geometry.points.length <= 2,
-                onPressed: geometry.points.length <= 2
-                    ? null
-                    : () => _edit('remove particle polyline point', (
-                        GlossParticleLayer edited,
-                      ) {
-                        if (pointIndex < edited.geometry.points.length) {
-                          edited.geometry.points.removeAt(pointIndex);
-                        }
-                      }),
-              ),
-            ],
-          ),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          icon: ArcaneIcon.plus(size: IconSize.sm),
-          onPressed: () =>
-              _edit('add particle polyline point', (GlossParticleLayer edited) {
-                final Vec3 next = edited.geometry.points.isEmpty
-                    ? Vec3.zero()
-                    : edited.geometry.points.last.copy();
-                edited.geometry.points.add(next);
-              }),
-          label: huiText('Add'),
-        ),
-      ],
     ),
   );
 
-  Widget _placementFields() => dom.div(<Widget>[
-    HuiEyebrow(huiText('Placement')),
-    _choiceField(
+  Widget _placementField() => Field(
+    label: huiText('Placement'),
+    child: ToggleChoice<String>(
+      id: '$idBase-placement',
       label: huiText('Placement'),
       value: layer.placement.layer,
-      values: glossParticlePlacementLayers,
-      labels: const <String, String>{
-        'behind': 'Behind',
-        'front': 'Front',
-        'center': 'Centered',
-      },
+      options: <ChoiceOption<String>>[
+        for (final String value in <String>[
+          ...glossParticlePlacementLayers,
+          if (!glossParticlePlacementLayers.contains(layer.placement.layer))
+            layer.placement.layer,
+        ])
+          ChoiceOption<String>(
+            value,
+            const <String, String>{
+                  'behind': 'Behind',
+                  'front': 'Front',
+                  'center': 'Centered',
+                }[value] ??
+                value,
+          ),
+      ],
       onChanged: (String value) =>
           _edit('particle placement plane', (GlossParticleLayer edited) {
             edited.placement.layer = value;
           }),
     ),
-    HuiField(
-      label: 'depth',
-      control: HuiNumberField(
-        value: layer.placement.depth,
-        min: 0,
-        max: 16,
-        step: 0.01,
-        decimals: 3,
-        onChanged: (double value) =>
-            _edit('particle placement depth', (GlossParticleLayer edited) {
-              edited.placement.depth = value;
-            }),
-      ),
-    ),
-    _vectorField(
-      label: huiText('Offset'),
-      value: layer.placement.offset,
-      onChanged: (Vec3 value) =>
-          _edit('particle placement offset', (GlossParticleLayer edited) {
-            edited.placement.offset = value;
-          }),
-    ),
-  ]);
+  );
 
-  Widget _particleFields() {
+  List<Widget> _particleFields(ComponentSize size) {
     final bool dust =
         layer.particle.key.trim().toLowerCase() == 'minecraft:dust';
-    return dom.div(<Widget>[
-      HuiEyebrow(huiText('Particle layers')),
-      HuiField(
-        label: huiText('Type'),
+    return <Widget>[
+      Field(
+        label: huiText('Particle'),
+        forId: '$idBase-particle',
         required: true,
-        control: TextInput(
-          value: layer.particle.key,
-          size: ComponentSize.sm,
-          fullWidth: true,
-          placeholder: 'minecraft:dust',
-          onChanged: _setParticleKey,
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
-        ),
-      ),
-      HuiSegmented(
-        value: dust
-            ? 'minecraft:dust'
-            : layer.particle.key == 'minecraft:soul'
-            ? 'minecraft:soul'
-            : 'custom',
-        segments: <HuiSegment>[
-          const HuiSegment(value: 'minecraft:dust', label: 'dust'),
-          const HuiSegment(value: 'minecraft:soul', label: 'soul'),
-          HuiSegment(value: 'custom', label: huiText('Custom')),
-        ],
-        onChanged: (String value) {
-          if (value == 'custom') return;
-          _setParticleKey(value);
-        },
+        child: Component.fragment(<Widget>[
+          ToggleChoice<String>(
+            label: huiText('Particle'),
+            value: dust
+                ? 'minecraft:dust'
+                : layer.particle.key == 'minecraft:soul'
+                ? 'minecraft:soul'
+                : 'custom',
+            options: <ChoiceOption<String>>[
+              const ChoiceOption<String>('minecraft:dust', 'dust'),
+              const ChoiceOption<String>('minecraft:soul', 'soul'),
+              ChoiceOption<String>('custom', huiText('Custom')),
+            ],
+            onChanged: (String value) {
+              if (value == 'custom') return;
+              _setParticleKey(value);
+            },
+          ),
+          TextInput(
+            id: '$idBase-particle',
+            value: layer.particle.key,
+            size: size,
+            fullWidth: true,
+            placeholder: 'minecraft:dust',
+            onChanged: _setParticleKey,
+            styles: technicalInputStyles,
+            attributes: technicalInputAttributes,
+          ),
+        ]),
       ),
       if (dust) ...<Widget>[
-        HuiField(
+        Field(
           label: huiText('Color'),
+          forId: '$idBase-color',
           required: true,
-          control: HuiColorField(
+          child: ColorField(
+            id: '$idBase-color',
             value: layer.particle.color ?? '#ffffff',
             format: HuiColorFormat.rgb,
             label: huiText('Color'),
@@ -556,22 +533,33 @@ class _ParticleLayerCard extends StatelessWidget {
                 }),
           ),
         ),
-        HuiField(
+        _numberField(
           label: huiText('Size'),
-          control: HuiNumberField(
-            value: layer.particle.size ?? 1,
-            min: 0.01,
-            max: 4,
-            step: 0.05,
-            decimals: 2,
-            onChanged: (double value) =>
-                _edit('particle dust size', (GlossParticleLayer edited) {
-                  edited.particle.size = value;
-                }),
-          ),
+          id: '$idBase-size',
+          value: layer.particle.size ?? 1,
+          min: 0.01,
+          max: 4,
+          step: 0.05,
+          decimals: 2,
+          onChanged: (double value) =>
+              _edit('particle dust size', (GlossParticleLayer edited) {
+                edited.particle.size = value;
+              }),
         ),
       ],
-    ]);
+      _numberField(
+        label: huiText('Count'),
+        id: '$idBase-count',
+        value: layer.particle.count.toDouble(),
+        integer: true,
+        min: 1,
+        max: 64,
+        onChanged: (double value) =>
+            _edit('particle count', (GlossParticleLayer edited) {
+              edited.particle.count = value.round();
+            }),
+      ),
+    ];
   }
 
   void _setParticleKey(String value) =>
@@ -586,10 +574,11 @@ class _ParticleLayerCard extends StatelessWidget {
         }
       });
 
-  Widget _emissionFields() => dom.div(<Widget>[
-    HuiEyebrow(huiText('Settings')),
+  List<Widget> _emissionFields(ComponentSize size) => <Widget>[
     _choiceField(
-      label: huiText('Type'),
+      size: size,
+      label: huiText('Pattern'),
+      id: '$idBase-pattern',
       value: layer.emission.pattern,
       values: glossParticleEmissionPatterns,
       labels: const <String, String>{
@@ -605,74 +594,208 @@ class _ParticleLayerCard extends StatelessWidget {
             edited.emission.pattern = value;
           }),
     ),
-    HuiField(
-      label: huiText('Speed'),
-      control: HuiNumberField(
-        value: layer.emission.intervalTicks.toDouble(),
-        integer: true,
-        min: 1,
-        max: 200,
-        suffix: huiText('ticks'),
-        onChanged: (double value) =>
-            _edit('particle emission interval', (GlossParticleLayer edited) {
-              edited.emission.intervalTicks = value.round();
-            }),
-      ),
+    _numberField(
+      label: huiText('Interval'),
+      id: '$idBase-interval',
+      value: layer.emission.intervalTicks.toDouble(),
+      integer: true,
+      min: 1,
+      max: 200,
+      suffix: huiText('ticks'),
+      onChanged: (double value) =>
+          _edit('particle emission interval', (GlossParticleLayer edited) {
+            edited.emission.intervalTicks = value.round();
+          }),
     ),
-    HuiField(
-      label: huiText('Speed'),
-      control: HuiNumberField(
-        value: layer.emission.periodTicks.toDouble(),
-        integer: true,
-        min: 1,
-        max: 72000,
-        suffix: huiText('ticks'),
-        onChanged: (double value) =>
-            _edit('particle emission period', (GlossParticleLayer edited) {
-              edited.emission.periodTicks = value.round();
-            }),
-      ),
-    ),
-    HuiField(
-      label: huiText('Value'),
-      control: HuiNumberField(
-        value: layer.emission.seed.toDouble(),
-        integer: true,
-        onChanged: (double value) =>
-            _edit('particle emission seed', (GlossParticleLayer edited) {
-              edited.emission.seed = value.round();
-            }),
-      ),
-    ),
-  ]);
+  ];
 
+  /// Rare but not expert: under the layer's More.
+  List<Widget> _rareFields() => <Widget>[
+    _numberField(
+      label: huiText('View distance'),
+      id: '$idBase-view',
+      value: layer.viewDistance,
+      min: 4,
+      max: 128,
+      step: 1,
+      suffix: huiText('blocks'),
+      onChanged: (double value) =>
+          _edit('particle view distance', (GlossParticleLayer edited) {
+            edited.viewDistance = value;
+          }),
+    ),
+    _numberField(
+      label: huiText('Padding'),
+      id: '$idBase-padding',
+      value: layer.geometry.padding,
+      min: 0,
+      max: 16,
+      step: 0.01,
+      onChanged: (double value) =>
+          _edit('particle geometry padding', (GlossParticleLayer edited) {
+            edited.geometry.padding = value;
+          }),
+    ),
+    _numberField(
+      label: huiText('Spacing'),
+      id: '$idBase-spacing',
+      value: layer.geometry.spacing,
+      min: 0.02,
+      max: 16,
+      step: 0.01,
+      onChanged: (double value) =>
+          _edit('particle geometry spacing', (GlossParticleLayer edited) {
+            edited.geometry.spacing = value;
+          }),
+    ),
+    _numberField(
+      label: huiText('Distance'),
+      id: '$idBase-plane-depth',
+      value: layer.placement.depth,
+      min: 0,
+      max: 16,
+      step: 0.01,
+      onChanged: (double value) =>
+          _edit('particle placement depth', (GlossParticleLayer edited) {
+            edited.placement.depth = value;
+          }),
+    ),
+    _vectorField(
+      label: huiText('Offset'),
+      id: '$idBase-offset',
+      value: layer.placement.offset,
+      onChanged: (Vec3 value) =>
+          _edit('particle placement offset', (GlossParticleLayer edited) {
+            edited.placement.offset = value;
+          }),
+    ),
+    _numberField(
+      label: huiText('Speed'),
+      id: '$idBase-speed',
+      value: layer.particle.speed,
+      min: 0,
+      max: 10,
+      step: 0.05,
+      onChanged: (double value) =>
+          _edit('particle speed', (GlossParticleLayer edited) {
+            edited.particle.speed = value;
+          }),
+    ),
+    _vectorField(
+      label: huiText('Spread'),
+      id: '$idBase-spread',
+      value: layer.particle.spread,
+      onChanged: (Vec3 value) =>
+          _edit('particle spread', (GlossParticleLayer edited) {
+            edited.particle.spread = value;
+          }),
+    ),
+    _numberField(
+      label: huiText('Cycle'),
+      id: '$idBase-period',
+      value: layer.emission.periodTicks.toDouble(),
+      integer: true,
+      min: 1,
+      max: 72000,
+      suffix: huiText('ticks'),
+      onChanged: (double value) =>
+          _edit('particle emission period', (GlossParticleLayer edited) {
+            edited.emission.periodTicks = value.round();
+          }),
+    ),
+    _numberField(
+      label: huiText('Seed'),
+      id: '$idBase-seed',
+      value: layer.emission.seed.toDouble(),
+      integer: true,
+      onChanged: (double value) =>
+          _edit('particle emission seed', (GlossParticleLayer edited) {
+            edited.emission.seed = value.round();
+          }),
+    ),
+    _numberField(
+      label: huiText('Priority'),
+      id: '$idBase-priority',
+      value: layer.priority.toDouble(),
+      integer: true,
+      min: -1000,
+      max: 1000,
+      onChanged: (double value) =>
+          _edit('particle layer priority', (GlossParticleLayer edited) {
+            edited.priority = value.round();
+          }),
+    ),
+  ];
+
+  /// Five or more fixed values: a select. A value outside the list stays
+  /// selectable, so an unknown one is shown rather than replaced.
   Widget _choiceField({
+    required ComponentSize size,
     required String label,
+    required String id,
     required String value,
     required List<String> values,
     required Map<String, String> labels,
     required void Function(String value) onChanged,
-  }) => HuiField(
+  }) => Field(
     label: label,
-    control: ArcaneSelect(
+    forId: id,
+    child: ArcaneSelect(
+      id: id,
       value: value,
-      size: ComponentSize.sm,
+      size: size,
       fullWidth: true,
       options: <ArcaneSelectOption>[
-        for (final String option in values)
+        for (final String option in <String>[
+          ...values,
+          if (!values.contains(value)) value,
+        ])
           ArcaneSelectOption(label: labels[option] ?? option, value: option),
       ],
       onChanged: onChanged,
     ),
   );
 
+  Widget _numberField({
+    required String label,
+    required String id,
+    required double value,
+    required void Function(double value) onChanged,
+    double? min,
+    double? max,
+    double step = 0.05,
+    int decimals = 3,
+    bool integer = false,
+    bool required = false,
+    String? suffix,
+  }) => Field(
+    label: label,
+    forId: id,
+    required: required,
+    child: NumberField(
+      id: id,
+      value: value,
+      min: min,
+      max: max,
+      step: integer ? 1 : step,
+      decimals: decimals,
+      integer: integer,
+      suffix: suffix,
+      onChanged: onChanged,
+    ),
+  );
+
   Widget _vectorField({
     required String label,
+    required String id,
     required Vec3 value,
     required void Function(Vec3 value) onChanged,
-  }) => HuiField(
+  }) => Field(
     label: label,
-    control: HuiVec3Field(
+    forId: id,
+    child: Vec3Field(
+      id: id,
+      label: label,
       value: value,
       step: 0.1,
       decimals: 3,
@@ -680,29 +803,41 @@ class _ParticleLayerCard extends StatelessWidget {
     ),
   );
 
+  /// Width, height or depth that fits the target when omitted: Automatic
+  /// removes the key, Custom writes [suggested] and shows the number.
   Widget _optionalDimension({
     required String label,
+    required String id,
     required double? value,
     required double suggested,
     required void Function(double? value) onChanged,
-  }) => HuiField(
+  }) => Field(
     label: label,
-    trailing: ArcaneCheckbox(
-      checked: value == null,
-      size: ComponentSize.sm,
-      label: huiText('Reset'),
-      onChanged: (bool checked) => onChanged(checked ? null : suggested),
-    ),
-    control: value == null
-        ? const dom.span(<Widget>[])
-        : HuiNumberField(
-            value: value,
-            min: 0,
-            max: 128,
-            step: 0.05,
-            decimals: 3,
-            suffix: huiText('blocks'),
-            onChanged: onChanged,
-          ),
+    forId: value == null ? null : id,
+    child: Component.fragment(<Widget>[
+      ToggleChoice<bool>(
+        label: label,
+        value: value == null,
+        options: <ChoiceOption<bool>>[
+          ChoiceOption<bool>(true, huiText('Automatic')),
+          ChoiceOption<bool>(false, huiText('Custom')),
+        ],
+        onChanged: (bool automatic) {
+          if (automatic == (value == null)) return;
+          onChanged(automatic ? null : suggested);
+        },
+      ),
+      if (value != null)
+        NumberField(
+          id: id,
+          value: value,
+          min: 0,
+          max: 128,
+          step: 0.05,
+          decimals: 3,
+          suffix: huiText('blocks'),
+          onChanged: onChanged,
+        ),
+    ]),
   );
 }

@@ -169,8 +169,11 @@ public class CommandGlossHologram {
             return;
         }
 
-        Location target = hologram.location().clone().add(x, y, z);
-        hologram.teleport(target);
+        Location location = loaded(sender, hologram, id);
+        if (location == null) {
+            return;
+        }
+        hologram.teleport(location.add(x, y, z));
         GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_OFFSET,
                 MessageArgument.untrusted("id", id),
                 MessageArgument.trusted("x", x),
@@ -189,7 +192,11 @@ public class CommandGlossHologram {
             return;
         }
 
-        plugin.scheduler().teleport(player, hologram.location());
+        Location location = loaded(player, hologram, id);
+        if (location == null) {
+            return;
+        }
+        plugin.scheduler().teleport(player, location);
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_TELEPORTED, MessageArgument.untrusted("id", id));
     }
 
@@ -219,14 +226,15 @@ public class CommandGlossHologram {
             return;
         }
 
-        Location location = hologram.location();
-        String world = location.getWorld() == null ? "unknown" : location.getWorld().getName();
-        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_HEADER,
-                MessageArgument.untrusted("id", id),
-                MessageArgument.untrusted("world", world),
-                MessageArgument.trusted("x", location.getBlockX()),
-                MessageArgument.trusted("y", location.getBlockY()),
-                MessageArgument.trusted("z", location.getBlockZ()));
+        Location location = loaded(sender, hologram, id);
+        if (location != null) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_HEADER,
+                    MessageArgument.untrusted("id", id),
+                    MessageArgument.untrusted("world", location.getWorld().getName()),
+                    MessageArgument.trusted("x", location.getBlockX()),
+                    MessageArgument.trusted("y", location.getBlockY()),
+                    MessageArgument.trusted("z", location.getBlockZ()));
+        }
         GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_ORIENTATION,
                 MessageArgument.trusted("scale", hologram.style().scaleX() + "/" + hologram.style().scaleY() + "/" + hologram.style().scaleZ()),
                 MessageArgument.trusted("billboard", hologram.style().billboard().name()),
@@ -367,6 +375,18 @@ public class CommandGlossHologram {
             GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_MISSING, MessageArgument.untrusted("id", id));
         }
         return hologram;
+    }
+
+    /** The hologram's location, or null after telling the sender that the world its document names is not loaded. */
+    private Location loaded(CommandSender sender, AnchoredHologram hologram, String id) {
+        Location location = hologram.location();
+        if (location != null && location.getWorld() != null) {
+            return location;
+        }
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_UNLOADED,
+                MessageArgument.untrusted("id", id),
+                MessageArgument.untrusted("world", plugin.holograms().worldName(id)));
+        return null;
     }
 
     private boolean outOfRange(CommandSender sender, AnchoredHologram hologram, String id, int line) {

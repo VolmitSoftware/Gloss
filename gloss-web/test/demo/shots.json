@@ -1,7 +1,7 @@
 [
   {
     "id": "scoreboard",
-    "create": "New scoreboard",
+    "create": "Scoreboard",
     "fixture": "scoreboard",
     "coverage": [
       "sidebar title",
@@ -30,14 +30,22 @@
   },
   {
     "id": "hologram",
-    "create": "New hologram",
+    "create": "Hologram",
     "fixture": "hologram",
     "operations": [
+      {
+        "kind": "level",
+        "value": "Advanced"
+      },
       {
         "kind": "input",
         "selector": "input[placeholder='&fText, %papi%, |animation.id|, {{ expression }}']",
         "value": "&6&lMarket Hall",
         "index": 0
+      },
+      {
+        "kind": "show",
+        "section": "Display style"
       },
       {
         "kind": "extras",
@@ -78,7 +86,8 @@
   },
   {
     "id": "animation",
-    "create": "New animation",
+    "create": "Animation",
+    "level": "advanced",
     "fixture": "animation",
     "operations": [
       {
@@ -88,7 +97,7 @@
       },
       {
         "kind": "click",
-        "button": "Ping-pong"
+        "selector": ".hui-inspector-body [data-choice='Ping-pong']"
       },
       {
         "kind": "input",
@@ -110,7 +119,7 @@
   },
   {
     "id": "surface",
-    "create": "New surface",
+    "create": "Surface",
     "fixture": "surface",
     "operations": [
       {
@@ -136,7 +145,7 @@
   },
   {
     "id": "motd",
-    "create": "New MOTD",
+    "create": "MOTD",
     "fixture": "motd",
     "operations": [
       {
@@ -146,8 +155,12 @@
       },
       {
         "kind": "input",
-        "aria": "Entry weight",
+        "field": "Weight",
         "value": "3"
+      },
+      {
+        "kind": "click",
+        "selector": ".hui-inspector-body .ui-section-title:text-is('More')"
       }
     ],
     "coverage": [
@@ -164,7 +177,7 @@
   },
   {
     "id": "connections",
-    "create": "New connection messages",
+    "create": "Connection messages",
     "fixture": "connections",
     "operations": [
       {
@@ -186,7 +199,7 @@
   },
   {
     "id": "channel",
-    "create": "New chat channel",
+    "create": "Chat channel",
     "fixture": "channel",
     "operations": [
       {
@@ -196,7 +209,7 @@
       },
       {
         "kind": "input",
-        "aria": "Preview chat message",
+        "selector": "#hui-channel-sample-message",
         "value": "Hello @Steve, trading [item] today!"
       },
       {
@@ -218,7 +231,7 @@
   },
   {
     "id": "emoji",
-    "create": "New emoji",
+    "create": "Emoji",
     "fixture": "emoji",
     "operations": [
       {
@@ -244,7 +257,7 @@
   },
   {
     "id": "bubble-style",
-    "create": "New bubble style",
+    "create": "Bubble style",
     "fixture": "bubble-style",
     "operations": [
       {
@@ -261,6 +274,10 @@
         "kind": "input",
         "field": "Lifetime",
         "value": "6000"
+      },
+      {
+        "kind": "show",
+        "section": "Display style"
       }
     ],
     "coverage": [
@@ -291,6 +308,14 @@
         "field": "Text format",
         "value": "&6-{amount}",
         "index": 0
+      },
+      {
+        "kind": "show",
+        "section": "Healing"
+      },
+      {
+        "kind": "show",
+        "section": "Audience"
       }
     ],
     "coverage": [
@@ -311,9 +336,17 @@
     "fixture": "entity-overlays",
     "operations": [
       {
+        "kind": "click",
+        "button": "Sample controls"
+      },
+      {
         "kind": "input",
         "aria": "Sample name",
         "value": "Market Sentinel"
+      },
+      {
+        "kind": "click",
+        "button": "Close sheet"
       },
       {
         "kind": "input",
@@ -322,7 +355,7 @@
       },
       {
         "kind": "input",
-        "aria": "Health segments",
+        "field": "Health segments",
         "value": "12"
       }
     ],
@@ -340,7 +373,7 @@
   },
   {
     "id": "tablist",
-    "create": "New tablist",
+    "create": "Tab list",
     "fixture": "tablist",
     "operations": [
       {
@@ -352,6 +385,10 @@
         "kind": "input",
         "field": "Footer",
         "value": "&7Trade and explore"
+      },
+      {
+        "kind": "show",
+        "section": "Layout"
       }
     ],
     "coverage": [
@@ -367,7 +404,7 @@
   },
   {
     "id": "inventory",
-    "create": "New inventory",
+    "create": "Inventory",
     "fixture": "inventory",
     "operations": [
       {
@@ -395,7 +432,7 @@
   },
   {
     "id": "nameplate",
-    "create": "New nameplate",
+    "create": "Nameplate",
     "fixture": "nameplate",
     "operations": [
       {
@@ -406,7 +443,7 @@
       },
       {
         "kind": "input",
-        "aria": "Preview player",
+        "aria": "Sample name",
         "value": "Trader"
       }
     ],
@@ -423,22 +460,23 @@
   },
   {
     "id": "nametag",
-    "create": "New nametag",
+    "create": "Nametag",
     "fixture": "nametag",
     "operations": [
       {
         "kind": "input",
-        "aria": "Preview player",
+        "aria": "Sample name",
         "value": "Trader"
       },
       {
         "kind": "input",
-        "aria": "Preview permissions",
+        "aria": "Permissions",
         "value": "gloss.nametag.default,gloss.nametag.staff"
       },
       {
         "kind": "input",
-        "aria": "Prefix",
+        "field": "Prefix",
+        "index": 1,
         "value": "&c[Market Staff] "
       }
     ],
@@ -455,7 +493,7 @@
   },
   {
     "id": "marker",
-    "create": "New marker",
+    "create": "Marker",
     "fixture": "marker",
     "operations": [
       {
@@ -483,14 +521,12 @@
   },
   {
     "id": "waypoint",
-    "create": "Waypoints",
+    "create": "Waypoint",
     "fixture": "waypoint",
     "operations": [
       {
-        "kind": "select",
-        "selector": ".hui-inspector-body select",
-        "index": 0,
-        "value": "player"
+        "kind": "click",
+        "selector": "[data-choice='Player']"
       },
       {
         "kind": "input",
@@ -498,10 +534,17 @@
         "value": "Trader"
       },
       {
-        "kind": "select",
-        "selector": ".hui-inspector-body select",
-        "index": 1,
+        "kind": "input",
+        "field": "Style",
         "value": "bowtie"
+      },
+      {
+        "kind": "level",
+        "value": "Advanced"
+      },
+      {
+        "kind": "show",
+        "section": "Audience"
       }
     ],
     "coverage": [
@@ -519,6 +562,7 @@
   {
     "id": "names",
     "create": "Names",
+    "level": "advanced",
     "fixture": "names",
     "operations": [
       {
@@ -542,6 +586,7 @@
   {
     "id": "strings",
     "create": "Strings",
+    "level": "advanced",
     "fixture": "strings",
     "operations": [
       {
@@ -571,7 +616,7 @@
   },
   {
     "id": "menu-slider",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-forms",
     "coverage": [
       "slider authoring",
@@ -587,7 +632,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
@@ -622,7 +667,7 @@
   },
   {
     "id": "menu-list",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-forms",
     "coverage": [
       "list source expression",
@@ -639,7 +684,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
@@ -677,7 +722,7 @@
   },
   {
     "id": "menu-field",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-forms",
     "coverage": [
       "field label",
@@ -694,7 +739,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
@@ -714,7 +759,7 @@
       },
       {
         "kind": "input",
-        "selector": "input[placeholder=\"Value\"]:visible",
+        "selector": "[role=\"dialog\"] input:visible",
         "value": "Trader"
       },
       {
@@ -734,7 +779,7 @@
   },
   {
     "id": "menu-tabs",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-forms",
     "coverage": [
       "tab labels",
@@ -751,7 +796,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
@@ -787,7 +832,7 @@
   },
   {
     "id": "menu-shop",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-shop",
     "coverage": [
       "menu components",
@@ -804,7 +849,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
@@ -833,7 +878,7 @@
   },
   {
     "id": "menu-toggle",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-settings",
     "coverage": [
       "toggle conditions",
@@ -849,7 +894,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
@@ -874,7 +919,7 @@
   },
   {
     "id": "hologram-mixed",
-    "create": "New hologram",
+    "create": "Hologram",
     "fixture": "hologram-mixed",
     "coverage": [
       "mixed text and object lines",
@@ -911,7 +956,7 @@
   },
   {
     "id": "container-preview",
-    "create": "New preview document",
+    "create": "Container preview",
     "fixture": "container-preview",
     "coverage": [
       "container preview card",
@@ -923,21 +968,23 @@
     "operations": [
       {
         "kind": "select",
-        "selector": "select",
-        "index": 0,
+        "selector": "#hui-preview-sim-target",
         "value": "furnace"
       },
       {
-        "kind": "extras",
-        "section": "Settings",
-        "key": "scale",
-        "value": 0.85
+        "kind": "input",
+        "field": "Scale",
+        "value": "0.85"
+      },
+      {
+        "kind": "level",
+        "value": "Advanced"
       },
       {
         "kind": "input",
         "aria": "Visibility expression",
-        "value": "true",
-        "index": 0
+        "index": 0,
+        "value": "true"
       }
     ],
     "assertions": {
@@ -974,7 +1021,8 @@
   },
   {
     "id": "world-panel",
-    "create": "New menu",
+    "create": "Menu",
+    "level": "advanced",
     "coverage": [
       "workspace flow map",
       "world panel creation",
@@ -986,14 +1034,12 @@
     "operations": [
       {
         "kind": "input",
-        "selector": ".hui-field input",
-        "index": 0,
+        "field": "Panel id",
         "value": "market-panel"
       },
       {
         "kind": "input",
-        "selector": ".hui-field input",
-        "index": 2,
+        "field": "World UUID",
         "value": "00000000-0000-0000-0000-000000000001"
       },
       {
@@ -1008,20 +1054,21 @@
           "id": "market-panel",
           "transform.worldUuid": "00000000-0000-0000-0000-000000000001",
           "rootMenuId": "my-menu"
-        }
+        },
+        "menu": "More actions"
       }
     ],
     "fixture": "menu-flow",
     "setup": [
       {
         "kind": "newDocument",
-        "create": "New menu flow map"
+        "create": "Flow map"
       }
     ]
   },
   {
     "id": "project-workflow",
-    "create": "New menu",
+    "create": "Menu",
     "fixture": "menu-shop",
     "coverage": [
       "Visual Code Split Preview modes",
@@ -1036,10 +1083,14 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ],
     "operations": [
+      {
+        "kind": "level",
+        "value": "Advanced"
+      },
       {
         "kind": "input",
         "selector": ".hui-inspector-body textarea",
@@ -1092,7 +1143,7 @@
   },
   {
     "id": "seeded-randomizer",
-    "create": "New menu",
+    "create": "Menu",
     "coverage": [
       "authored seed",
       "generated current components",
@@ -1101,28 +1152,14 @@
     ],
     "operations": [
       {
-        "kind": "click",
-        "selector": ".hui-library-row-menu",
-        "index": 0
+        "kind": "level",
+        "value": "Advanced"
       },
       {
-        "kind": "click",
-        "button": "Create random menu",
-        "role": "menuitem"
-      },
-      {
-        "kind": "input",
-        "aria": "Seed",
-        "value": "1234"
-      },
-      {
-        "kind": "click",
-        "button": "Generate with seed",
-        "key": "Shift"
-      },
-      {
-        "kind": "click",
-        "button": "Fit to components (F)"
+        "kind": "newDocument",
+        "start": "Random",
+        "seed": 1234,
+        "create": "Menu"
       },
       {
         "kind": "exportSnapshot",
@@ -1133,28 +1170,10 @@
         "key": "ControlOrMeta+z"
       },
       {
-        "kind": "click",
-        "selector": ".hui-library-row-menu",
-        "index": 0
-      },
-      {
-        "kind": "click",
-        "button": "Create random menu",
-        "role": "menuitem"
-      },
-      {
-        "kind": "input",
-        "aria": "Seed",
-        "value": "1234"
-      },
-      {
-        "kind": "click",
-        "button": "Generate with seed",
-        "key": "Shift"
-      },
-      {
-        "kind": "click",
-        "button": "Fit to components (F)"
+        "kind": "newDocument",
+        "start": "Random",
+        "seed": 1234,
+        "create": "Menu"
       },
       {
         "kind": "exportSnapshot",
@@ -1164,7 +1183,7 @@
   },
   {
     "id": "image-library",
-    "create": "New menu",
+    "create": "Menu",
     "coverage": [
       "canvas image placement",
       "real PNG upload",
@@ -1208,7 +1227,7 @@
       },
       {
         "kind": "click",
-        "button": "Fit to components (F)"
+        "button": "Reset view"
       }
     ]
   }

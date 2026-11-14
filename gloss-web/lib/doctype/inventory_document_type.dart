@@ -23,8 +23,6 @@ final class InventoryDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('inventory');
 
-  @override
-  String get createLabel => huiText('New inventory');
 
   @override
   String get pluralLabel => huiText('Inventories');

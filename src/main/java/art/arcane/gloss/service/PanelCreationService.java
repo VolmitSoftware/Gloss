@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -218,7 +219,10 @@ public final class PanelCreationService {
       return originalFailure;
     }
     try {
-      dependencies.projectTransaction().recover();
+      List<String> quarantined = dependencies.projectTransaction().recover();
+      if (!quarantined.isEmpty()) {
+        throw new IOException("the rollback could not finish and was quarantined: " + String.join(", ", quarantined));
+      }
     } catch (IOException rollbackFailure) {
       originalFailure.addSuppressed(rollbackFailure);
       accepting.set(false);

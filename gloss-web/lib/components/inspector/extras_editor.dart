@@ -1,20 +1,30 @@
-/// Editor for the unknown keys the codec preserves.
+/// Editor for the keys of one JSON object, one row of text per key.
 ///
+/// By default it shows the unknown keys the codec preserves:
 /// `json_codec.dart:112-129` deep-copies every key Gloss does not recognise
 /// and merges it back on export, which is what makes an import/export round
-/// trip lossless. Until now the only way to see those keys was the code view.
+/// trip lossless. With [ExtrasEditor.extensionKeys] off it edits a known
+/// object's keys as raw values instead.
 ///
-/// The disclosure is hand-built rather than `ArcaneDisclosure`: that component
-/// has no `on*` props at all, its open state is JS toggling `hidden`, and this
-/// subtree rebuilds on every keystroke — which would revert it.
+/// The group is a kit [AppSection], closed at first; the section owns its
+/// open state, so the rebuild on every keystroke keeps it as the reader left
+/// it. An unknown-key editor is Advanced only.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 
 import '../../logic/json_value.dart';
-import '../common/common.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/section.dart';
+import '../../ui/technical_input.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+
+int _nextExtrasId = 0;
 
 class ExtrasEditor extends StatefulWidget {
   const ExtrasEditor({
@@ -24,11 +34,13 @@ class ExtrasEditor extends StatefulWidget {
     this.knownKeys = const <String>{},
     this.extensionKeys = true,
     this.stringsOnly = false,
+    this.advancedOnly,
+    this.open = false,
     super.key,
   });
 
-  /// Names the object the keys hang off — `Menu`, `Icon`, `Action`. Also the
-  /// stem of the undo labels this editor commits.
+  /// Names the object the keys hang off (`Menu`, `Icon`, `Action`): the
+  /// section title, and the stem of the undo labels this editor commits.
   final String title;
 
   /// The live extras map. Insertion order is the export order, so edits keep it.
@@ -39,12 +51,20 @@ class ExtrasEditor extends StatefulWidget {
   final bool extensionKeys;
   final bool stringsOnly;
 
+  /// Hides the editor in Simple mode. Null follows [extensionKeys]: unknown
+  /// keys are Advanced only, a known object's values show in both modes.
+  final bool? advancedOnly;
+
+  /// Starts open: for a form whose whole content is this list (a strings
+  /// document's entries, a names category).
+  final bool open;
+
   @override
   State<ExtrasEditor> createState() => _ExtrasEditorState();
 }
 
 class _ExtrasEditorState extends State<ExtrasEditor> {
-  bool _open = false;
+  final String _id = 'extras-${_nextExtrasId++}';
 
   /// Text the user is typing, per key. Held locally so an entry that does not
   /// parse yet stays on screen instead of being reverted by the next rebuild.
@@ -76,14 +96,19 @@ class _ExtrasEditorState extends State<ExtrasEditor> {
   }
 
   String _valueText(String key) =>
-      _drafts[key] ?? (component.stringsOnly ? '${component.extras[key] ?? ''}' : formatJsonValue(component.extras[key]));
+      _drafts[key] ??
+      (component.stringsOnly
+          ? '${component.extras[key] ?? ''}'
+          : formatJsonValue(component.extras[key]));
 
   void _commit(String label, Map<String, dynamic> next) =>
       component.onChanged('${component.title.toLowerCase()} $label', next);
 
   void _editValue(String key, String raw) {
     _drafts[key] = raw;
-    final JsonParseResult parsed = component.stringsOnly ? JsonParseResult.value(raw) : parseJsonValue(raw);
+    final JsonParseResult parsed = component.stringsOnly
+        ? JsonParseResult.value(raw)
+        : parseJsonValue(raw);
     setState(() {
       if (parsed.ok) {
         _errors.remove(key);
@@ -130,169 +155,95 @@ class _ExtrasEditorState extends State<ExtrasEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final int count = _unknownKeys.length;
-    return dom.div(
-      classes: classNames(<String?>[
-        'hui-extras',
-        _open ? 'is-open' : null,
-        count == 0 ? 'is-empty' : null,
-      ]),
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'flex',
-          'flex-direction': 'column',
-          'gap': '8px',
-          'min-width': '0',
-        },
-      ),
-      <Widget>[_summary(count), if (_open) _body()],
+    final List<String> keys = _unknownKeys.toList();
+    final ComponentSize size = controlSize(DensityScope.of(context));
+    final Widget section = AppSection(
+      title: component.title,
+      count: keys.length,
+      open: component.open,
+      // Hook for the browser scripts that edit a key by its label.
+      classes: 'hui-extras',
+      tip: component.extensionKeys
+          ? huiText(
+              'Gloss ignores keys it does not recognise, so nothing here changes '
+              'anything in game. The editor keeps them and writes them back on '
+              'export, which is why an imported file never loses what it arrived '
+              'with.',
+            )
+          : null,
+      children: <Widget>[
+        if (keys.isEmpty)
+          ArcaneFieldDescription(
+            component.extensionKeys
+                ? huiText('No extra keys on this object.')
+                : huiText('Nothing here yet'),
+          )
+        else
+          for (int index = 0; index < keys.length; index++)
+            _row(keys[index], '$_id-$index', size),
+        _addRow(size),
+      ],
     );
+    return component.advancedOnly ?? component.extensionKeys
+        ? AdvancedOnly(child: section)
+        : section;
   }
 
-  Widget _summary(int count) => Button(
-    variant: ButtonVariant.ghost,
-    size: ButtonSize.sm,
-    fullWidth: true,
-    onPressed: () => setState(() => _open = !_open),
-    attributes: <String, String>{
-      'aria-expanded': _open ? 'true' : 'false',
-      'aria-label': component.title,
-      // The legacy accordion binder claims every `button[aria-expanded]`
-      // in a one-shot 100ms scan, then flips `aria-expanded` itself and
-      // writes `display` onto the button's next sibling — this body, whose
-      // visibility Dart owns. `data-arcane-interactive` is the binder's own
-      // opt-out (accordion_scripts.dart:8), and unlike the CSS guard below
-      // it also stops the attribute flip.
-      'data-arcane-interactive': 'true',
-    },
-    icon: _open
-        ? ArcaneIcon.chevronUp(size: IconSize.sm)
-        : ArcaneIcon.chevronDown(size: IconSize.sm),
-    label: '${component.title} ($count)',
-  );
-
-  Widget _body() => dom.div(
-    classes: 'hui-extras-body',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'display': 'flex',
-        'flex-direction': 'column',
-        'gap': '10px',
-        'min-width': '0',
-      },
-    ),
-    <Widget>[
-      if (component.extensionKeys) _note(),
-      if (_unknownKeys.isEmpty)
-        _empty()
-      else
-        for (final String key in _unknownKeys) _row(key),
-      const HuiDivider(),
-      _addRow(),
-    ],
-  );
-
-  /// The one thing a reader has to know before touching this section.
-  Widget _note() => dom.p(
-    classes: 'hui-extras-note',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'margin': '0',
-        'font-size': '0.72rem',
-        'line-height': '1.45',
-        'color': 'var(--muted-foreground)',
-      },
-    ),
-    <Widget>[
-      Text(
-        huiText(
-          'Gloss ignores keys it does not recognise, so nothing here changes '
-          'anything in game. The editor keeps them and writes them back on '
-          'export, which is why an imported file never loses what it arrived '
-          'with.',
+  Widget _row(String key, String id, ComponentSize size) =>
+      dom.div(classes: 'hui-extras-row', <Widget>[
+        Field(
+          label: key,
+          forId: id,
+          error: _errors[key]?.error,
+          tip: component.stringsOnly
+              ? null
+              : huiText(
+                  'Bare text is a string; quote it to keep a literal like true or 7.',
+                ),
+          trailing: AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText("Remove {key}", <String, Object?>{'key': key}),
+            onPressed: () => _remove(key),
+          ),
+          child: TextInput(
+            id: id,
+            value: _valueText(key),
+            size: size,
+            fullWidth: true,
+            placeholder: huiText('value'),
+            onChanged: (String value) => _editValue(key, value),
+            attributes: const <String, String>{
+              'autocomplete': 'off',
+              'spellcheck': 'false',
+            },
+          ),
         ),
-      ),
-    ],
-  );
+      ]);
 
-  Widget _empty() => dom.p(
-    classes: 'hui-extras-empty',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'margin': '0',
-        'font-size': '0.74rem',
-        'color': 'var(--muted-foreground)',
-      },
-    ),
-    <Widget>[Text(component.extensionKeys ? huiText('No extra keys on this object.') : huiText('Nothing here yet'))],
-  );
-
-  Widget _row(String key) => HuiField(
-    label: key,
-    classes: 'hui-extras-row',
-    error: _errors[key]?.error,
-    help: component.stringsOnly ? null : huiText(
-      'Bare text is a string; quote it to keep a literal like true or 7.',
-    ),
-    trailing: Button(
-      variant: ButtonVariant.ghost,
-      size: ButtonSize.iconSm,
-      onPressed: () => _remove(key),
-      attributes: <String, String>{
-        'aria-label': huiText("Remove {key}", <String, Object?>{'key': key}),
-      },
-      icon: ArcaneIcon.trash2(size: IconSize.sm),
-    ),
-    control: TextInput(
-      value: _valueText(key),
-      size: ComponentSize.sm,
-      fullWidth: true,
-      placeholder: huiText('value'),
-      onChanged: (String value) => _editValue(key, value),
-      attributes: const <String, String>{
-        'autocomplete': 'off',
-        'spellcheck': 'false',
-      },
-    ),
-  );
-
-  Widget _addRow() => HuiField(
+  Widget _addRow(ComponentSize size) => Field(
     label: huiText('Add a key'),
+    forId: '$_id-new',
     error: _newKeyError?.call(),
-    control: dom.div(
-      classes: 'hui-extras-add',
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'grid',
-          'grid-template-columns': 'minmax(0, 1fr) auto',
-          'align-items': 'center',
-          'gap': '8px',
-          'min-width': '0',
-        },
-      ),
-      <Widget>[
-        TextInput(
-          value: _newKey,
-          size: ComponentSize.sm,
-          fullWidth: true,
-          placeholder: huiText('myPluginKey'),
-          onChanged: (String value) {
-            _newKey = value;
-            if (_newKeyError != null) {
-              setState(() => _newKeyError = null);
-            }
-          },
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
-        ),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          icon: ArcaneIcon.plus(size: IconSize.sm),
-          onPressed: _add,
-          label: huiText('Add'),
-        ),
-      ],
+    trailing: AppIconButton(
+      icon: ArcaneIcon.plus(),
+      label: huiText('Add'),
+      onPressed: _add,
+    ),
+    child: TextInput(
+      id: '$_id-new',
+      value: _newKey,
+      size: size,
+      fullWidth: true,
+      placeholder: huiText('myPluginKey'),
+      onChanged: (String value) {
+        _newKey = value;
+        if (_newKeyError != null) {
+          setState(() => _newKeyError = null);
+        }
+      },
+      onSubmitted: (String _) => _add(),
+      styles: technicalInputStyles,
+      attributes: technicalInputAttributes,
     ),
   );
 }

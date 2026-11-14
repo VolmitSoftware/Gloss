@@ -18,6 +18,12 @@ import 'dart:math' as math;
 const double huiMinZoom = 0.2;
 const double huiMaxZoom = 20.0;
 
+/// The range a fit (on open, F, 0) stays in: past 200% a small menu turns
+/// into blocks, under 50% its text and tags cannot be read. At either limit
+/// the content is centred and the user zooms or pans from there.
+const double huiFitMinZoom = 0.5;
+const double huiFitMaxZoom = 2.0;
+
 /// CSS pixels per block at `zoom == 1`. A default menu spans roughly two
 /// blocks, so this shows a comfortable working area on a typical canvas.
 const double huiDefaultPixelsPerBlock = 120.0;
@@ -424,8 +430,14 @@ class HuiViewport {
       zoomAtCenter(transform.zoom * factor);
 
   /// Fit [bounds] into the canvas with [paddingPx] of breathing room and centre
-  /// it. Degenerate (zero-size) bounds keep the current zoom.
-  HuiViewport zoomToFit(WorldBounds bounds, {double paddingPx = 32}) {
+  /// it, the zoom kept within [minZoom]..[maxZoom]. Degenerate (zero-size)
+  /// bounds keep the current zoom.
+  HuiViewport zoomToFit(
+    WorldBounds bounds, {
+    double paddingPx = 32,
+    double minZoom = huiMinZoom,
+    double maxZoom = huiMaxZoom,
+  }) {
     final double availableWidth = math.max(
       widthPx - paddingPx * 2,
       _minPixelsPerBlock,
@@ -448,7 +460,11 @@ class HuiViewport {
     } else if (bounds.height > 0) {
       target = availableHeight / (bounds.height * base);
     }
-    final double nextZoom = clampZoom(target);
+    final double nextZoom = clampZoom(
+      target,
+      minZoom: minZoom,
+      maxZoom: maxZoom,
+    );
     final double scale = base * nextZoom;
     return withTransform(
       CanvasTransform(

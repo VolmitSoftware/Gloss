@@ -1,4 +1,4 @@
-/// The canvas viewport: a DPR-aware HTML5 canvas plus its control strip.
+/// The canvas viewport: a DPR-aware HTML5 canvas in a [StageFrame].
 ///
 /// Rendering is driven by a single dirty flag and one on-demand
 /// `requestAnimationFrame`; the Jaspr tree is never rebuilt for a pan, a zoom
@@ -18,7 +18,7 @@ import 'dart:math' as math;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show Component, ListenableBuilder;
+import 'package:jaspr/jaspr.dart' show Component;
 import 'package:web/web.dart' as web;
 
 import '../../config/editing.dart';
@@ -27,6 +27,7 @@ import '../../logic/canvas_scene.dart';
 import '../../logic/hui_geometry.dart' show HuiRect;
 import '../../logic/mc_text.dart';
 import '../../logic/multi_select.dart';
+import '../../logic/stage_fit.dart';
 import '../../logic/viewport_math.dart';
 import '../../model/model.dart';
 import '../../services/catalogs.dart';
@@ -37,7 +38,9 @@ import '../render/canvas_brush.dart';
 import '../render/icon_renderers.dart';
 import '../shell/key_listener.dart' show huiMobilePaneOpen;
 import '../shell/shell_status.dart';
-import '../common/common.dart';
+import '../shell/store_selector.dart';
+import '../../ui/menu.dart';
+import '../../ui/stage_frame.dart';
 import 'backdrop.dart';
 import 'canvas_painter.dart';
 import 'canvas_toolbar.dart';
@@ -150,7 +153,6 @@ class _CanvasViewportState extends State<CanvasViewport> {
   String get _canvasId => '$_uid-surface';
   String get _stageId => '$_uid-stage';
   String get _readoutId => '$_uid-readout';
-  String get _zoomLabelId => '$_uid-zoom';
 
   late final CanvasAssets _assets = CanvasAssets(onReady: _markDirty);
   final McFontMetrics _metrics = McFontMetrics();
@@ -191,9 +193,12 @@ class _CanvasViewportState extends State<CanvasViewport> {
   bool _framePending = false;
   bool _postFramePending = false;
   bool _disposed = false;
-  bool _needsInitialFit = true;
-  int _lastFitRequest = 0;
   bool _fontRequested = false;
+
+  /// Fits each menu until its camera is moved by hand; the hand-set cameras
+  /// live in the store, per document.
+  late final StageFitMemory<CanvasTransform> _camera =
+      StageFitMemory<CanvasTransform>(cameras: component.store.canvasCameras);
 
   Timer? _obfuscationTimer;
   Timer? _animationTimer;
@@ -216,8 +221,9 @@ class _CanvasViewportState extends State<CanvasViewport> {
   double _lastClientY = 0;
   bool _spaceHeld = false;
   String? _hoveredId;
-  HuiActionMenuPoint? _creationMenuPoint;
-  Vec3? _creationOffset;
+
+  /// Where the last right-click landed: the add menu creates there.
+  Vec3 _creationOffset = Vec3.zero();
   String? _creationDocumentId;
 
   // Multi-select gesture state.
@@ -243,10 +249,20 @@ class _CanvasViewportState extends State<CanvasViewport> {
   /// The eased camera move in flight, or null when the viewport is at rest.
   _ViewportEase? _ease;
 
+  /// The last `data-content-box` written on the surface.
+  String? _contentBox;
+
+  /// The game font is drawable (see [_ensureMinecraftFont]).
+  bool _fontReady = false;
+
+  /// When painting started waiting for assets ([_holdsPaint]); null while
+  /// nothing is loading.
+  DateTime? _holdSince;
+  Timer? _holdTimer;
+
   @override
   void initState() {
     super.initState();
-    _lastFitRequest = component.store.canvasFitRequest;
     component.store.addListener(_onStoreChanged);
     component.images.addListener(_onImagesChanged);
     _schedulePostFrame();
@@ -275,6 +291,7 @@ class _CanvasViewportState extends State<CanvasViewport> {
     _obfuscationTimer?.cancel();
     _animationTimer?.cancel();
     _selectionTimer?.cancel();
+    _holdTimer?.cancel();
     _detachListeners();
     _resizeObserver?.disconnect();
     _resizeObserver = null;
@@ -298,201 +315,198 @@ class _CanvasViewportState extends State<CanvasViewport> {
         tag: 'canvas',
         id: _canvasId,
         classes: 'hui-canvas-surface',
+        attributes: const <String, String>{'data-game-drawn': ''},
       ),
       dom.div(id: _readoutId, classes: 'hui-canvas-readout', const <Widget>[]),
     ],
   );
 
+  /// Hints differ by pointer: a touch screen has no Space, wheel or right
+  /// button.
+  late final bool _coarsePointer = web.window
+      .matchMedia('(pointer: coarse)')
+      .matches;
+
   @override
   Widget build(BuildContext context) {
     _schedulePostFrame();
     final EditorStore store = component.store;
+    final Widget stage = AppContextMenu(
+      id: '$_uid-create-menu',
+      entries: _creationEntries(),
+      child: _stageTree,
+    );
     return dom.div(classes: 'hui-canvas', <Widget>[
-      ListenableBuilder(
+      StoreSelector<CanvasToolbarState>(
         listenable: store,
-        builder: (BuildContext inner) => CanvasToolbar(
-          store: store,
-          zoomLabelId: _zoomLabelId,
-          zoomPercent: _zoomPercentText,
-          // Eased: a button press has no inertia of its own to respect, so the
-          // travel is what tells the user the artboard moved rather than
+        selector: () => canvasToolbarState(store),
+        builder: (BuildContext _, CanvasToolbarState state) => StageFrame(
+          title: huiText('Canvas'),
+          fit: StageFit.free,
+          // Eased: a button press has no inertia of its own to respect, so
+          // the travel is what tells the user the artboard moved rather than
           // changed. The wheel and the keyboard keep their immediate paths.
-          onZoomIn: () => _easeThrough(() => _zoomFromCenter(huiZoomStep)),
-          onZoomOut: () => _easeThrough(() => _zoomFromCenter(1 / huiZoomStep)),
-          onZoomReset: () => _easeThrough(_resetView),
-          onFit: () => _easeThrough(_fitToContent),
-          hasAnimatedIcons: _sceneHasAnimation,
-          onZOrder: _applyZOrder,
+          actions: canvasActions(
+            store: store,
+            state: state,
+            animated: _sceneHasAnimation,
+            onZoomIn: () => _easeThrough(() => _zoomFromCenter(huiZoomStep)),
+            onZoomOut: () =>
+                _easeThrough(() => _zoomFromCenter(1 / huiZoomStep)),
+          ),
+          more: canvasMoreEntries(
+            store: store,
+            state: state,
+            onZOrder: _applyZOrder,
+          ),
+          onReset: _resetView,
+          status: _coarsePointer
+              ? huiText('Drag empty canvas to pan')
+              : huiText(
+                  'Space or middle-drag pans · scroll zooms · 0 resets '
+                  '· F fits',
+                ),
+          statusTip: _coarsePointer
+              ? huiText('Drag components to move')
+              : huiText(
+                  'Drag empty space to marquee · Shift-click adds · '
+                  'Alt-drag copies · right-click creates',
+                ),
+          child: stage,
         ),
       ),
-      _stageTree,
-      if (_creationMenuPoint != null) _creationMenu(),
-      // One line, never two: the separators are drawn by CSS between the
-      // items, and the trailing note is dropped by CSS before anything is
-      // allowed to wrap. See `.hui-canvas-hint` in web/styles/03-canvas.css.
-      dom.div(classes: 'hui-canvas-hint hui-canvas-hint-desktop', <Widget>[
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          // Left-drag on empty space is the marquee now; panning is Space-drag
-          // or the middle button, which is why the pan verb moved up front.
-          Component.text(
-            huiText(
-              'Space or middle-drag pans - scroll zooms - 0 resets '
-              '- F fits',
-            ),
-          ),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(
-            huiText(
-              'Drag empty space to marquee - Shift-click adds - '
-              'Alt-drag copies - right-click creates',
-            ),
-          ),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item hui-canvas-hint-note', <Widget>[
-          Component.text(
-            huiText(
-              'The 3D preview applies each icon\'s billboard mode '
-              'and keeps its click plane aligned.',
-            ),
-          ),
-        ]),
-      ]),
-      dom.div(classes: 'hui-canvas-hint hui-canvas-hint-touch', <Widget>[
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(huiText('Drag empty canvas to pan')),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(huiText('Use the zoom controls')),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(huiText('Drag components to move')),
-        ]),
-      ]),
     ]);
   }
 
   // --- frame loop -----------------------------------------------------------
 
   void _onStoreChanged() {
-    final int fitRequest = component.store.canvasFitRequest;
-    if (_lastFitRequest != fitRequest) {
-      _lastFitRequest = fitRequest;
-      if (component.store.isMenuDoc) {
-        _needsInitialFit = true;
-        _syncCanvasSize();
-      }
-    }
+    _frameCamera();
     _statusDirty = true;
     _markDirty();
   }
 
-  Widget _creationMenu() {
-    final Vec3 offset = _creationOffset!.copy();
-    final String? documentId = _creationDocumentId;
-    return HuiActionMenu(
-      id: '$_uid-create-menu',
-      label: huiText('Add component at canvas position'),
-      point: _creationMenuPoint!,
-      onClose: _closeCreationMenu,
-      items: <HuiActionMenuItem>[
-        HuiActionMenuItem(
-          label: huiText('Text decoration'),
-          icon: ArcaneIcon.baseline(size: IconSize.sm),
-          onSelect: () =>
-              _addIconAt(createDefaultIcon('text'), offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Image or GIF'),
-          icon: ArcaneIcon.image(size: IconSize.sm),
-          onSelect: () => _addMediaAt(offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Pixelated player head'),
-          icon: ArcaneIcon.user(size: IconSize.sm),
-          onSelect: () => _addPlayerHeadAt(offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Living entity'),
-          icon: ArcaneIcon.userRound(size: IconSize.sm),
-          onSelect: () =>
-              _addIconAt(createDefaultIcon('entity'), offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Item'),
-          icon: ArcaneIcon.package(size: IconSize.sm),
-          onSelect: () =>
-              _addIconAt(createDefaultIcon('item'), offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Block'),
-          icon: ArcaneIcon.boxes(size: IconSize.sm),
-          onSelect: () =>
-              _addIconAt(createDefaultIcon('block'), offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Interactive button'),
-          icon: ArcaneIcon.mousePointerClick(size: IconSize.sm),
-          separatorBefore: true,
-          onSelect: () => _addDefaultAt('button', offset, documentId),
-        ),
-        HuiActionMenuItem(
-          label: huiText('Conditional toggle'),
-          icon: ArcaneIcon.toggleRight(size: IconSize.sm),
-          onSelect: () => _addDefaultAt('toggle', offset, documentId),
-        ),
-      ],
+  /// Fits the open menu, or brings back the camera it was given by hand,
+  /// when the menu changes, is imported or the canvas changes size
+  /// ([resized]). Waits while the canvas has no box: a hidden canvas cannot
+  /// measure, and the menu is framed when it shows.
+  void _frameCamera({bool resized = false}) {
+    final EditorStore store = component.store;
+    if (!_hasArea || _viewport.widthPx <= 0 || !store.isMenuDoc) return;
+    final StageCamera next = _camera.next(
+      docId: store.workspace.activeId,
+      fitRequest: store.canvasFitRequest,
+      resized: resized,
     );
+    switch (next) {
+      case StageCamera.fit:
+        _ease = null;
+        _fitToContent();
+      case StageCamera.restore:
+        _ease = null;
+        _commitViewport(_viewport.withTransform(_camera.handView!));
+      case StageCamera.keep:
+        break;
+    }
   }
 
-  void _openCreationMenuAt(double clientX, double clientY) {
+  /// The right-click menu. Entries read the offset when picked, so the menu
+  /// itself never has to rebuild for a new click.
+  List<AppMenuEntry> _creationEntries() => <AppMenuEntry>[
+    AppMenuEntry.heading(huiText('Add component')),
+    AppMenuEntry(
+      huiText('Text decoration'),
+      () => _addIconAt(createDefaultIcon('text')),
+      icon: ArcaneIcon.baseline(),
+    ),
+    AppMenuEntry(
+      huiText('Image or GIF'),
+      () => _addMediaAt(),
+      icon: ArcaneIcon.image(),
+    ),
+    AppMenuEntry(
+      huiText('Pixelated player head'),
+      () => _addPlayerHeadAt(),
+      icon: ArcaneIcon.user(),
+    ),
+    AppMenuEntry(
+      huiText('Living entity'),
+      () => _addIconAt(createDefaultIcon('entity')),
+      icon: ArcaneIcon.userRound(),
+    ),
+    AppMenuEntry(
+      huiText('Item'),
+      () => _addIconAt(createDefaultIcon('item')),
+      icon: ArcaneIcon.package(),
+    ),
+    AppMenuEntry(
+      huiText('Block'),
+      () => _addIconAt(createDefaultIcon('block')),
+      icon: ArcaneIcon.boxes(),
+    ),
+    const AppMenuEntry.separator(),
+    AppMenuEntry(
+      huiText('Interactive button'),
+      () => _addDefaultAt('button'),
+      icon: ArcaneIcon.mousePointerClick(),
+    ),
+    AppMenuEntry(
+      huiText('Conditional toggle'),
+      () => _addDefaultAt('toggle'),
+      icon: ArcaneIcon.toggleRight(),
+    ),
+  ];
+
+  /// Records where a right-click (or the menu key) asked to create. The
+  /// library's context menu opens itself on the same event.
+  void _recordCreationPoint(double clientX, double clientY) {
     final WorldPoint world = _worldPoint(clientX, clientY);
-    final Vec3 offset = component.store.snapVec(Vec3(world.x, world.y, 0));
-    setState(() {
-      _creationMenuPoint = HuiActionMenuPoint(clientX, clientY);
-      _creationOffset = offset;
-      _creationDocumentId = component.store.workspace.activeId;
-    });
-    context.binding.addPostFrameCallback(() {
-      focusHuiActionMenu('$_uid-create-menu');
-    });
+    _creationOffset = component.store.snapVec(Vec3(world.x, world.y, 0));
+    _creationDocumentId = component.store.workspace.activeId;
   }
 
-  void _closeCreationMenu() {
-    if (_creationMenuPoint == null) return;
-    setState(() {
-      _creationMenuPoint = null;
-      _creationOffset = null;
-      _creationDocumentId = null;
-    });
-    _stage?.focus();
+  /// Opens the right-click menu from the keyboard: a synthetic `contextmenu`
+  /// at [clientX], [clientY] reaches the library's menu and
+  /// [_recordCreationPoint] the same way a real right-click does.
+  void _openCreationMenuAt(double clientX, double clientY) {
+    _canvas?.dispatchEvent(
+      web.MouseEvent(
+        'contextmenu',
+        web.MouseEventInit(
+          bubbles: true,
+          cancelable: true,
+          clientX: clientX.round(),
+          clientY: clientY.round(),
+        ),
+      ),
+    );
   }
 
   bool _isCurrentCreationTarget(String? documentId) =>
       component.store.workspace.activeId == documentId;
 
-  void _addDefaultAt(String type, Vec3 offset, String? documentId) {
-    if (!_isCurrentCreationTarget(documentId)) return;
-    component.store.addComponent(type, offset: offset);
+  void _addDefaultAt(String type) {
+    if (!_isCurrentCreationTarget(_creationDocumentId)) return;
+    component.store.addComponent(type, offset: _creationOffset.copy());
   }
 
-  void _addIconAt(HuiIcon icon, Vec3 offset, String? documentId) {
-    if (!_isCurrentCreationTarget(documentId)) return;
+  void _addIconAt(HuiIcon icon) {
+    if (!_isCurrentCreationTarget(_creationDocumentId)) return;
     component.store.addComponentData(
       HuiDecorationData(icon),
-      offset: offset,
+      offset: _creationOffset.copy(),
       id: icon.type,
     );
   }
 
-  void _addMediaAt(Vec3 offset, String? documentId) {
-    if (!_isCurrentCreationTarget(documentId)) return;
-    component.onAddMedia?.call(offset);
+  void _addMediaAt() {
+    if (!_isCurrentCreationTarget(_creationDocumentId)) return;
+    component.onAddMedia?.call(_creationOffset.copy());
   }
 
-  void _addPlayerHeadAt(Vec3 offset, String? documentId) {
-    if (!_isCurrentCreationTarget(documentId)) return;
-    component.onAddPlayerHead?.call(offset);
+  void _addPlayerHeadAt() {
+    if (!_isCurrentCreationTarget(_creationDocumentId)) return;
+    component.onAddPlayerHead?.call(_creationOffset.copy());
   }
 
   void _onImagesChanged() {
@@ -755,16 +769,56 @@ class _CanvasViewportState extends State<CanvasViewport> {
     if (_fontRequested) return;
     _fontRequested = true;
     try {
+      _fontReady = web.document.fonts.check('16px "Minecraftia"');
       web.document.fonts.load('16px "Minecraftia"').toDart.then<void>((
         JSArray<web.FontFace> _,
       ) {
         if (_disposed) return;
+        _fontReady = true;
         _metrics.invalidate();
+        // Text measured with the fallback font was framed too wide or too
+        // narrow; a camera nobody has moved frames it again.
+        if (_hasArea && !_camera.handSet && component.store.isMenuDoc) {
+          _fitToContent();
+        }
         _markDirty();
-      }, onError: (Object _) {});
+      }, onError: (Object _) {
+        _fontReady = true;
+        _markDirty();
+      });
     } catch (_) {
       // Font Loading API unavailable: the fallback metric still renders.
+      _fontReady = true;
     }
+  }
+
+  /// True while the menu should not be painted yet: the game font, the
+  /// catalogs or a sprite it draws is still loading, so it would flash in a
+  /// fallback font or as placeholder boxes. Holds [stageAssetHold] at most;
+  /// the stage is `aria-busy` meanwhile.
+  bool _holdsPaint(CanvasScene scene) {
+    bool loading =
+        !_fontReady ||
+        !huiFreshestCatalogs(component.store.catalogs, component.catalogs).loaded;
+    for (final CanvasItem item in scene.items) {
+      final String? sprite = item.itemTexture;
+      final String? entity = item.entityTexture;
+      if (sprite != null) _assets.image(sprite);
+      if (entity != null) _assets.image(entity);
+    }
+    loading = loading || _assets.hasPending;
+    final DateTime now = DateTime.now();
+    final DateTime? since = _holdSince;
+    final bool hold =
+        loading && (since == null || now.difference(since) < stageAssetHold);
+    if (!loading) _holdSince = null;
+    if (hold && since == null) {
+      _holdSince = now;
+      _holdTimer?.cancel();
+      _holdTimer = Timer(stageAssetHold, _markDirty);
+    }
+    _stage?.setAttribute('aria-busy', '$hold');
+    return hold;
   }
 
   void _syncCanvasSize() {
@@ -787,16 +841,14 @@ class _CanvasViewportState extends State<CanvasViewport> {
     final int backingHeight = (height * ratio).round();
     if (canvas.width != backingWidth) canvas.width = backingWidth;
     if (canvas.height != backingHeight) canvas.height = backingHeight;
+    final bool resized =
+        !hadArea || width != _viewport.widthPx || height != _viewport.heightPx;
     _viewport = _viewport.resized(
       widthPx: width,
       heightPx: height,
       devicePixelRatio: ratio,
     );
-    if (_needsInitialFit) {
-      _needsInitialFit = false;
-      _fitToContent();
-      return;
-    }
+    _frameCamera(resized: resized);
     _markDirty();
   }
 
@@ -818,6 +870,7 @@ class _CanvasViewportState extends State<CanvasViewport> {
         raw as web.CanvasRenderingContext2D;
     final EditorStore store = component.store;
     final CanvasScene scene = _buildScene();
+    if (_holdsPaint(scene)) return;
     _painter.paint(
       ctx: ctx,
       viewport: _viewport,
@@ -841,13 +894,52 @@ class _CanvasViewportState extends State<CanvasViewport> {
         selectionDashOffset: _selectionTick * huiSelectionDashStep,
       ),
     );
+    _publishContentBox(scene);
     _reconcileTimers();
+  }
+
+  /// Writes where the components landed on the surface (`data-content-box`),
+  /// so the browser check can tell a fitted canvas from a cropped one.
+  void _publishContentBox(CanvasScene scene) {
+    final web.HTMLCanvasElement? canvas = _canvas;
+    if (canvas == null) return;
+    final WorldBounds bounds = scene.contentBounds;
+    final String? box = scene.isEmpty
+        ? null
+        : stageContentBox(
+            left: _viewport.worldToScreenX(bounds.minX),
+            top: _viewport.worldToScreenY(bounds.maxY),
+            right: _viewport.worldToScreenX(bounds.maxX),
+            bottom: _viewport.worldToScreenY(bounds.minY),
+            width: _viewport.widthPx,
+            height: _viewport.heightPx,
+          );
+    // At the fit's floor the content is centred and larger than the room:
+    // the user pans, and the browser check knows the cut is meant.
+    final bool floor =
+        box != null &&
+        (_viewport.zoom - huiFitMinZoom).abs() < 1e-6 &&
+        (bounds.width * _viewport.basePixelsPerBlock * huiFitMinZoom >
+                _viewport.widthPx ||
+            bounds.height * _viewport.basePixelsPerBlock * huiFitMinZoom >
+                _viewport.heightPx);
+    if (floor) {
+      canvas.setAttribute('data-fit-floor', '');
+    } else {
+      canvas.removeAttribute('data-fit-floor');
+    }
+    if (box == _contentBox) return;
+    _contentBox = box;
+    if (box == null) {
+      canvas.removeAttribute('data-content-box');
+    } else {
+      canvas.setAttribute('data-content-box', box);
+    }
   }
 
   /// Belt-and-braces re-assert of the DOM state the canvas owns imperatively,
   /// in case something else in the tree ever re-patches these nodes.
   void _restoreDomState() {
-    _syncZoomReadout();
     _setStageState(
       dragging: _activePointerId != null,
       overComponent: _hoveredId != null,
@@ -994,7 +1086,4 @@ class _CanvasViewportState extends State<CanvasViewport> {
     final web.Element? root = web.document.documentElement;
     return root != null && root.classList.contains('light');
   }
-
-  String get _zoomPercentText =>
-      '${(_viewport.zoom * 100).round().clamp(1, 999999)}%';
 }

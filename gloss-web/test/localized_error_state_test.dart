@@ -6,7 +6,7 @@ import 'package:gloss_editor/logic/json_value.dart';
 import 'package:gloss_editor/logic/preview_doc_validation.dart';
 import 'package:gloss_editor/logic/validation.dart';
 import 'package:gloss_editor/model/preview_doc.dart';
-import 'package:gloss_editor/services/editor_sync.dart';
+import 'package:gloss_editor/services/server/error_copy.dart';
 import 'package:gloss_editor/state/editor_store.dart';
 import 'package:gloss_editor/state/workspace.dart';
 import 'package:gloss_editor/state/workspace_repository.dart';
@@ -133,43 +133,18 @@ void main() {
     expect(issue.message, 'Unbekannte Variable: vars.missing');
   });
 
-  test('deferred sync failures resolve in the active locale', () {
-    final EditorSyncFailure failure = EditorSyncFailure.deferred(
-      () => huiText('The synced images could not be stored locally.'),
-    );
-    expect(failure.message, 'The synced images could not be stored locally.');
+  test('server problems are worded in the active locale', () {
+    expect(serverCopy('pairing-expired').cause, 'This link expired.');
 
     _installGerman(<String, String>{
-      'The synced images could not be stored locally.':
-          'Die synchronisierten Bilder konnten nicht lokal gespeichert werden.',
+      'This link expired.': 'Dieser Link ist abgelaufen.',
     });
 
+    expect(serverCopy('pairing-expired').cause, 'Dieser Link ist abgelaufen.');
     expect(
-      failure.message,
-      'Die synchronisierten Bilder konnten nicht lokal gespeichert werden.',
-    );
-  });
-
-  test('sync conflict fallbacks retranslate but relay messages stay literal', () {
-    const EditorSyncConflict fallback = EditorSyncConflict(
-      'The relay rejected the publication because the session changed.',
-    );
-    final EditorSyncConflict relay = EditorSyncConflict.literal(
-      'The relay rejected the publication because the session changed.',
-    );
-
-    _installGerman(<String, String>{
-      'The relay rejected the publication because the session changed.':
-          'Das Relay lehnte die Veröffentlichung ab, weil sich die Sitzung geändert hat.',
-    });
-
-    expect(
-      fallback.message,
-      'Das Relay lehnte die Veröffentlichung ab, weil sich die Sitzung geändert hat.',
-    );
-    expect(
-      relay.message,
-      'The relay rejected the publication because the session changed.',
+      serverCopy('token-revoked').cause,
+      'Pairing ended.',
+      reason: 'a sentence with no translation stays English',
     );
   });
 }

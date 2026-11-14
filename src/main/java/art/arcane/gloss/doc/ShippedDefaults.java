@@ -5,10 +5,12 @@ import art.arcane.gloss.Gloss;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.logging.Level;
 
 public final class ShippedDefaults {
@@ -32,7 +34,37 @@ public final class ShippedDefaults {
     }
 
     public String resourcePath(String name) {
+        return resourcePath(kind, name);
+    }
+
+    /** Where the jar holds the shipped copy of {@code kind/name}. */
+    public static String resourcePath(String kind, String name) {
         return RESOURCE_ROOT + kind + "/" + name + EXTENSION;
+    }
+
+    /**
+     * The bytes Gloss extracts to {@code relativePath} under the data folder ({@code boards/default.json}, or
+     * {@code tablist.json} for a single-file kind), or empty when it ships nothing there.
+     */
+    public static Optional<byte[]> shippedCopy(String relativePath) {
+        if (relativePath == null || !relativePath.endsWith(EXTENSION)) {
+            return Optional.empty();
+        }
+        String stem = relativePath.substring(0, relativePath.length() - EXTENSION.length());
+        int slash = stem.indexOf('/');
+        String kind = slash < 0 ? stem : stem.substring(0, slash);
+        String name = slash < 0 ? stem : stem.substring(slash + 1);
+        for (ShippedDocumentCatalog.Entry<?> entry : ShippedDocumentCatalog.all()) {
+            if (!entry.kind().equals(kind) || !entry.names().contains(name)) {
+                continue;
+            }
+            try (InputStream stream = ShippedDefaults.class.getResourceAsStream(resourcePath(kind, name))) {
+                return stream == null ? Optional.empty() : Optional.of(stream.readAllBytes());
+            } catch (IOException failure) {
+                throw new UncheckedIOException("cannot read the shipped " + relativePath, failure);
+            }
+        }
+        return Optional.empty();
     }
 
     public List<String> extractMissing() {

@@ -4,10 +4,12 @@ import 'package:test/test.dart';
 
 void main() {
   group('PaneLayout defaults', () {
-    test('ship 240 rail and 320 inspector', () {
+    test('ship 280 rail and 340 inspector', () {
+      // Wide enough for the library's group headings and the kit's dense
+      // inspector rows on one line.
       const PaneLayout layout = PaneLayout.defaults;
-      expect(layout.railWidth, 240);
-      expect(layout.inspectorWidth, 320);
+      expect(layout.railWidth, 280);
+      expect(layout.inspectorWidth, 340);
     });
 
     test('expose the css custom property each pane track reads', () {
@@ -36,13 +38,13 @@ void main() {
 
     test('refuses to squeeze the canvas below its floor', () {
       const PaneLayout layout = PaneLayout.defaults;
-      // 1280 - 320 inspector - 420 canvas - 12 handles = 528 of room, so the
+      // 1280 - 340 inspector - 420 canvas - 12 handles = 508 of room, so the
       // hard 420 maximum still wins.
       expect(layout.clampWidth(PaneSide.rail, 999, viewportWidth: 1280), 420);
-      // 1024 - 320 - 420 - 12 leaves 272 of room, so the canvas floor bites
+      // 1024 - 340 - 420 - 12 leaves 252 of room, so the canvas floor bites
       // before the hard maximum does.
-      expect(layout.clampWidth(PaneSide.rail, 999, viewportWidth: 1024), 272);
-      // 900 leaves 148, below the rail minimum: the minimum wins so the pane
+      expect(layout.clampWidth(PaneSide.rail, 999, viewportWidth: 1024), 252);
+      // 900 leaves 128, below the rail minimum: the minimum wins so the pane
       // never collapses to nothing.
       expect(layout.clampWidth(PaneSide.rail, 999, viewportWidth: 900), 200);
     });

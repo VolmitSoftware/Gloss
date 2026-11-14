@@ -460,6 +460,31 @@ void main() {
       expect(corner.y, greaterThanOrEqualTo(20 - 1e-7));
     });
 
+    test('zoomToFit keeps a fit inside the readable range and centres at the limit', () {
+      final HuiViewport v = _viewport();
+      const WorldBounds tiny = WorldBounds(minX: 1, minY: 1, maxX: 1.2, maxY: 1.1);
+      final HuiViewport close = v.zoomToFit(
+        tiny,
+        minZoom: huiFitMinZoom,
+        maxZoom: huiFitMaxZoom,
+      );
+      expect(huiFitMaxZoom, 2.0);
+      expect(close.zoom, huiFitMaxZoom, reason: 'never above 200%');
+      final ScreenPoint middle = close.worldToScreen(1.1, 1.05);
+      expect(middle.x, closeTo(400, 1e-7));
+      expect(middle.y, closeTo(300, 1e-7));
+      const WorldBounds huge = WorldBounds(minX: -40, minY: -30, maxX: 40, maxY: 30);
+      final HuiViewport far = v.zoomToFit(
+        huge,
+        minZoom: huiFitMinZoom,
+        maxZoom: huiFitMaxZoom,
+      );
+      expect(far.zoom, huiFitMinZoom, reason: 'never so small text cannot be read; the user pans');
+      final ScreenPoint centre = far.worldToScreen(0, 0);
+      expect(centre.x, closeTo(400, 1e-7));
+      expect(centre.y, closeTo(300, 1e-7));
+    });
+
     test('zoomToFit clamps degenerate bounds instead of dividing by zero', () {
       final HuiViewport v = _viewport();
       const WorldBounds point = WorldBounds(minX: 2, minY: 2, maxX: 2, maxY: 2);

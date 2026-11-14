@@ -13,8 +13,8 @@ void main() {
   ).readAsStringSync();
 
   test('both favicon fields edit through the MOTD mutation path', () {
-    expect(inspector, contains("const HuiFieldHelp('motd.favicon')"));
-    expect(inspector, contains("const HuiFieldHelp('motd.entries.favicon')"));
+    expect(inspector, contains("docKey: 'motd.favicon'"));
+    expect(inspector, contains("docKey: 'motd.entries.favicon'"));
     expect(inspector, contains('edited.favicon = value.isEmpty'));
     expect(
       inspector,
@@ -40,7 +40,7 @@ void main() {
   });
 
   test('Refresh is the only MOTD frame transport', () {
-    expect(source, contains('onPressed: _refreshSample'));
+    expect(source, contains("huiText('Refresh'),\n            _refreshSample,"));
     expect(source, contains('ArcaneIcon.refreshCcw'));
     expect(source, isNot(contains('_playPause')));
     expect(source, isNot(contains('ArcaneIcon.play')));
@@ -57,7 +57,7 @@ void main() {
   });
 
   test('choosing an entry represents a fresh ping sample', () {
-    expect(source, contains("'click': (Object? _) => _selectEntry(index)"));
+    expect(source, contains('onPicked: (String _) => _selectEntry(index)'));
     expect(source, contains('_sampledAtMs = DateTime.now()'));
   });
 
@@ -84,14 +84,8 @@ void main() {
       'motd.entries.max',
       'motd.entries.version',
     ]) {
-      // Both mount the same popover: a field row through HuiFieldHelp, a
-      // list section through the docKey its header renders.
-      expect(
-        inspector.contains("HuiFieldHelp('$key')") ||
-            inspector.contains("docKey: '$key'"),
-        isTrue,
-        reason: key,
-      );
+      // A field and a list section both show the doc through their docKey.
+      expect(inspector, contains("docKey: '$key'"), reason: key);
     }
     expect(inspector, contains('edited.links.add('));
     expect(inspector, contains('edited.links.removeAt('));

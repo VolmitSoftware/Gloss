@@ -12,7 +12,6 @@ import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 
 import '../../logic/mc_text.dart';
-import '../common/common.dart';
 
 /// One run of characters sharing a resolved style.
 class GlossMcSpan extends StatelessWidget {
@@ -27,10 +26,7 @@ class GlossMcSpan extends StatelessWidget {
       if (span.strikethrough) 'line-through',
     ];
     return dom.span(
-      classes: classNames(<String?>[
-        'hui-mc-span',
-        span.obfuscated ? 'is-obfuscated' : null,
-      ]),
+      classes: span.obfuscated ? 'hui-mc-span is-obfuscated' : 'hui-mc-span',
       styles: dom.Styles(
         raw: <String, String>{
           'color': mcColorCss(span.color),

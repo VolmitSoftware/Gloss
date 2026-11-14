@@ -290,9 +290,9 @@ void main() {
       expect(spans[2].rgb, 0xFFFFFF);
     });
 
-    test('an unmatched closing tag is a no-op and warns', () {
+    test('an unmatched closing tag prints as text and warns', () {
       final McTextResult result = parseMcText('a</bold>b');
-      expect(result.lines.first.single.text, 'ab');
+      expect(result.lines.first.single.text, 'a</bold>b');
       expect(result.warnings, hasLength(1));
       expect(result.warnings.single, contains('</bold>'));
     });

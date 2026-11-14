@@ -8,7 +8,6 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.junit.Test;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -104,15 +103,12 @@ public class TextUtilsFormattingTest {
   }
 
   @Test
-  public void logicalLineBoundaryEndsObfuscation() {
-    String joined = TextUtils.joinLegacyLines(List.of("§kA", "B"));
+  public void obfuscationCarriesAcrossALineBreakInOneComponent() {
+    Component parsed = TextUtils.parse("\u00a7kA\nB");
+    TextComponent carried = componentWithContent(parsed, "A\nB");
 
-    assertEquals("<obfuscated>A<reset>\nB", TextUtils.translateLegacy(joined));
-  }
-
-  @Test
-  public void embeddedLineBreaksStartFreshLegacyScopes() {
-    assertEquals("§kA\n§rB\r\n§rC", TextUtils.scopeLegacyLines("§kA\nB\r\nC"));
+    assertNotNull(carried);
+    assertEquals(TextDecoration.State.TRUE, carried.decoration(TextDecoration.OBFUSCATED));
   }
 
   @Test

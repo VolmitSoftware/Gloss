@@ -3528,6 +3528,7 @@ LocalizationSource collectLocalizationSource(Directory root) {
         'error',
         'fallbackError',
       });
+      _collectFirstLiteralArgument(source, messages, '_workspaceText');
     }
     if (entity.path.endsWith('${Platform.pathSeparator}workspace_panel.dart')) {
       _collectAssignedString(source, messages, <String>{'warning'});
@@ -5424,6 +5425,7 @@ _unchangedNaturalLanguageAllowlistByReason = <String, Map<String, Set<String>>>{
           'messages["Radius"]',
           'messages["Scoreboards"]',
           'messages["Server"]',
+          'messages["Server {id}"]',
           'messages["Simulation"]',
           'messages["Slot"]',
           'messages["Text"]',
@@ -5458,6 +5460,7 @@ _unchangedNaturalLanguageAllowlistByReason = <String, Map<String, Set<String>>>{
           'messages["Clips"]',
           'messages["Code"]',
           'messages["Condition"]',
+          'messages["Conditions"]',
           'messages["Documentation"]',
           'messages["Documents"]',
           'messages["Hitbox"]',
@@ -5479,6 +5482,10 @@ _unchangedNaturalLanguageAllowlistByReason = <String, Map<String, Set<String>>>{
           'messages["distance"]',
           'messages["image {path}"]',
           'messages["inaudible"]',
+          'plurals["start.documents"].one',
+          'plurals["start.documents"].other',
+          'plurals["start.images"].one',
+          'plurals["start.images"].other',
           'previewMessages["gloss.preview.theme.title.dropper"]',
           'previewMessages["gloss.preview.theme.title.jukebox"]',
         },
@@ -5488,6 +5495,7 @@ _unchangedNaturalLanguageAllowlistByReason = <String, Map<String, Set<String>>>{
           'messages["Emoji {id}"]',
           'messages["Hitbox"]',
           'messages["schema {version}"]',
+          'messages["Server {id}"]',
           'messages["Var"]',
           'messages["Vars"]',
           'messages["File"]',
@@ -5504,10 +5512,12 @@ _unchangedNaturalLanguageAllowlistByReason = <String, Map<String, Set<String>>>{
           'messages["Emoji {id}"]',
           'messages["Filters"]',
           'messages["Frame"]',
+          'messages["Frame {number}"]',
           'messages["Frames"]',
           'messages["Hitbox"]',
           'messages["Overlays"]',
           'messages["Routes"]',
+          'messages["Server {id}"]',
           'messages["Spawn"]',
           'messages["Type"]',
           'messages["Variant {id}"]',
@@ -5526,6 +5536,7 @@ _unchangedNaturalLanguageAllowlistByReason = <String, Map<String, Set<String>>>{
           'messages["via proxy"]',
           'contexts["state.open"]',
           'plurals["export.component_count"].one',
+          'plurals["start.documents"].one',
           'plurals["workspace.document_count"].one',
           'previewMessages["gloss.preview.theme.title.container"]',
           'previewMessages["gloss.preview.theme.title.dispenser"]',
@@ -6062,7 +6073,6 @@ void _collectFiniteDartMetadata(Directory root, Set<String> messages) {
     '${root.path}/lib/components/dialogs/help_dialog.dart',
     '${root.path}/lib/components/shell/tour.dart',
     '${root.path}/lib/components/inspector/text_icon_editor.dart',
-    '${root.path}/lib/components/preview/preview_toolbar.dart',
   ];
   final Directory doctype = Directory('${root.path}/lib/doctype');
   for (final FileSystemEntity entity in doctype.listSync()) {

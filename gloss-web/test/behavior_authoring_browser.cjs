@@ -1,21 +1,14 @@
 const assert = require('node:assert/strict');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-async function exported(page) {
-  await page.getByRole('button', {name: /^Export .* JSON$/}).click();
-  const value = JSON.parse(await page.locator('pre.hui-codeblock:visible').last().innerText());
-  await page.getByRole('button', {name: 'Close', exact: true}).click();
-  return value;
-}
+const shell = require('./support/shell.cjs');
 async function main() {
-  const browser = await chromium.launch({headless: true,
-    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {})});
+  const browser = await shell.launch();
   try {
-    const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
-    const errors = []; page.on('pageerror', error => errors.push(error.message));
-    await page.goto(process.env.EDITOR_URL || 'http://127.0.0.1:8107');
-    await page.waitForSelector('.hui-inspector-body', {state: 'attached', timeout: 60000});
-    if (await page.getByText('Skip', {exact: true}).isVisible()) await page.getByText('Skip', {exact: true}).click();
-    await page.waitForSelector('.hui-inspector-body');
+    const {page, errors} = await shell.openEditor(browser);
+    // Cue ticks are Advanced only.
+    if (!(await shell.setMode(page, 'advanced'))) {
+      await page.evaluate(() => window.localStorage.setItem('gloss.mode', 'advanced'));
+      await shell.ready(page);
+    }
     const fixture = {schemaVersion: 2, on: [{trigger: 'join', do: [
       {type: 'sequence', future: {keep: true}, steps: [
         {type: 'setState', key: 'visits', value: '1', atTicks: 10, extension: 'keep'},
@@ -23,20 +16,18 @@ async function main() {
       ]},
       {type: 'if', when: 'true', then: [{type: 'addState', key: 'visits', value: '1'}], else: []},
     ]}], state: {visits: {scope: 'player', type: 'number', default: '2', extension: {keep: true}}}, future: 'keep'};
-    await page.getByRole('button', {name: 'Import JSON', exact: true}).click();
-    await page.locator('textarea:visible').last().fill(JSON.stringify(fixture));
-    await page.getByRole('button', {name: /Replace document$/}).click();
-    const baseline = await exported(page);
+    await shell.importJson(page, fixture);
+    const baseline = await shell.exportJson(page);
     assert.deepEqual(baseline.on, fixture.on); assert.deepEqual(baseline.state, fixture.state);
     assert.equal(await page.getByText('Click trigger', {exact: true}).count(), 0);
     assert.equal(await page.getByRole('button', {name: 'Call named action', exact: true}).count(), 0);
     const state = page.locator('[data-behavior-state="visits"]');
     await state.getByRole('combobox', {name: 'Scope', exact: true}).selectOption('global');
-    await page.getByLabel('state/visits/default', {exact: true}).fill('7');
-    await page.getByLabel('state/visits/default', {exact: true}).press('Tab');
-    await page.locator('input[aria-label$="/on/0/do/0/steps/0/value"]').fill('5');
-    await page.locator('input[aria-label$="/on/0/do/0/steps/0/atTicks"]').fill('40');
-    await page.locator('input[aria-label$="/on/0/do/0/steps/0/atTicks"]').press('Tab');
+    await page.locator('#behavior-state-visits-default').fill('7');
+    await page.locator('#behavior-state-visits-default').press('Tab');
+    await page.locator('input[id$="/on/0/do/0/steps/0/value"]').fill('5');
+    await page.locator('input[id$="/on/0/do/0/steps/0/atTicks"]').fill('40');
+    await page.locator('input[id$="/on/0/do/0/steps/0/atTicks"]').press('Tab');
     await page.getByRole('button', {name: 'Add state', exact: true}).focus();
     await page.keyboard.press('Enter');
     const addedState = page.locator('[data-behavior-state="state1"]');
@@ -46,14 +37,13 @@ async function main() {
     await addedState.getByRole('switch', {name: 'Value', exact: true}).focus();
     await page.keyboard.press('Space');
     await page.setViewportSize({width: 390, height: 1000});
-    await page.getByRole('button', {name: 'Open inspector', exact: true}).click();
-    await page.waitForSelector('.hui-inspector.is-mobile-open');
-    await page.locator('input[aria-label$="/on/0/do/1/then/0/value"]').fill('3');
-    await page.locator('input[aria-label$="/on/0/do/1/then/0/value"]').press('Tab');
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-    await page.getByRole('button', {name: 'Close inspector', exact: true}).click();
+    // One action row is open at a time: open the `if` to reach its branch.
+    await page.locator('[data-action-path$="/on/0/do/1"]').getByRole('button', {name: 'Edit action 2', exact: true}).first().click();
+    await page.locator('input[id$="/on/0/do/1/then/0/value"]').fill('3');
+    await page.locator('input[id$="/on/0/do/1/then/0/value"]').press('Tab');
+    assert.equal(await shell.noHorizontalScroll(page), true);
     await page.setViewportSize({width: 1440, height: 1000});
-    const output = await exported(page);
+    const output = await shell.exportJson(page);
     const expected = structuredClone(baseline);
     expected.state.visits.scope = 'global'; expected.state.visits.default = 7;
     expected.state.state1 = {scope: 'player', type: 'boolean', default: true};

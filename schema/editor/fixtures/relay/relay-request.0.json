@@ -1,0 +1,21 @@
+{
+  "type": "request",
+  "id": 7,
+  "method": "POST",
+  "path": "/v1/changes",
+  "headers": {
+    "Authorization": "Bearer gls_x",
+    "X-Gloss-Counter": "12"
+  },
+  "body": {
+    "idempotencyKey": "pub_4kB2f0Qx9w1mZr8c",
+    "documents": [
+      {
+        "op": "delete",
+        "kind": "menu",
+        "id": "shop/m0002",
+        "baseHash": "sha256:4b7e1f0fd924414f265a31818fca0d138e92a131cb96da1ca8e8ae4e8ec51813"
+      }
+    ]
+  }
+}

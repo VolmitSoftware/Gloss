@@ -1,6 +1,7 @@
 package art.arcane.gloss.locale;
 
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.editor.EditorSettings;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.volmlib.util.director.help.DirectorHelpMessages;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeMessages;
@@ -217,7 +218,7 @@ public class GlossLocalizationTest {
   public void repositoryMessagesUsePurpleBrandingWithDarkGreyStructure() throws Exception {
     assertTrue(GlossMessages.PERMISSION_DENIED.english().startsWith("&8[&dGloss&8]: &c"));
     assertTrue(GlossMessages.MENU_CLOSED.english().startsWith("&8[&dGloss&8]: &a"));
-    assertTrue(GlossMessages.WEB_CAPABILITY_WARNING.english().startsWith("&8[&dGloss&8]: &e"));
+    assertTrue(GlossMessages.EDITOR_FAILED.english().startsWith("&8[&dGloss&8]: &c"));
     assertTrue(GlossMessages.SCREEN_HUD_HEADER.english().contains("&d{count}"));
 
     for (String locale : VolmitLocales.nonEnglish()) {
@@ -248,9 +249,9 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void builderLinkTakesItsUrlFromSettingsAndNoLocaleHardcodesOne() throws Exception {
-    assertEquals("https://gloss.volmitsoftware.com", GlossConfig.current().editorSync().builderUrl());
-    assertTrue(GlossMessages.WEB_OPEN.english().contains("{url}"));
+  public void editorLinkTakesItsUrlFromSettingsAndNoLocaleHardcodesOne() throws Exception {
+    assertEquals("https://gloss.volmitsoftware.com", GlossConfig.current().editor().editorUrl());
+    assertTrue(GlossMessages.EDITOR_LINK_CONSOLE.english().contains("{url}"));
 
     for (String locale : VolmitLocales.nonEnglish()) {
       Path resource = Path.of("src/main/resources/languages", locale + ".toml");
@@ -263,15 +264,15 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void builderUrlFallsBackWhenTheConfiguredValueIsNotAPlainLink() {
-    assertEquals("https://editor.example.com/hui", GlossConfigFile.sanitizeBuilderUrl("  https://editor.example.com/hui  "));
-    assertEquals("http://127.0.0.1:8080", GlossConfigFile.sanitizeBuilderUrl("http://127.0.0.1:8080"));
-    assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, GlossConfigFile.sanitizeBuilderUrl(null));
-    assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, GlossConfigFile.sanitizeBuilderUrl(""));
-    assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, GlossConfigFile.sanitizeBuilderUrl("gloss.volmitsoftware.com"));
-    assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, GlossConfigFile.sanitizeBuilderUrl("javascript:alert(1)"));
-    assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, GlossConfigFile.sanitizeBuilderUrl("https://a.example'><click:run_command:/op me>"));
-    assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, GlossConfigFile.sanitizeBuilderUrl("https://a.example/ b"));
+  public void editorUrlFallsBackWhenTheConfiguredValueIsNotAPlainLink() {
+    assertEquals("https://editor.example.com/hui", GlossConfigFile.sanitizeEditorUrl("  https://editor.example.com/hui  "));
+    assertEquals("http://127.0.0.1:8080", GlossConfigFile.sanitizeEditorUrl("http://127.0.0.1:8080"));
+    assertEquals(EditorSettings.EDITOR_URL, GlossConfigFile.sanitizeEditorUrl(null));
+    assertEquals(EditorSettings.EDITOR_URL, GlossConfigFile.sanitizeEditorUrl(""));
+    assertEquals(EditorSettings.EDITOR_URL, GlossConfigFile.sanitizeEditorUrl("gloss.volmitsoftware.com"));
+    assertEquals(EditorSettings.EDITOR_URL, GlossConfigFile.sanitizeEditorUrl("javascript:alert(1)"));
+    assertEquals(EditorSettings.EDITOR_URL, GlossConfigFile.sanitizeEditorUrl("https://a.example'><click:run_command:/op me>"));
+    assertEquals(EditorSettings.EDITOR_URL, GlossConfigFile.sanitizeEditorUrl("https://a.example/ b"));
   }
 
   @Test
@@ -507,12 +508,12 @@ public class GlossLocalizationTest {
 
   @Test
   public void zeroArgumentRenderingTranslatesTheTemplateOnlyForLegacy() {
-    String english = GlossMessages.WEB_CAPABILITY_WARNING.english();
+    String english = GlossMessages.EDITOR_NOT_RUNNING.english();
 
-    assertEquals(english, localization.text(GlossMessages.WEB_CAPABILITY_WARNING));
+    assertEquals(english, localization.text(GlossMessages.EDITOR_NOT_RUNNING));
     assertEquals(
         ChatColor.translateAlternateColorCodes('&', english),
-        localization.legacy(GlossMessages.WEB_CAPABILITY_WARNING)
+        localization.legacy(GlossMessages.EDITOR_NOT_RUNNING)
     );
   }
 
@@ -574,28 +575,19 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void webConsoleMessagesAcceptOnlyTheirDeclaredArguments() {
-    assertEquals(Set.of(), GlossMessages.WEB_CAPABILITY_WARNING.placeholders());
-    assertEquals(Set.of("subject", "url"), GlossMessages.WEB_OPEN_CONSOLE.placeholders());
-    assertEquals(Set.of("session"), GlossMessages.WEB_LINK_HOVER.placeholders());
-    String warning = localization.legacy(GlossMessages.WEB_CAPABILITY_WARNING);
-    String open = localization.legacy(
-        GlossMessages.WEB_OPEN_CONSOLE,
+  public void editorConsoleMessagesAcceptOnlyTheirDeclaredArguments() {
+    assertEquals(Set.of(), GlossMessages.EDITOR_NOT_RUNNING.placeholders());
+    assertEquals(Set.of("minutes", "url"), GlossMessages.EDITOR_LINK_CONSOLE.placeholders());
+    assertEquals(Set.of("scopes", "folders", "lifetime", "token"), GlossMessages.EDITOR_LINK_DETAILS.placeholders());
+    String link = localization.legacy(
+        GlossMessages.EDITOR_LINK_CONSOLE,
         MessageArgs.builder()
-            .untrusted("subject", "sync-qa")
-            .untrusted("url", "https://editor.example/#/sync/secret")
+            .untrusted("minutes", 10)
+            .untrusted("url", "https://editor.example/#/pair/GLS1.abc")
             .build()
     );
-    assertTrue(warning.contains("Treat it as a secret"));
-    assertTrue(open.contains("sync-qa"));
-    assertTrue(open.contains("https://editor.example/#/sync/secret"));
-    String hover = localization.text(
-        GlossMessages.WEB_LINK_HOVER,
-        MessageArgs.builder()
-            .untrusted("session", "session12345")
-            .build()
-    );
-    assertTrue(hover.contains("session12345"));
+    assertTrue(link.contains("10 minutes"));
+    assertTrue(link.contains("https://editor.example/#/pair/GLS1.abc"));
   }
 
   @Test
@@ -633,16 +625,16 @@ public class GlossLocalizationTest {
   @Test
   public void editorAddsAChildMessageBesideItsTranslatedParent() throws Exception {
     Path file = localization.languageFile().toPath().getParent().resolve("fr_FR.toml");
-    Files.writeString(file, "# Local messages\n[command.help]\nweb = \"Editeur web\"\n");
+    Files.writeString(file, "# Local messages\n[command.help]\neditor = \"Editeur web\"\n");
     PluginLanguageEditor.Options editor = localization.editorOptions();
     LocalizationSnapshot current = editor.loader().load("fr_FR");
     TextValue replacement = new TextValue("Ouvrir l'editeur");
     LocalizationSnapshot edited = editor.writer().write(new PluginLanguageEditor.Edit(
-        "fr_FR", GlossMessages.HELP_WEB_OPEN.id(), current.value(GlossMessages.HELP_WEB_OPEN), replacement));
-    assertEquals(new TextValue("Editeur web"), edited.value(GlossMessages.HELP_WEB));
-    assertEquals(replacement, editor.loader().load("fr_FR").value(GlossMessages.HELP_WEB_OPEN));
+        "fr_FR", GlossMessages.HELP_EDITOR_PAIR.id(), current.value(GlossMessages.HELP_EDITOR_PAIR), replacement));
+    assertEquals(new TextValue("Editeur web"), edited.value(GlossMessages.HELP_EDITOR));
+    assertEquals(replacement, editor.loader().load("fr_FR").value(GlossMessages.HELP_EDITOR_PAIR));
     assertTrue(Files.readString(file).startsWith("# Local messages"));
-    assertTrue(Files.readString(file).contains("\"web.open\" = "));
+    assertTrue(Files.readString(file).contains("\"editor.pair\" = "));
   }
 
   @Test

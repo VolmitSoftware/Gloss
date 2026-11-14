@@ -381,6 +381,64 @@ void main() {
       expect(first[start.id]?.y, second[start.id]?.y);
     });
 
+    test('a tall layer wraps into columns so the board stays near square', () {
+      final _MemoryWorkspace memory = _MemoryWorkspace();
+      final Workspace workspace = _workspace(memory);
+      for (int i = 0; i < 25; i++) {
+        workspace.create(
+          title: 'Menu $i',
+          runtimeId: 'loose/m$i',
+          json: _menuJson(const <HuiComponent>[]),
+        );
+      }
+      final WorkspaceFlowGraph graph = buildWorkspaceFlowGraph(
+        workspace,
+        const WorkspacePanelData(),
+      );
+      final Map<String, WorkspacePanelPoint> placed = arrangeWorkspaceFlowGraph(
+        graph,
+      );
+      final Set<double> columns = <double>{
+        for (final WorkspacePanelPoint point in placed.values) point.x,
+      };
+      final Set<double> rows = <double>{
+        for (final WorkspacePanelPoint point in placed.values) point.y,
+      };
+      expect(columns.length, 4);
+      expect(rows.length, 7);
+      final Set<String> spots = <String>{
+        for (final WorkspacePanelPoint point in placed.values)
+          '${point.x},${point.y}',
+      };
+      expect(spots.length, 25, reason: 'no two menus share a spot');
+    });
+
+    test('a wrapped layer keeps the next layer to its right', () {
+      final _MemoryWorkspace memory = _MemoryWorkspace();
+      final Workspace workspace = _workspace(memory);
+      final List<WorkspaceDoc> starts = <WorkspaceDoc>[
+        for (int i = 0; i < 12; i++)
+          workspace.create(
+            title: 'Start $i',
+            runtimeId: 'flow/s$i',
+            json: _menuJson(<HuiComponent>[
+              _button('next', 'push', target: 'flow/end'),
+            ]),
+          ),
+      ];
+      final WorkspaceDoc end = workspace.create(
+        title: 'End',
+        runtimeId: 'flow/end',
+        json: _menuJson(const <HuiComponent>[]),
+      );
+      final Map<String, WorkspacePanelPoint> placed = arrangeWorkspaceFlowGraph(
+        buildWorkspaceFlowGraph(workspace, const WorkspacePanelData()),
+      );
+      for (final WorkspaceDoc start in starts) {
+        expect(placed[start.id]!.x, lessThan(placed[end.id]!.x));
+      }
+    });
+
     test('nested runtime ids resolve exactly and remain case-sensitive', () {
       final _MemoryWorkspace memory = _MemoryWorkspace();
       final Workspace workspace = _workspace(memory);

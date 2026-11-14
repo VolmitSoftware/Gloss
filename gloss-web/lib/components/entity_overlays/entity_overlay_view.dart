@@ -1,3 +1,7 @@
+/// The entity overlays surface: a sample mob in the game screen's world with
+/// the document's overlay anchored above it. The header strikes and heals
+/// the sample; the sample controls sheet sets its name, stats and which
+/// plugins it pretends are installed. None of that reaches the server.
 library;
 
 import 'dart:async';
@@ -5,6 +9,7 @@ import 'dart:math' as math;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../l10n/hui_localizations.dart';
 import '../../logic/entity_overlay_preview.dart';
@@ -18,23 +23,22 @@ import '../../mc/scene/mc_scene.dart';
 import '../gloss/gloss_particle_overlay.dart';
 import '../../model/gloss_entity_overlays.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/number_field.dart';
+import '../../ui/sheet.dart';
+import '../../ui/switch_field.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_text_line.dart';
 import '../mc/mc_asset_loader.dart';
 import '../mc/mc_dom_layer.dart';
-import '../mc/mc_stage.dart';
 import '../mc/mc_stage_controller.dart';
 
 class EntityOverlayView extends StatefulWidget {
-  const EntityOverlayView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const EntityOverlayView({required this.store, super.key});
 
   final EditorStore store;
-  final bool gameContext;
 
   @override
   State<EntityOverlayView> createState() => _EntityOverlayViewState();
@@ -62,12 +66,15 @@ class _EntityOverlayViewState extends State<EntityOverlayView> {
   /// for 500 ms after this regardless of `doc.hitHighlightMs`.
   int _hitAtMs = -1000;
 
-  /// The editor stage frames the sample's midriff and orbits; the game frame
-  /// stands at the client's eye over the sample and does not.
+  /// Whether the sample controls sheet is open.
+  bool _sampleOpen = false;
+
+  /// The game frame stands at the client's eye over the sample and does not
+  /// orbit.
   late final McStageController _stage = McStageController(
-    kind: component.gameContext ? McStageKind.frame : McStageKind.overlays,
-    homePivot: McVec3(0.5, component.gameContext ? mcCameraEyeHeight : 0.9, 0.5),
-    freeCamera: !component.gameContext,
+    kind: McStageKind.frame,
+    homePivot: const McVec3(0.5, mcCameraEyeHeight, 0.5),
+    freeCamera: false,
   );
 
   /// The last camera and WebGL verdict this view rendered against, so a
@@ -189,7 +196,12 @@ class _EntityOverlayViewState extends State<EntityOverlayView> {
   @override
   Widget build(BuildContext context) {
     GlossEntityOverlaysDoc? doc = component.store.entityOverlaysDoc;
-    if (doc == null) return const dom.div(<Widget>[]);
+    if (doc == null) {
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.world,
+        label: huiText('Entity overlay sample in game'),
+      );
+    }
     final EntityOverlaySample sample = EntityOverlaySample(
       name: _name,
       health: _health,
@@ -206,7 +218,12 @@ class _EntityOverlayViewState extends State<EntityOverlayView> {
       player: _player,
       entityType: _player ? 'PLAYER' : 'ZOMBIE',
     );
-    doc = resolveEntityOverlayDocument(doc, sample, nowMs: _clock.elapsedMilliseconds, names: component.store.workspaceNames);
+    doc = resolveEntityOverlayDocument(
+      doc,
+      sample,
+      nowMs: _clock.elapsedMilliseconds,
+      names: component.store.workspaceNames,
+    );
     final EntityOverlayPreview preview = resolveEntityOverlayPreview(
       doc,
       sample,
@@ -226,9 +243,6 @@ class _EntityOverlayViewState extends State<EntityOverlayView> {
         (_hitTimer != null || _animationTimer != null) &&
         component.store.animationsPlaying;
     if (animating) _poseTimeMs = _clock.elapsedMilliseconds;
-    if (!component.gameContext) {
-      _stage.homePivot = McVec3(0.5, rig.heightBlocks / 2, 0.5);
-    }
     _stage.scene = McScene(<McSceneNode>[
       McRigNode(
         key: 'sample',
@@ -245,35 +259,48 @@ class _EntityOverlayViewState extends State<EntityOverlayView> {
     final List<Widget> overlay = preview.visible
         ? <Widget>[_labelAnchor(doc, preview, rig)]
         : const <Widget>[];
-    final Widget chrome = _chrome(preview);
-    return dom.div(classes: 'hui-entity-overlay-stage', <Widget>[
-      if (component.gameContext)
-        GlossGameScreen(
-          anchor: GlossGameAnchor.world,
-          label: huiText('Entity overlay sample in game'),
-          world: _stage,
-          worldOverlay: overlay,
-          child: chrome,
-        )
-      else
-        dom.div(classes: 'hui-entity-overlay-sky', <Widget>[
-          McStage(
-            controller: _stage,
-            overlay: overlay,
-            label: huiText('Sample entity overlay'),
+    // Why the overlay is hidden for this sample, else the still-world note.
+    final String? status =
+        preview.hiddenReason ?? (_stage.webGlAvailable ? null : _noWebGlNote());
+    // The sheet is fixed over the page, so it adds nothing to the centre
+    // cell's layout next to the frame.
+    return Component.fragment(<Widget>[
+      GlossGameScreen(
+        anchor: GlossGameAnchor.world,
+        label: huiText('Entity overlay sample in game'),
+        actions: <RowAction>[
+          RowAction(
+            huiText('Strike sample'),
+            _strike,
+            icon: ArcaneIcon.sword(),
+            iconOnly: true,
           ),
-          chrome,
-        ]),
-      if (preview.errors.isNotEmpty)
-        dom.div(
-          classes: 'hui-entity-overlay-hidden',
-          attributes: const <String, String>{'role': 'alert'},
-          <Widget>[
-            for (final String error in preview.errors)
-              dom.p(<Widget>[Text(error)]),
-          ],
-        ),
-      _controls(),
+          RowAction(
+            huiText('Restore health'),
+            _restore,
+            icon: ArcaneIcon.heartPulse(),
+            iconOnly: true,
+          ),
+          RowAction(
+            huiText('Sample controls'),
+            () => setState(() => _sampleOpen = !_sampleOpen),
+            icon: ArcaneIcon.slidersHorizontal(),
+            iconOnly: true,
+            expanded: _sampleOpen,
+          ),
+        ],
+        status: status,
+        world: _stage,
+        worldOverlay: overlay,
+        child: const dom.div(<Widget>[]),
+      ),
+      Sheet(
+        open: _sampleOpen,
+        title: huiText('Sample controls'),
+        dense: true,
+        onClose: () => setState(() => _sampleOpen = false),
+        child: _sampleControls(),
+      ),
     ]);
   }
 
@@ -358,129 +385,102 @@ class _EntityOverlayViewState extends State<EntityOverlayView> {
     );
   }
 
-  /// Non-anchored chrome over the stage: the hidden-state banner and the
-  /// sample-entity note. `pointer-events: none` so it never blocks orbit
-  /// dragging on the stage beneath it.
-  Widget _chrome(EntityOverlayPreview preview) => dom.div(
-    classes: 'hui-entity-overlay-scene',
-    styles: const dom.Styles(raw: <String, String>{'pointer-events': 'none'}),
-    <Widget>[
-      if (!preview.visible)
-        dom.div(
-          classes: 'hui-entity-overlay-hidden',
-          attributes: const <String, String>{'role': 'status'},
-          <Widget>[Text(huiText(preview.hiddenReason!))],
-        ),
-      dom.span(classes: 'hui-entity-overlay-sample-note', <Widget>[
-        Text(huiText('Sample entity in world')),
-        if (!_stage.webGlAvailable) Text(' · ${_noWebGlNote()}'),
-      ]),
-    ],
-  );
-
-  /// Appended to the sample note when the stage fell back to the still.
+  /// The status line when the stage fell back to the still.
   String _noWebGlNote() => huiText(
     'No WebGL2 in this browser: the world is a still and models are '
     'sprites',
   );
 
-  Widget _controls() => dom.div(
-    classes: 'hui-entity-overlay-controls',
-    <Widget>[
-      dom.div(classes: 'hui-entity-overlay-control-row', <Widget>[
-        dom.strong(<Widget>[Text(huiText('Sample controls'))]),
-        Button(
-          label: huiText('Strike sample'),
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          onPressed: _strike,
-        ),
-        Button(
-          label: huiText('Restore health'),
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          onPressed: _restore,
-        ),
-      ]),
-      dom.div(classes: 'hui-entity-overlay-control-row', <Widget>[
-        dom.label(classes: 'hui-entity-overlay-sample-name', <Widget>[
-          dom.span(<Widget>[Text(huiText('Sample name'))]),
-          TextInput(
-            value: _name,
-            size: ComponentSize.sm,
-            attributes: <String, String>{'aria-label': huiText('Sample name')},
-            onChanged: (String value) => setState(() => _name = value),
-          ),
-        ]),
-        _number(
-          'Sample health',
-          _health,
-          (double value) => _health = value.clamp(0, _maxHealth),
-        ),
-        _number('Sample max health', _maxHealth, (double value) {
-          _maxHealth = math.max(1, value);
-          _health = math.min(_health, _maxHealth);
-        }),
-        _number(
-          'Sample attack',
-          _attack,
-          (double value) => _attack = math.max(0, value),
-        ),
-        _number(
-          'Sample armor',
-          _armor,
-          (double value) => _armor = math.max(0, value),
-        ),
-        _number(
-          'Sample distance',
-          _distance,
-          (double value) => _distance = math.max(0, value),
-        ),
-      ]),
-      dom.div(classes: 'hui-entity-overlay-control-row', <Widget>[
-        _toggle('Player sample', _player, () => _player = !_player),
-        _toggle('React installed', _react, () => _react = !_react),
-        if (_react)
-          _number(
-            'Sample stack count',
-            _stackCount.toDouble(),
-            (double value) => _stackCount = math.max(1, value.round()),
-          ),
-        _toggle('Adapt installed', _adapt, () => _adapt = !_adapt),
-        if (_adapt) ...<Widget>[
-          _toggle('Insight active', _insight, () => _insight = !_insight),
-          _toggle(
-            'Adapt exclusive',
-            _exclusive,
-            () => _exclusive = !_exclusive,
-          ),
-        ],
-      ]),
+  /// The sample's name, stats and the plugins it pretends are installed.
+  /// Editing a stat clears a pending hit so the label shows the new value.
+  Widget _sampleControls() => Component.fragment(<Widget>[
+    ArcaneFieldDescription(
+      huiText(
+        'Use the sample controls to compare these states. Sample controls do not change server settings.',
+      ),
+    ),
+    Field(
+      label: huiText('Sample name'),
+      forId: 'entity-overlay-sample-name',
+      child: TextInput(
+        id: 'entity-overlay-sample-name',
+        value: _name,
+        size: controlSize(Density.dense),
+        fullWidth: true,
+        onChanged: (String value) => setState(() => _name = value),
+      ),
+    ),
+    _number(
+      'Sample health',
+      'health',
+      _health,
+      (double value) => _health = value.clamp(0, _maxHealth),
+    ),
+    _number('Sample max health', 'max-health', _maxHealth, (double value) {
+      _maxHealth = math.max(1, value);
+      _health = math.min(_health, _maxHealth);
+    }),
+    _number(
+      'Sample attack',
+      'attack',
+      _attack,
+      (double value) => _attack = math.max(0, value),
+    ),
+    _number(
+      'Sample armor',
+      'armor',
+      _armor,
+      (double value) => _armor = math.max(0, value),
+    ),
+    _number(
+      'Sample distance',
+      'distance',
+      _distance,
+      (double value) => _distance = math.max(0, value),
+    ),
+    _toggle('Player sample', _player, (bool on) => _player = on),
+    _toggle('React installed', _react, (bool on) => _react = on),
+    if (_react)
+      _number(
+        'Sample stack count',
+        'stack-count',
+        _stackCount.toDouble(),
+        (double value) => _stackCount = math.max(1, value.round()),
+      ),
+    _toggle('Adapt installed', _adapt, (bool on) => _adapt = on),
+    if (_adapt) ...<Widget>[
+      _toggle('Insight active', _insight, (bool on) => _insight = on),
+      _toggle('Adapt exclusive', _exclusive, (bool on) => _exclusive = on),
     ],
-  );
+  ]);
 
-  Widget _number(String label, double value, void Function(double) edit) =>
-      dom.label(classes: 'hui-entity-overlay-sample-number', <Widget>[
-        dom.span(<Widget>[Text(huiText(label))]),
-        HuiNumberField(
-          value: value,
-          decimals: 1,
-          step: 1,
-          steppers: false,
-          onChanged: (double next) => setState(() {
-            _damage = 0;
-            edit(next);
-          }),
-        ),
-      ]);
-
-  Widget _toggle(String label, bool value, void Function() edit) => Button(
+  Widget _number(
+    String label,
+    String key,
+    double value,
+    void Function(double) edit,
+  ) => Field(
     label: huiText(label),
-    variant: ButtonVariant.outline,
-    size: ButtonSize.sm,
-    attributes: <String, String>{'aria-pressed': value.toString()},
-    onPressed: () => setState(edit),
+    forId: 'entity-overlay-sample-$key',
+    child: NumberField(
+      id: 'entity-overlay-sample-$key',
+      value: value,
+      decimals: 1,
+      step: 1,
+      onChanged: (double next) => setState(() {
+        _damage = 0;
+        edit(next);
+      }),
+    ),
   );
+
+  Widget _toggle(String label, bool value, void Function(bool) edit) =>
+      SwitchField(
+        label: huiText(label),
+        value: value,
+        onChanged: (bool next) => setState(() => edit(next)),
+      );
+
   static String _argb(String value) {
     if (!RegExp(r'^#[a-fA-F0-9]{8}$').hasMatch(value)) return 'transparent';
     return '#${value.substring(3)}${value.substring(1, 3)}';

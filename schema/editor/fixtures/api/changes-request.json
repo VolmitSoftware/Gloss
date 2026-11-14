@@ -1,0 +1,28 @@
+{
+  "idempotencyKey": "pub_4kB2f0Qx9w1mZr8c",
+  "documents": [
+    {
+      "op": "put",
+      "kind": "hologram",
+      "id": "welcome",
+      "baseHash": "sha256:7f6869313a34292141a07ccb2e5b8f0ed5562fb513904fea37993aea1d738049",
+      "json": "{\"schemaVersion\":3,\"revision\":1,\"anchor\":{\"world\":\"world\",\"position\":[0.0,0.0,0.0]},\"lines\":[\"Edited in the browser\"],\"particleLayers\":[],\"style\":{\"billboard\":\"center\",\"seeThrough\":true,\"scaleX\":1.0,\"scaleY\":1.0,\"scaleZ\":1.0},\"box\":{\"enabled\":false,\"padding\":4,\"borderWidth\":1,\"backgroundArgb\":\"#B31B1B22\",\"borderArgb\":\"#FFAAAAAA\"}}\n"
+    },
+    {
+      "op": "put",
+      "kind": "hologram",
+      "id": "spawn",
+      "baseHash": "sha256:32db12d47bb71bfac66fff27602ecf885ac872a573adeb544f1d0a536e454430",
+      "json": "{\"schemaVersion\":3,\"revision\":1,\"anchor\":{\"world\":\"world\",\"position\":[0.0,0.0,0.0]},\"lines\":[\"Mine\"],\"particleLayers\":[],\"style\":{\"billboard\":\"center\",\"seeThrough\":true,\"scaleX\":1.0,\"scaleY\":1.0,\"scaleZ\":1.0},\"box\":{\"enabled\":false,\"padding\":4,\"borderWidth\":1,\"backgroundArgb\":\"#B31B1B22\",\"borderArgb\":\"#FFAAAAAA\"}}\n"
+    }
+  ],
+  "images": [
+    {
+      "op": "put",
+      "path": "shop/new.png",
+      "baseHash": null,
+      "hash": "sha256:5c85e71fe5a69e87ef57ce24e3b1fdfe0a4f4457e17c1132f7feefa843ce1e59",
+      "mediaType": "image/png"
+    }
+  ]
+}

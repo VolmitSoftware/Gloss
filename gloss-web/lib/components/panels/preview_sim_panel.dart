@@ -1,24 +1,17 @@
-/// The simulation control panel: category picker, per-variable sample-value
-/// controls, the surge toggle, sample-item pickers, and playback transport —
-/// the showcase surface an author watches a container-preview card animate
-/// through.
+/// The simulation controls of a container-preview document, as one section
+/// of the inspector: the simulated target, playback, sample values and sample
+/// items the card animates through.
 ///
-/// Everything this renders is a direct read of `store.previewSim`
-/// ([PreviewSimController], `lib/logic/preview_sim_controls.dart`), the ONE
-/// simulation the pixel-card viewport paints from — this panel is a sibling
-/// widget with no reference to the viewport, so sharing that one controller
-/// (rather than building a second [PreviewSim]) is what keeps the two from
-/// ever disagreeing about what is on screen. Every control here writes
-/// through the controller, never through `EditorStore.mutatePreview`: a
-/// pinned sample value is simulation state, not document state, so it must
-/// repaint the card without an undo step, without dirtying the workspace, and
-/// without the document-revision bump the viewport memoizes its own
-/// category/vars resolution against.
+/// Everything here reads `store.previewSim` ([PreviewSimController]), the one
+/// simulation the pixel-card viewport paints from, so the two never disagree
+/// about what is on screen. Every control writes through the controller,
+/// never through `EditorStore.mutatePreview`: a pinned sample value is
+/// simulation state, not document state, so it repaints the card without an
+/// undo step, without dirtying the workspace and without the revision bump
+/// the viewport memoizes its category and vars against.
 ///
 /// Mounted for every view except [EditorView.code] (see
-/// `doctype/document_inspector.dart`) — the "preview HUD-ish chrome" the brief
-/// asks for belongs to the surface that is actually animating, and the code
-/// view of the same document has nothing on screen to animate.
+/// `doctype/document_inspector.dart`): the code view has no card to animate.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
@@ -30,9 +23,18 @@ import '../../logic/preview_sim_controls.dart';
 import '../../model/preview_doc.dart';
 import '../../services/catalogs.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
-import '../inspector/inspector_widgets.dart';
-import '../inspector/registry_picker.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/field_group.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/picker.dart';
+import '../../ui/section.dart';
+import '../../ui/slider_field.dart';
+import '../../ui/switch_field.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class PreviewSimPanel extends StatelessWidget {
@@ -40,198 +42,223 @@ class PreviewSimPanel extends StatelessWidget {
 
   final EditorStore store;
 
-  /// Boot snapshot; `store.catalogs` wins once it holds anything — same
+  /// Boot snapshot; `store.catalogs` wins once it holds anything, the same
   /// freshness rule the rest of the inspector uses.
   final HuiCatalogs? catalogs;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => DenseBox(
+    classes: 'hui-inspector-body is-preview-sim',
+    children: <Widget>[Builder(builder: _section)],
+  );
+
+  Widget _section(BuildContext context) {
     final PreviewSimController controller = store.previewSim;
     final PreviewSim sim = controller.sim;
-    final HuiCatalogs cats = huiFreshestCatalogs(store.catalogs, catalogs);
-    return dom.div(classes: 'hui-inspector-body is-preview-sim', <Widget>[
-      _header(),
-      _categorySection(controller),
-      _playbackSection(controller),
-      ..._variableSection(controller, sim),
-      if (previewSimCategorySupportsSurge(controller.category))
-        _surgeSection(controller, sim),
-      if (previewSimCategorySupportsSlots(controller.category))
-        _slotsSection(controller, sim, cats),
-    ]);
-  }
-
-  Widget _header() => dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-    HuiEyebrow(huiText('Simulation')),
-    dom.p(classes: 'hui-inspector-lede', <Widget>[
-      Text(
-        huiText(
-          'The editor has no server, so this is a canned target the card '
-          'previews against. Pin any value below to hold it still; '
-          'anything not pinned follows the simulation.',
-        ),
+    final ComponentSize size = controlSize(DensityScope.of(context));
+    return AppSection(
+      title: huiText('Simulation'),
+      memoryKey: 'preview.simulation',
+      tip: huiText(
+        'The editor has no server, so this is a canned target the card '
+        'previews against. Pin any value below to hold it still; '
+        'anything not pinned follows the simulation.',
       ),
-    ]),
-  ]);
-
-  // --- category ---------------------------------------------------------
-
-  Widget _categorySection(PreviewSimController controller) {
-    final HuiPreviewDoc? doc = store.previewDoc;
-    final String auto = doc == null ? 'statics' : previewAutoSimCategory(doc);
-    final bool manual = controller.categoryOverride != null;
-    return InspectorSection(
-      title: huiText('Target'),
       children: <Widget>[
-        HuiField(
-          label: huiText('Simulated target'),
-          help: huiText(
-            'Which canned state (a chest, a running furnace, ...) the '
-            'card previews against.',
-          ),
-          trailing: !manual
-              ? null
-              : HuiIconButton(
-                  icon: ArcaneIcon.refreshCcw(size: IconSize.sm),
-                  label: huiText(
-                    "Follow the document's own match ({previewSimCategoryLabel})",
-                    <String, Object?>{
-                      'previewSimCategoryLabel': previewSimCategoryLabel(auto),
-                    },
-                  ),
-                  onPressed: () => controller.setCategory(null),
-                ),
-          control: ArcaneSelect(
-            value: controller.category,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            options: <ArcaneSelectOption>[
-              for (final String category in previewSimCategories)
-                ArcaneSelectOption(
-                  label: previewSimCategoryLabel(category),
-                  value: category,
-                ),
-            ],
-            onChanged: (String value) => controller.setCategory(value),
+        _target(controller, size),
+        _playback(controller),
+        SwitchField(
+          label: huiText('Force ticking on a static card'),
+          value: controller.forcePlay,
+          onChanged: controller.setForcePlay,
+          tip: huiText(
+            'Runs the clock even if nothing in this document reads a '
+            'value it moves. Normally the surface skips ticking a card '
+            'that would draw the same picture every frame.',
           ),
         ),
+        if (previewSimCategorySupportsSurge(controller.category))
+          ..._surge(controller, sim),
+        ?_sampleValues(controller, sim, size),
+        if (previewSimCategorySupportsSlots(controller.category) &&
+            sim.inventorySize > 0)
+          _sampleItems(
+            controller,
+            sim,
+            huiFreshestCatalogs(store.catalogs, catalogs),
+          ),
       ],
     );
   }
 
-  // --- playback -----------------------------------------------------------
+  Widget _target(PreviewSimController controller, ComponentSize size) {
+    final HuiPreviewDoc? doc = store.previewDoc;
+    final String auto = doc == null ? 'statics' : previewAutoSimCategory(doc);
+    return Field(
+      label: huiText('Simulated target'),
+      forId: 'hui-preview-sim-target',
+      tip: huiText(
+        'Which canned state (a chest, a running furnace, ...) the '
+        'card previews against.',
+      ),
+      trailing: controller.categoryOverride == null
+          ? null
+          : AppIconButton(
+              icon: ArcaneIcon.refreshCcw(),
+              label: huiText(
+                "Follow the document's own match ({previewSimCategoryLabel})",
+                <String, Object?>{
+                  'previewSimCategoryLabel': previewSimCategoryLabel(auto),
+                },
+              ),
+              tipAtEnd: true,
+              onPressed: () => controller.setCategory(null),
+            ),
+      child: ArcaneSelect(
+        id: 'hui-preview-sim-target',
+        value: controller.category,
+        size: size,
+        fullWidth: true,
+        options: <ArcaneSelectOption>[
+          for (final String category in previewSimCategories)
+            ArcaneSelectOption(
+              label: previewSimCategoryLabel(category),
+              value: category,
+            ),
+        ],
+        onChanged: (String value) => controller.setCategory(value),
+      ),
+    );
+  }
 
-  Widget _playbackSection(PreviewSimController controller) => InspectorSection(
-    title: huiText('Playback'),
-    description: huiText(
-      'Drives the same clock the canvas toolbar\'s play/pause '
-      'does — one simulated game tick every 50 ms.',
-    ),
-    children: <Widget>[
-      dom.div(
-        styles: const dom.Styles(
-          raw: <String, String>{'display': 'flex', 'gap': '6px'},
-        ),
-        <Widget>[
-          Button(
-            variant: store.animationsPlaying
-                ? ButtonVariant.secondary
-                : ButtonVariant.outline,
-            size: ButtonSize.sm,
-            icon: store.animationsPlaying
-                ? ArcaneIcon.pause(size: IconSize.sm)
-                : ArcaneIcon.play(size: IconSize.sm),
-            onPressed: () => store.animationsPlaying = !store.animationsPlaying,
-            attributes: <String, String>{
-              'aria-pressed': '${store.animationsPlaying}',
-              'aria-label': store.animationsPlaying
-                  ? huiText('Pause')
-                  : huiText('Play'),
-            },
-            label: store.animationsPlaying ? huiText('Pause') : huiText('Play'),
+  Widget _playback(PreviewSimController controller) {
+    final bool playing = store.animationsPlaying;
+    return Field(
+      label: huiText('Playback'),
+      tip: huiText(
+        'Drives the same clock as the canvas Play button: one game '
+        'tick every 50 ms.',
+      ),
+      child: ActionRow(
+        dense: true,
+        label: huiText('Playback'),
+        secondary: <RowAction>[
+          RowAction(
+            huiText('Play'),
+            () => store.animationsPlaying = !playing,
+            icon: ArcaneIcon.play(),
+            pressed: playing,
           ),
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.sm,
-            icon: ArcaneIcon.stepForward(size: IconSize.sm),
-            onPressed: controller.step,
-            attributes: <String, String>{
-              'aria-label': huiText('Step one second of simulation'),
-            },
-            label: huiText('Step'),
+          RowAction(
+            huiText('Step'),
+            controller.step,
+            icon: ArcaneIcon.stepForward(),
           ),
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.sm,
-            icon: ArcaneIcon.rotateCcw(size: IconSize.sm),
-            onPressed: controller.reset,
-            attributes: <String, String>{
-              'aria-label': huiText('Reset the simulated state'),
-            },
-            label: huiText('Reset'),
+          RowAction(
+            huiText('Reset'),
+            controller.reset,
+            icon: ArcaneIcon.rotateCcw(),
           ),
         ],
       ),
-      HuiSwitchRow(
-        label: huiText('Force ticking on a static card'),
-        value: controller.forcePlay,
-        onChanged: controller.setForcePlay,
-        help: huiText(
-          'Runs the clock even if nothing in this document reads a '
-          'value it moves. Normally the surface skips ticking a card '
-          'that would draw the same picture every frame.',
+    );
+  }
+
+  List<Widget> _surge(PreviewSimController controller, PreviewSim sim) =>
+      <Widget>[
+        SwitchField(
+          label: huiText('Surge active'),
+          value: sim.surgeActive,
+          onChanged: (bool value) => controller.setSurge(value),
+          tip: huiText(
+            'Simulates the plugin\'s own catch-up window after a '
+            'refresh gap: progress jumps by more than the elapsed ticks, '
+            'which is what `surge.active`/`surge.gain` report.',
+          ),
         ),
-      ),
-    ],
-  );
+        if (sim.surgeActive)
+          Field(
+            label: huiText('Gain (seconds)'),
+            forId: 'hui-preview-sim-surge-gain',
+            child: SliderField(
+              id: 'hui-preview-sim-surge-gain',
+              label: huiText('Surge gain'),
+              value: sim.surgeGain,
+              min: 0,
+              max: 30,
+              step: 0.1,
+              decimals: 1,
+              onChanged: (double value) =>
+                  controller.setSurge(true, gain: value),
+            ),
+          ),
+      ];
 
-  // --- per-variable controls -----------------------------------------------
-
-  List<Widget> _variableSection(
+  Widget? _sampleValues(
     PreviewSimController controller,
     PreviewSim sim,
+    ComponentSize size,
   ) {
     final List<PreviewSimVarControl> controls = previewSimControlsFor(
       controller.category,
     );
-    if (controls.isEmpty) return const <Widget>[];
-    return <Widget>[
-      InspectorSection(
-        title: huiText('Sample values'),
-        children: <Widget>[
-          for (final PreviewSimVarControl c in controls)
-            _controlRow(controller, sim, c),
-        ],
-      ),
-    ];
+    if (controls.isEmpty) return null;
+    final bool anyPinned = controls.any(
+      (PreviewSimVarControl control) => sim.overrides.containsKey(control.name),
+    );
+    return FieldGroup(
+      title: huiText('Sample values'),
+      actions: <Widget>[
+        if (anyPinned)
+          AppIconButton(
+            icon: ArcaneIcon.pinOff(),
+            label: huiText('Unpin all'),
+            tipAtEnd: true,
+            onPressed: () {
+              for (final String name in sim.overrides.keys.toList()) {
+                controller.clearOverride(name);
+              }
+            },
+          ),
+      ],
+      children: <Widget>[
+        for (final PreviewSimVarControl control in controls)
+          _sampleValue(controller, sim, control, size),
+      ],
+    );
   }
 
-  Widget _controlRow(
+  Widget _sampleValue(
     PreviewSimController controller,
     PreviewSim sim,
     PreviewSimVarControl control,
+    ComponentSize size,
   ) {
-    final bool pinned = sim.overrides.containsKey(control.name);
+    final String label = previewSimVarLabel(control.name);
+    final String id = 'hui-preview-sim-${control.name.replaceAll('.', '-')}';
     final Object current =
         sim.overrides[control.name] ??
         sim.variable(control.name) ??
         _fallback(control.kind);
-    final Widget? unpin = !pinned
+    final Widget? unpin = !sim.overrides.containsKey(control.name)
         ? null
-        : HuiIconButton(
-            icon: ArcaneIcon.pinOff(size: IconSize.sm),
+        : AppIconButton(
+            icon: ArcaneIcon.pinOff(),
             label: huiText("Unpin {previewSimVarLabel}", <String, Object?>{
-              'previewSimVarLabel': previewSimVarLabel(control.name),
+              'previewSimVarLabel': label,
             }),
+            tipAtEnd: true,
             onPressed: () => controller.clearOverride(control.name),
           );
     switch (control.kind) {
       case PreviewSimControlKind.number:
-        return HuiField(
-          label: previewSimVarLabel(control.name),
+        return Field(
+          label: label,
+          forId: id,
           trailing: unpin,
-          control: HuiSliderField(
-            label: previewSimVarLabel(control.name),
+          child: SliderField(
+            id: id,
+            label: label,
             value: (current as num).toDouble(),
             min: control.min,
             max: control.max,
@@ -241,19 +268,21 @@ class PreviewSimPanel extends StatelessWidget {
           ),
         );
       case PreviewSimControlKind.boolean:
-        return HuiSwitchRow(
-          label: previewSimVarLabel(control.name),
+        return SwitchField(
+          id: id,
+          label: label,
           value: current == true,
-          trailing: unpin,
           onChanged: (bool value) => controller.setOverride(control, value),
         );
       case PreviewSimControlKind.string:
-        return HuiField(
-          label: previewSimVarLabel(control.name),
+        return Field(
+          label: label,
+          forId: id,
           trailing: unpin,
-          control: TextInput(
+          child: TextInput(
+            id: id,
             value: current.toString(),
-            size: ComponentSize.sm,
+            size: size,
             fullWidth: true,
             onChanged: (String value) => controller.setOverride(control, value),
             attributes: const <String, String>{
@@ -271,50 +300,15 @@ class PreviewSimPanel extends StatelessWidget {
     PreviewSimControlKind.string => '',
   };
 
-  // --- surge ----------------------------------------------------------------
-
-  Widget _surgeSection(PreviewSimController controller, PreviewSim sim) =>
-      InspectorSection(
-        title: huiText('Surge'),
-        description: huiText(
-          'Simulates the plugin\'s own catch-up window after a '
-          'refresh gap: progress jumps by more than the elapsed ticks, '
-          'which is what `surge.active`/`surge.gain` report.',
-        ),
-        children: <Widget>[
-          HuiSwitchRow(
-            label: huiText('Surge active'),
-            value: sim.surgeActive,
-            onChanged: (bool value) => controller.setSurge(value),
-          ),
-          if (sim.surgeActive)
-            HuiField(
-              label: huiText('Gain (seconds)'),
-              control: HuiSliderField(
-                label: huiText('Surge gain'),
-                value: sim.surgeGain,
-                min: 0,
-                max: 30,
-                step: 0.1,
-                decimals: 1,
-                onChanged: (double value) =>
-                    controller.setSurge(true, gain: value),
-              ),
-            ),
-        ],
-      );
-
-  // --- sample items -----------------------------------------------------
-
-  Widget _slotsSection(
+  Widget _sampleItems(
     PreviewSimController controller,
     PreviewSim sim,
     HuiCatalogs cats,
   ) {
     final int size = sim.inventorySize;
-    if (size <= 0) return const dom.div(<Widget>[]);
-    return HuiMore(
-      summary: huiText('Sample items ({slots})', <String, Object?>{
+    return MoreFields(
+      memoryKey: 'preview.simulation.items',
+      label: huiText('Sample items ({slots})', <String, Object?>{
         'slots': huiPlural(
           'preview.sample_slot_count',
           size,
@@ -324,12 +318,12 @@ class PreviewSimPanel extends StatelessWidget {
       }),
       children: <Widget>[
         for (int slot = 0; slot < size; slot++)
-          _slotRow(controller, sim, cats, slot),
+          _sampleItem(controller, sim, cats, slot),
       ],
     );
   }
 
-  Widget _slotRow(
+  Widget _sampleItem(
     PreviewSimController controller,
     PreviewSim sim,
     HuiCatalogs cats,
@@ -338,63 +332,53 @@ class PreviewSimPanel extends StatelessWidget {
     final SimSlotItem? item = previewSimSlotAt(sim.slotItems, slot);
     final String material = item?.material ?? '';
     final int count = item?.count ?? 0;
-    return HuiField(
+    final String id = 'hui-preview-sim-slot-$slot';
+    return Field(
       label: huiText("Slot {slot}", <String, Object?>{'slot': slot}),
-      control: dom.div(
-        styles: const dom.Styles(
-          raw: <String, String>{
-            'display': 'grid',
-            'grid-template-columns': 'minmax(0, 1fr) 72px',
-            'gap': '8px',
-            'min-width': '0',
-          },
+      forId: id,
+      child: dom.div(classes: 'hui-sim-slot', <Widget>[
+        Picker(
+          id: id,
+          // The sim stores Bukkit enum names (`IRON_ORE`); the catalog and
+          // every other picker use lowercase keys (`iron_ore`).
+          value: material.toLowerCase(),
+          lowercase: true,
+          placeholder: huiText('air'),
+          searchPlaceholder: huiPlural(
+            'preview.search_materials',
+            cats.materials.length,
+            oneEnglish: 'Search {count} material',
+            otherEnglish: 'Search {count} materials',
+          ),
+          search: (String query) => <PickerOption>[
+            for (final MaterialEntry entry in cats.searchMaterials(
+              query,
+              limit: 60,
+            ))
+              PickerOption(entry.key, image: entry.texture),
+          ],
+          onChanged: (String value) => controller.setSlot(
+            slot,
+            material: value.toUpperCase(),
+            count: count > 0 ? count : 1,
+          ),
         ),
-        <Widget>[
-          RegistryPicker(
-            // The sim stores Bukkit enum names (`IRON_ORE`); the catalogue and
-            // every other picker in this editor use lowercase namespaced keys
-            // (`iron_ore`) — bridge here so the UI stays consistent while
-            // `SimSlotItem.material` keeps the form `item()`/`readable()`
-            // expect.
-            value: material.toLowerCase(),
-            placeholder: huiText('air'),
-            browseLabel: huiText('Browse items'),
-            searchPlaceholder: huiPlural(
-              'preview.search_materials',
-              cats.materials.length,
-              oneEnglish: 'Search {count} material',
-              otherEnglish: 'Search {count} materials',
-            ),
-            catalogAvailable: cats.materials.isNotEmpty,
-            textureFor: cats.textureFor,
-            search: (String query, int limit) => cats
-                .searchMaterials(query, limit: limit)
-                .map(
-                  (MaterialEntry entry) =>
-                      RegistryOption(entry.key, entry.texture),
-                )
-                .toList(),
-            onChanged: (String value) => controller.setSlot(
-              slot,
-              material: value.toUpperCase(),
-              count: count > 0 ? count : 1,
-            ),
+        NumberField(
+          id: '$id-count',
+          label: huiText('Count'),
+          value: count.toDouble(),
+          min: 0,
+          max: 6400,
+          step: 1,
+          integer: true,
+          steppers: false,
+          onChanged: (double value) => controller.setSlot(
+            slot,
+            material: material,
+            count: value.round(),
           ),
-          HuiNumberField(
-            value: count.toDouble(),
-            min: 0,
-            max: 6400,
-            step: 1,
-            integer: true,
-            steppers: false,
-            onChanged: (double value) => controller.setSlot(
-              slot,
-              material: material,
-              count: value.round(),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }

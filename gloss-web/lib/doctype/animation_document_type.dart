@@ -25,8 +25,6 @@ final class AnimationDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('animation');
 
-  @override
-  String get createLabel => huiText('New animation');
 
   @override
   String get pluralLabel => huiText('Animations');

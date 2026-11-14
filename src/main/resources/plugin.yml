@@ -54,7 +54,7 @@ permissions:
       gloss.preview: true
       gloss.previews: true
       gloss.items: true
-      gloss.web: true
+      gloss.editor: true
       gloss.import: true
       gloss.emoji.use: true
       gloss.chat.color: true
@@ -227,25 +227,21 @@ permissions:
   gloss.items.export:
     description: Allows exporting the custom item catalog for the web editor.
     default: op
-  gloss.web:
+  gloss.editor:
     description: Gives access to all Gloss web editor permissions.
     default: op
     children:
-      gloss.web.open: true
-      gloss.web.edit: true
-      gloss.web.workspace: true
-      gloss.web.sessions: true
-  gloss.web.open:
-    description: Allows opening an empty hosted Gloss editor.
+      gloss.editor.pair: true
+      gloss.editor.commands: true
+      gloss.editor.notify: true
+  gloss.editor.pair:
+    description: Allows pairing the web editor and listing or revoking its tokens; a player's tokens end when they lose it.
     default: op
-  gloss.web.edit:
-    description: Allows opening individual live Gloss documents in the web editor.
+  gloss.editor.commands:
+    description: Allows pairing the publish:commands scope, which publishes documents that run console commands.
     default: op
-  gloss.web.workspace:
-    description: Allows opening the complete live Gloss workspace.
-    default: op
-  gloss.web.sessions:
-    description: Allows managing live Gloss web editor sessions.
+  gloss.editor.notify:
+    description: Shows web editor pairings, publishes and failed pairings in chat.
     default: op
   gloss.import:
     description: Allows previewing legacy hologram migrations.

@@ -1,0 +1,25 @@
+{
+  "documents": [
+    {
+      "kind": "hologram",
+      "id": "spawn",
+      "hash": "sha256:32db12d47bb71bfac66fff27602ecf885ac872a573adeb544f1d0a536e454430",
+      "revision": 1,
+      "json": "{\"schemaVersion\":3,\"revision\":1,\"anchor\":{\"world\":\"world\",\"position\":[0.0,0.0,0.0]},\"lines\":[\"Spawn\"],\"particleLayers\":[],\"style\":{\"billboard\":\"center\",\"seeThrough\":true,\"scaleX\":1.0,\"scaleY\":1.0,\"scaleZ\":1.0},\"box\":{\"enabled\":false,\"padding\":4,\"borderWidth\":1,\"backgroundArgb\":\"#B31B1B22\",\"borderArgb\":\"#FFAAAAAA\"}}\n"
+    },
+    {
+      "kind": "hologram",
+      "id": "welcome",
+      "hash": "sha256:7f6869313a34292141a07ccb2e5b8f0ed5562fb513904fea37993aea1d738049",
+      "revision": 1,
+      "json": "{\"schemaVersion\":3,\"revision\":1,\"anchor\":{\"world\":\"world\",\"position\":[0.0,0.0,0.0]},\"lines\":[\"Welcome\"],\"particleLayers\":[],\"style\":{\"billboard\":\"center\",\"seeThrough\":true,\"scaleX\":1.0,\"scaleY\":1.0,\"scaleZ\":1.0},\"box\":{\"enabled\":false,\"padding\":4,\"borderWidth\":1,\"backgroundArgb\":\"#B31B1B22\",\"borderArgb\":\"#FFAAAAAA\"}}\n"
+    },
+    {
+      "kind": "menu",
+      "id": "shop/main",
+      "hash": "sha256:04a13c70728cd5f50e69e7d36b66d536918835b83b41e1b3fd09e85e4696806a",
+      "json": "{\"title\":\"&6Shop\",\"components\":[]}"
+    }
+  ],
+  "next": null
+}

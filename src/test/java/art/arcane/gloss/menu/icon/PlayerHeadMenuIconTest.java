@@ -253,7 +253,7 @@ public class PlayerHeadMenuIconTest {
         defaults.chat(), defaults.text(), defaults.bubbles(), defaults.indicators(), defaults.drops(),
         defaults.realDrops(), defaults.motd(), defaults.groups(), defaults.hotload(), defaults.commands(),
         defaults.menus(), defaults.panels(), defaults.previews(),
-        defaults.editorSync(), defaults.debug(), defaults.customItems(),
+        defaults.editor(), defaults.debug(), defaults.customItems(),
         new GlossConfig.PlayerHeads(enabled, heads.cacheMinutes(), heads.unknownCacheMinutes(),
             heads.maxCachedProfiles(), heads.unknownFallbackItem()),
         defaults.integration(), defaults.modules(), defaults.visibility(), defaults.images(), defaults.teams(), defaults.imports());

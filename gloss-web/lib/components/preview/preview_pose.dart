@@ -92,9 +92,7 @@ class PreviewLogBuffer extends ChangeNotifier {
 class PreviewLiveState extends ChangeNotifier {
   String? _hoveredId;
   int _hoveredIds = 0;
-  int _hoverTicks = 0;
   double _hoverPushBlocks = 0;
-  double _highlightModifier = 0;
   double _distanceToCenter = 0;
   bool _isOpen = true;
   PreviewCloseReason? _closeReason;
@@ -107,14 +105,8 @@ class PreviewLiveState extends ChangeNotifier {
   /// arbitration.
   int get hoveredIds => _hoveredIds;
 
-  /// Consecutive ticks [hoveredId] has been held, counting from 1.
-  int get hoverTicks => _hoverTicks;
-
   /// Blocks [hoveredId] is currently displaced toward the eye.
   double get hoverPushBlocks => _hoverPushBlocks;
-
-  /// The authored modifier for [hoveredId], unclamped.
-  double get highlightModifier => _highlightModifier;
 
   /// Player to menu centre, in blocks. Compared against `maxDistance`.
   double get distanceToCenter => _distanceToCenter;
@@ -132,9 +124,7 @@ class PreviewLiveState extends ChangeNotifier {
   void update({
     required String? hoveredId,
     required int hoveredIds,
-    required int hoverTicks,
     required double hoverPushBlocks,
-    required double highlightModifier,
     required double distanceToCenter,
     required bool isOpen,
     required PreviewCloseReason? closeReason,
@@ -142,9 +132,7 @@ class PreviewLiveState extends ChangeNotifier {
   }) {
     if (hoveredId == _hoveredId &&
         hoveredIds == _hoveredIds &&
-        hoverTicks == _hoverTicks &&
         hoverPushBlocks == _hoverPushBlocks &&
-        highlightModifier == _highlightModifier &&
         distanceToCenter == _distanceToCenter &&
         isOpen == _isOpen &&
         closeReason == _closeReason &&
@@ -153,9 +141,7 @@ class PreviewLiveState extends ChangeNotifier {
     }
     _hoveredId = hoveredId;
     _hoveredIds = hoveredIds;
-    _hoverTicks = hoverTicks;
     _hoverPushBlocks = hoverPushBlocks;
-    _highlightModifier = highlightModifier;
     _distanceToCenter = distanceToCenter;
     _isOpen = isOpen;
     _closeReason = closeReason;
@@ -166,9 +152,7 @@ class PreviewLiveState extends ChangeNotifier {
   void reset() => update(
     hoveredId: null,
     hoveredIds: 0,
-    hoverTicks: 0,
     hoverPushBlocks: 0,
-    highlightModifier: 0,
     distanceToCenter: 0,
     isOpen: true,
     closeReason: null,

@@ -1,283 +1,412 @@
-/// Inspector body for a Gloss bubble-style document: the prefix and offset,
-/// the three silently-clamped numbers (with their effective values), the
-/// behavior switches, and the optional select rule.
+/// Inspector body for a Gloss bubble-style document: the look, wrap and
+/// timing, the stack, behaviour, expression motion, the shimmer band, the
+/// shared display editors and the optional select rule.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 
+import '../../logic/bubble_motion.dart';
+import '../../logic/gloss_show.dart';
+import '../../logic/gloss_text.dart';
 import '../../logic/validation.dart';
+import '../../model/gloss_hologram_box.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/badge.dart';
+import '../../ui/color_field.dart';
+import '../../ui/color_value.dart';
+import '../../ui/density.dart';
+import '../../ui/duration_field.dart';
+import '../../ui/duration_value.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/info_tip.dart';
+import '../../ui/menu.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/toggle_choice.dart';
+import '../../ui/vec3_field.dart';
+import '../../ui/technical_input.dart';
 import '../gloss/gloss_text_line.dart';
-import '../../logic/gloss_text.dart';
-import '../../logic/bubble_motion.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
-import 'extras_editor.dart';
-import 'display_style_editor.dart';
 import 'display_refresh_editor.dart';
-import 'hologram_box_editor.dart';
-import '../../model/gloss_hologram_box.dart';
+import 'display_style_editor.dart';
 import 'gloss_visibility_editor.dart';
-import '../../logic/gloss_show.dart';
-import 'preview_expr_field.dart';
+import 'hologram_box_editor.dart';
 import 'particle_layers_editor.dart';
+import 'preview_expr_field.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
-class BubbleInspector extends StatefulWidget {
+const String _defaultFormat = '{message}';
+const double _defaultStackDistance = 0.26;
+const int _defaultMaxPerSender = 4;
+
+class BubbleInspector extends StatelessWidget {
   const BubbleInspector({required this.store, super.key});
 
   final EditorStore store;
 
-  @override
-  State<BubbleInspector> createState() => _BubbleInspectorState();
-}
-
-class _BubbleInspectorState extends State<BubbleInspector> {
-  EditorStore get _store => component.store;
-
-  GlossBubbleStyleDoc? get _doc => _store.bubbleStyleDoc;
-
-  List<HuiIssue> _issuesFor(String path) => _store.issues
+  List<HuiIssue> _issuesFor(String path) => store.issues
       .where((HuiIssue issue) => issue.path.startsWith(path))
       .toList();
 
+  void _mutate(String label, void Function(GlossBubbleStyleDoc edited) edit) =>
+      store.mutateBubbleStyle(label, edit);
+
   @override
   Widget build(BuildContext context) {
-    final GlossBubbleStyleDoc? doc = _doc;
+    final GlossBubbleStyleDoc? doc = store.bubbleStyleDoc;
     if (doc == null) return const dom.div(<Widget>[]);
-    return dom.div(classes: 'hui-inspector-body is-bubble', <Widget>[
-      _header(doc),
-      GlossVisibilityEditor(
-        raw: doc.extras['show'],
-        sectionKey: 'bubble.visibility',
-        issues: _store.issues
-            .where((HuiIssue issue) => issue.path == r'$.show')
-            .toList(),
-        onChanged: (Object? value) => _store.mutateBubbleStyle(
-          'visibility',
-          (GlossBubbleStyleDoc edited) => setGlossShow(edited.extras, value),
-        ),
-      ),
-      DisplayStyleEditor(
-        style: doc.style,
-        defaults: defaultHologramDisplayStyle(),
-        issues: _issuesFor(r'$.style'),
-        onChanged: (String label, HuiIconStyle? value) =>
-            _store.mutateBubbleStyle(
-              label,
-              (GlossBubbleStyleDoc edited) =>
-                  edited.style = value ?? defaultHologramDisplayStyle(),
-            ),
-      ),
-      HologramBoxEditor(
-        box: doc.box,
-        sectionKey: 'bubble.box',
-        issues: _issuesFor(r'$.box'),
-        mutate: (String label, void Function(GlossHologramBox) edit) =>
-            _store.mutateBubbleStyle(
-              label,
-              (GlossBubbleStyleDoc edited) => edit(edited.box),
-            ),
-      ),
-      ExtrasEditor(
-        title: huiText('Settings'),
-        extensionKeys: false,
-        extras: <String, Object?>{'stackDistance': doc.stackDistance, 'maxPerSender': doc.maxPerSender, 'format': doc.format, 'blacklistWorlds': doc.blacklistWorlds},
-        onChanged: (String label, Map<String, dynamic> next) => _store.mutateBubbleStyle(
-          label, (GlossBubbleStyleDoc edited) {
-            edited.stackDistance = huiReadDouble(next, 'stackDistance', fallback: 0.26);
-            edited.maxPerSender = huiReadInt(next, 'maxPerSender', fallback: 4);
-            edited.format = huiReadString(next, 'format', fallback: '{message}');
-            edited.blacklistWorlds = huiReadList(next['blacklistWorlds']).map((Object? value) => value.toString()).toList();
-          },
-        ),
-      ),
-      HuiField(label: huiText('Overflow'), control: ArcaneSelect(
-        value: doc.overflow,
-        options: const <ArcaneSelectOption>[
-          ArcaneSelectOption(value: 'replace-oldest', label: 'Replace oldest'),
-          ArcaneSelectOption(value: 'reject-new', label: 'Reject new'),
-        ],
-        onChanged: (String value) => _store.mutateBubbleStyle('overflow',
-          (GlossBubbleStyleDoc edited) => edited.overflow = value),
-      )),
-      _look(doc),
-      DisplayRefreshEditor(refresh: doc.refresh, onChanged: (String label, GlossDisplayRefresh next) =>
-        _store.mutateBubbleStyle(label, (GlossBubbleStyleDoc edited) => edited.refresh = next)),
-      ParticleLayersEditor(
-        layers: doc.particleLayers,
-        sectionKey: 'bubble.particleLayers',
-        mutate: (String label, void Function(List<GlossParticleLayer>) edit) =>
-            _store.mutateBubbleStyle(
-              label,
-              (GlossBubbleStyleDoc edited) => edit(edited.particleLayers),
-            ),
-      ),
-      _timing(doc),
-      _motion(doc),
-      _shimmer(doc),
-      _behavior(doc),
-      _selection(doc),
-    ]);
-  }
-
-  Widget _header(GlossBubbleStyleDoc doc) =>
-      dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-        dom.div(classes: 'hui-inspector-header is-bubble', <Widget>[
-          HuiEyebrow(huiText('Bubble style')),
-          dom.div(classes: 'hui-inspector-title-row', <Widget>[
-            dom.h2(classes: 'hui-inspector-title hui-ltr', <Widget>[
-              Text(_store.menuId),
-            ]),
-            const HuiFieldHelp('bubble.id'),
-          ]),
-        ]),
-        dom.p(classes: 'hui-inspector-lede', <Widget>[
-          Text(
-            huiText(
-              'How chat bubbles look and move for players this style selects.',
+    return DenseBox(
+      classes: 'hui-inspector-body is-bubble',
+      children: <Widget>[
+        PaneHeader(
+          kind: huiText('Bubble style'),
+          title: store.menuId,
+          docKey: 'bubble.id',
+          status: AdvancedOnly(
+            child: StatusBadge(
+              huiText('revision {revision}', <String, Object?>{
+                'revision': doc.revision,
+              }),
             ),
           ),
-        ]),
-        HuiRevisionRow(revision: doc.revision),
-      ]);
-
-  Widget _look(GlossBubbleStyleDoc doc) => InspectorSection(
-    title: huiText('Look'),
-    children: <Widget>[
-      HuiField(
-        label: huiText('Prefix'),
-        trailing: const HuiFieldHelp('bubble.prefix'),
-        help: huiText(
-          'Colour codes prepended to every bubble line. Leaving the key '
-          'out of the file means &7; an explicit empty string stays '
-          'empty.',
         ),
-        control: dom.div(<Widget>[
-          TextInput(
-            value: doc.prefix,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            placeholder: '&7',
-            onChanged: (String value) => _store.mutateBubbleStyle(
-              'bubble prefix',
-              (GlossBubbleStyleDoc edited) {
-                edited.prefix = value;
-                edited.absentKeys.remove('prefix');
-              },
+        _look(doc),
+        _timing(doc),
+        _stack(doc),
+        _behavior(doc),
+        _motion(doc),
+        _shimmer(doc),
+        DisplayStyleEditor(
+          style: doc.style,
+          defaults: defaultHologramDisplayStyle(),
+          issues: _issuesFor(r'$.style'),
+          onChanged: (String label, HuiIconStyle? value) => _mutate(
+            label,
+            (GlossBubbleStyleDoc edited) =>
+                edited.style = value ?? defaultHologramDisplayStyle(),
+          ),
+        ),
+        HologramBoxEditor(
+          box: doc.box,
+          sectionKey: 'bubble.box',
+          issues: _issuesFor(r'$.box'),
+          mutate: (String label, void Function(GlossHologramBox) edit) =>
+              _mutate(label, (GlossBubbleStyleDoc edited) => edit(edited.box)),
+        ),
+        ParticleLayersEditor(
+          layers: doc.particleLayers,
+          sectionKey: 'bubble.particleLayers',
+          mutate:
+              (String label, void Function(List<GlossParticleLayer>) edit) =>
+                  _mutate(
+                    label,
+                    (GlossBubbleStyleDoc edited) => edit(edited.particleLayers),
+                  ),
+        ),
+        _selection(doc),
+        AdvancedOnly(
+          child: DisplayRefreshEditor(
+            refresh: doc.refresh,
+            onChanged: (String label, GlossDisplayRefresh next) => _mutate(
+              label,
+              (GlossBubbleStyleDoc edited) => edited.refresh = next,
             ),
+          ),
+        ),
+        AdvancedOnly(
+          child: GlossVisibilityEditor(
+            raw: doc.extras['show'],
+            sectionKey: 'bubble.visibility',
+            issues: store.issues
+                .where((HuiIssue issue) => issue.path == r'$.show')
+                .toList(),
+            onChanged: (Object? value) => _mutate(
+              'visibility',
+              (GlossBubbleStyleDoc edited) =>
+                  setGlossShow(edited.extras, value),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _look(GlossBubbleStyleDoc doc) {
+    final ComponentSize size = controlSize(Density.dense);
+    return AppSection(
+      title: huiText('Look'),
+      memoryKey: 'bubble.look',
+      children: <Widget>[
+        Field(
+          label: huiText('Prefix'),
+          forId: 'bubble-prefix',
+          docKey: 'bubble.prefix',
+          problems: _issuesFor(r'$.prefix'),
+          child: dom.div(<Widget>[
+            TextInput(
+              id: 'bubble-prefix',
+              value: doc.prefix,
+              size: size,
+              fullWidth: true,
+              placeholder: '&7',
+              attributes: const <String, String>{
+                'autocomplete': 'off',
+                'spellcheck': 'false',
+              },
+              onChanged: (String value) =>
+                  _mutate('bubble prefix', (GlossBubbleStyleDoc edited) {
+                    edited.prefix = value;
+                    edited.absentKeys.remove('prefix');
+                  }),
+            ),
+            ArcaneFieldDescription.child(
+              GlossTextLine(
+                render: renderGlossLine(
+                  '${doc.effectivePrefix}${huiText('Like this bubble line')}',
+                  richText: true,
+                ),
+              ),
+            ),
+          ]),
+        ),
+        Field(
+          label: huiText('Message format'),
+          forId: 'bubble-format',
+          defaultValue: _defaultFormat,
+          onReset: doc.format == _defaultFormat
+              ? null
+              : () => _mutate(
+                  'bubble format',
+                  (GlossBubbleStyleDoc edited) =>
+                      edited.format = _defaultFormat,
+                ),
+          problems: _issuesFor(r'$.format'),
+          child: TextInput(
+            id: 'bubble-format',
+            value: doc.format,
+            size: size,
+            fullWidth: true,
+            placeholder: _defaultFormat,
             attributes: const <String, String>{
               'autocomplete': 'off',
               'spellcheck': 'false',
             },
-          ),
-          dom.div(classes: 'hui-hologram-line-preview', <Widget>[
-            GlossTextLine(
-              render: renderGlossLine(
-                '${doc.effectivePrefix}${huiText('Like this bubble line')}',
-              ),
+            onChanged: (String value) => _mutate(
+              'bubble format',
+              (GlossBubbleStyleDoc edited) => edited.format = value,
             ),
-          ]),
-        ]),
-      ),
-      HuiField(
-        label: huiText('Offset'),
-        trailing: const HuiFieldHelp('bubble.offset'),
-        help: huiText(
-          'Blocks added to the sender\'s eye location before stacking. '
-          'The shipped default floats one block up.',
+          ),
         ),
-        control: dom.div(<Widget>[
-          HuiVec3Field(
+        Field(
+          label: huiText('Offset'),
+          forId: 'bubble-offset',
+          docKey: 'bubble.offset',
+          problems: _issuesFor(r'$.offset'),
+          child: Vec3Field(
+            id: 'bubble-offset',
+            label: huiText('Offset'),
             value: Vec3(doc.offset[0], doc.offset[1], doc.offset[2]),
-            onChanged: (Vec3 value) => _store.mutateBubbleStyle(
+            onChanged: (Vec3 value) => _mutate(
               'bubble offset',
               (GlossBubbleStyleDoc edited) =>
                   edited.setOffset(value.x, value.y, value.z),
             ),
           ),
-          HuiInlineIssues(_issuesFor(r'$.offset')),
-        ]),
-      ),
-    ],
-  );
-
-  Widget _timing(GlossBubbleStyleDoc doc) => InspectorSection(
-    title: huiText('Wrap and timing'),
-    sectionKey: 'bubble.timing',
-    children: <Widget>[
-      _clampedNumber(
-        label: huiText('Word wrap'),
-        helpKey: 'bubble.wordWrapChars',
-        help: huiText(
-          'Characters per bubble line before the soft wrap. 8..128.',
         ),
-        value: doc.wordWrapChars,
-        effective: doc.effectiveWordWrapChars,
+      ],
+    );
+  }
+
+  Widget _timing(GlossBubbleStyleDoc doc) => AppSection(
+    title: huiText('Wrap and timing'),
+    memoryKey: 'bubble.timing',
+    children: <Widget>[
+      _intField(
+        label: huiText('Word wrap'),
+        id: 'bubble-word-wrap',
+        docKey: 'bubble.wordWrapChars',
         path: r'$.wordWrapChars',
-        onChanged: (int value) => _store.mutateBubbleStyle('bubble wrap', (
-          GlossBubbleStyleDoc edited,
-        ) {
-          edited.wordWrapChars = value;
-          edited.absentKeys.remove('wordWrapChars');
-        }),
+        value: doc.wordWrapChars,
+        onChanged: (int value) =>
+            _mutate('bubble wrap', (GlossBubbleStyleDoc edited) {
+              edited.wordWrapChars = value;
+              edited.absentKeys.remove('wordWrapChars');
+            }),
       ),
-      _clampedNumber(
+      _intField(
         label: huiText('Lifetime'),
-        helpKey: 'bubble.maxAliveMs',
-        help: huiText('Milliseconds a bubble block lives. 500..60000.'),
-        value: doc.maxAliveMs,
-        effective: doc.effectiveMaxAliveMs,
+        id: 'bubble-lifetime',
+        docKey: 'bubble.maxAliveMs',
         path: r'$.maxAliveMs',
+        value: doc.maxAliveMs,
         unit: HuiDurationUnit.milliseconds,
         step: 500,
-        onChanged: (int value) => _store.mutateBubbleStyle('bubble lifetime', (
-          GlossBubbleStyleDoc edited,
-        ) {
-          edited.maxAliveMs = value;
-          edited.absentKeys.remove('maxAliveMs');
-        }),
+        onChanged: (int value) =>
+            _mutate('bubble lifetime', (GlossBubbleStyleDoc edited) {
+              edited.maxAliveMs = value;
+              edited.absentKeys.remove('maxAliveMs');
+            }),
       ),
     ],
   );
 
-  Widget _motion(GlossBubbleStyleDoc doc) => InspectorSection(
-    title: huiText('Motion'),
-    sectionKey: 'bubble.motion',
+  Widget _stack(GlossBubbleStyleDoc doc) => AppSection(
+    title: huiText('Stack'),
+    memoryKey: 'bubble.stack',
     children: <Widget>[
-      HuiNote(
-        huiText(
-          'Every field is a live expression. Use t (0..1), remaining, ageMs, '
-          'lifetimeMs, stackIndex, stackCount, lineCount, stackY, seed and pi.',
+      Field(
+        label: huiText('Stack distance'),
+        forId: 'bubble-stack-distance',
+        defaultValue: '$_defaultStackDistance',
+        onReset: doc.stackDistance == _defaultStackDistance
+            ? null
+            : () => _mutate(
+                'bubble stack distance',
+                (GlossBubbleStyleDoc edited) =>
+                    edited.stackDistance = _defaultStackDistance,
+              ),
+        problems: _issuesFor(r'$.stackDistance'),
+        child: NumberField(
+          id: 'bubble-stack-distance',
+          value: doc.stackDistance,
+          step: 0.01,
+          decimals: 3,
+          onChanged: (double value) => _mutate(
+            'bubble stack distance',
+            (GlossBubbleStyleDoc edited) => edited.stackDistance = value,
+          ),
         ),
       ),
-      dom.div(classes: 'hui-bubble-motion-presets', <Widget>[
-        _motionPreset(huiText('Static'), GlossBubbleMotion.identity),
-        _motionPreset(
-          huiText('Runtime fly-away'),
-          GlossBubbleMotion.runtimeDefaults,
+      _intField(
+        label: huiText('Bubbles per sender'),
+        id: 'bubble-max-per-sender',
+        path: r'$.maxPerSender',
+        value: doc.maxPerSender,
+        defaultValue: '$_defaultMaxPerSender',
+        onReset: doc.maxPerSender == _defaultMaxPerSender
+            ? null
+            : () => _mutate(
+                'bubble max per sender',
+                (GlossBubbleStyleDoc edited) =>
+                    edited.maxPerSender = _defaultMaxPerSender,
+              ),
+        onChanged: (int value) => _mutate(
+          'bubble max per sender',
+          (GlossBubbleStyleDoc edited) => edited.maxPerSender = value,
         ),
-        _motionPreset(huiText('Fly up'), _flyUpMotion),
-        _motionPreset(huiText('Fade away'), _fadeMotion),
-        _motionPreset(huiText('Shrink away'), _shrinkMotion),
-        _motionPreset(huiText('Arc + fall'), _arcMotion),
-      ]),
-      _motionVector(
+      ),
+      Field(
+        label: huiText('Overflow'),
+        problems: _issuesFor(r'$.overflow'),
+        child: ToggleChoice<String>(
+          label: huiText('Overflow'),
+          value: doc.overflow.trim().toLowerCase(),
+          onChanged: (String value) => _mutate(
+            'overflow',
+            (GlossBubbleStyleDoc edited) => edited.overflow = value,
+          ),
+          options: <ChoiceOption<String>>[
+            ChoiceOption<String>('replace-oldest', huiText('Replace oldest')),
+            ChoiceOption<String>('reject-new', huiText('Reject new')),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _behavior(GlossBubbleStyleDoc doc) => AppSection(
+    title: huiText('Behavior'),
+    memoryKey: 'bubble.behavior',
+    children: <Widget>[
+      SwitchField(
+        label: huiText('Follow player'),
+        docKey: 'bubble.followPlayer',
+        value: doc.followPlayer,
+        onChanged: (bool value) =>
+            _mutate('bubble followPlayer', (GlossBubbleStyleDoc edited) {
+              edited.followPlayer = value;
+              edited.absentKeys.remove('followPlayer');
+            }),
+      ),
+      SwitchField(
+        label: huiText('Hide own'),
+        docKey: 'bubble.hideOwn',
+        value: doc.hideOwn,
+        onChanged: (bool value) =>
+            _mutate('bubble hideOwn', (GlossBubbleStyleDoc edited) {
+              edited.hideOwn = value;
+              edited.absentKeys.remove('hideOwn');
+            }),
+      ),
+      Field(
+        label: huiText('Excluded worlds'),
+        forId: 'bubble-excluded-worlds',
+        tip: huiText('World names, separated by commas.'),
+        problems: _issuesFor(r'$.blacklistWorlds'),
+        child: TextInput(
+          id: 'bubble-excluded-worlds',
+          value: doc.blacklistWorlds.join(', '),
+          size: controlSize(Density.dense),
+          fullWidth: true,
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+          onChanged: (String value) => _mutate(
+            'bubble excluded worlds',
+            (GlossBubbleStyleDoc edited) => edited.blacklistWorlds = <String>[
+              for (final String world in value.split(','))
+                if (world.trim().isNotEmpty) world.trim(),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _motion(GlossBubbleStyleDoc doc) => AppSection(
+    title: huiText('Motion'),
+    memoryKey: 'bubble.motion',
+    tip: huiText(
+      'Every field is a live expression. Use t (0..1), remaining, ageMs, '
+      'lifetimeMs, stackIndex, stackCount, lineCount, stackY, seed and pi.',
+    ),
+    actions: <Widget>[
+      AppMenu(
+        id: 'hui-bubble-motion-preset',
+        label: huiText('Preset'),
+        alignEnd: true,
+        entries: <AppMenuEntry>[
+          _motionPreset(huiText('Static'), GlossBubbleMotion.identity),
+          _motionPreset(
+            huiText('Runtime fly-away'),
+            GlossBubbleMotion.runtimeDefaults,
+          ),
+          _motionPreset(huiText('Fly up'), _flyUpMotion),
+          _motionPreset(huiText('Fade away'), _fadeMotion),
+          _motionPreset(huiText('Shrink away'), _shrinkMotion),
+          _motionPreset(huiText('Arc + fall'), _arcMotion),
+        ],
+      ),
+    ],
+    children: <Widget>[
+      ..._motionVector(
         title: huiText('Translation (blocks)'),
         path: r'$.motion.translation',
         vector: doc.motion.translation,
         onEdit: (GlossBubbleMotion edited) => edited.translation,
       ),
-      _motionVector(
+      ..._motionVector(
         title: huiText('Scale'),
         path: r'$.motion.scale',
         vector: doc.motion.scale,
         onEdit: (GlossBubbleMotion edited) => edited.scale,
       ),
-      _motionVector(
+      ..._motionVector(
         title: huiText('Rotation (degrees)'),
         path: r'$.motion.rotation',
         vector: doc.motion.rotation,
@@ -292,7 +421,7 @@ class _BubbleInspectorState extends State<BubbleInspector> {
         help: huiText('Runtime clamps the result to 0..1.'),
         scope: glossBubbleMotionVariables,
         issues: _issuesFor(r'$.motion.opacity'),
-        onChanged: (Object? value) => _store.mutateBubbleStyle(
+        onChanged: (Object? value) => _mutate(
           'bubble motion opacity',
           (GlossBubbleStyleDoc edited) =>
               edited.motion.opacity = value as String? ?? '1',
@@ -301,61 +430,59 @@ class _BubbleInspectorState extends State<BubbleInspector> {
     ],
   );
 
-  Widget _motionPreset(String label, GlossBubbleMotion Function() create) =>
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        onPressed: () => _store.mutateBubbleStyle(
-          'bubble motion preset',
-          (GlossBubbleStyleDoc edited) => edited.motion = create(),
-        ),
-        label: label,
-      );
+  AppMenuEntry _motionPreset(
+    String label,
+    GlossBubbleMotion Function() create,
+  ) => AppMenuEntry(
+    label,
+    () => _mutate(
+      'bubble motion preset',
+      (GlossBubbleStyleDoc edited) => edited.motion = create(),
+    ),
+  );
 
-  Widget _motionVector({
+  /// One motion vector: its heading, then an expression per axis.
+  List<Widget> _motionVector({
     required String title,
     required String path,
     required GlossBubbleMotionVector vector,
     required GlossBubbleMotionVector Function(GlossBubbleMotion motion) onEdit,
-  }) => dom.div(<Widget>[
-    const dom.div(classes: 'hui-field-separator', <Widget>[]),
-    HuiEyebrow(huiText('Vector')),
-    dom.div(classes: 'hui-bubble-motion-grid', <Widget>[
-      for (final (String, String) axis in <(String, String)>[
-        ('X', vector.x),
-        ('Y', vector.y),
-        ('Z', vector.z),
-      ])
-        PreviewExprField(
-          label: huiText("{title} {value}", <String, Object?>{
-            'title': title,
-            'value': axis.$1,
-          }),
-          raw: axis.$2,
-          kind: PreviewExprKind.string,
-          required: true,
-          placeholder: axis.$1 == 'Y' ? '8 * t' : '0',
-          scope: glossBubbleMotionVariables,
-          issues: _issuesFor('$path.${axis.$1.toLowerCase()}'),
-          onChanged: (Object? value) => _store.mutateBubbleStyle(
-            'bubble motion ${axis.$1.toLowerCase()}',
-            (GlossBubbleStyleDoc edited) {
-              final GlossBubbleMotionVector target = onEdit(edited.motion);
-              final String next =
-                  value as String? ?? (path.endsWith('scale') ? '1' : '0');
-              switch (axis.$1) {
-                case 'X':
-                  target.x = next;
-                case 'Y':
-                  target.y = next;
-                case 'Z':
-                  target.z = next;
-              }
-            },
-          ),
+  }) => <Widget>[
+    dom.h3(classes: 'ui-section-title', <Widget>[Text(title)]),
+    for (final (String, String) axis in <(String, String)>[
+      ('X', vector.x),
+      ('Y', vector.y),
+      ('Z', vector.z),
+    ])
+      PreviewExprField(
+        label: huiText("{title} {value}", <String, Object?>{
+          'title': title,
+          'value': axis.$1,
+        }),
+        raw: axis.$2,
+        kind: PreviewExprKind.string,
+        required: true,
+        placeholder: axis.$1 == 'Y' ? '8 * t' : '0',
+        scope: glossBubbleMotionVariables,
+        issues: _issuesFor('$path.${axis.$1.toLowerCase()}'),
+        onChanged: (Object? value) => _mutate(
+          'bubble motion ${axis.$1.toLowerCase()}',
+          (GlossBubbleStyleDoc edited) {
+            final GlossBubbleMotionVector target = onEdit(edited.motion);
+            final String next =
+                value as String? ?? (path.endsWith('scale') ? '1' : '0');
+            switch (axis.$1) {
+              case 'X':
+                target.x = next;
+              case 'Y':
+                target.y = next;
+              case 'Z':
+                target.z = next;
+            }
+          },
         ),
-    ]),
-  ]);
+      ),
+  ];
 
   static GlossBubbleMotion _flyUpMotion() => GlossBubbleMotion(
     translation: GlossBubbleMotionVector(
@@ -401,60 +528,57 @@ class _BubbleInspectorState extends State<BubbleInspector> {
     opacity: '1 - smoothstep(0.8, 1, t)',
   );
 
-  Widget _shimmer(GlossBubbleStyleDoc doc) => InspectorSection(
+  Widget _shimmer(GlossBubbleStyleDoc doc) => AppSection(
     title: huiText('Shimmer'),
-    sectionKey: 'bubble.shimmer',
-    children: <Widget>[
-      HuiNote(
-        huiText(
-          'One solid three-glyph wave crosses the complete wrapped message. The '
-          'first pass waits 400 ms after chat; the second runs during the final '
-          '700 ms. Wrapped rows share one continuous band instead of restarting.',
-        ),
-      ),
-      dom.div(classes: 'hui-bubble-motion-presets', <Widget>[
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          onPressed: () => _store.mutateBubbleStyle(
-            'original Gloss shimmer preset',
-            (GlossBubbleStyleDoc edited) =>
-                edited.shimmer = GlossBubbleShimmer(),
+    memoryKey: 'bubble.shimmer',
+    tip: huiText(
+      'One solid three-glyph wave crosses the complete wrapped message. The '
+      'first pass waits 400 ms after chat; the second runs during the final '
+      '700 ms. Wrapped rows share one continuous band instead of restarting.',
+    ),
+    actions: <Widget>[
+      AppMenu(
+        id: 'hui-bubble-shimmer-preset',
+        label: huiText('Preset'),
+        alignEnd: true,
+        entries: <AppMenuEntry>[
+          AppMenuEntry(
+            huiText('Original Gloss'),
+            () => _mutate(
+              'original Gloss shimmer preset',
+              (GlossBubbleStyleDoc edited) =>
+                  edited.shimmer = GlossBubbleShimmer(),
+            ),
           ),
-          label: huiText('Original Gloss'),
-        ),
-      ]),
-      HuiSwitchRow(
+        ],
+      ),
+    ],
+    children: <Widget>[
+      SwitchField(
         label: huiText('At spawn'),
-        help: huiText(
+        tip: huiText(
           'Run one complete left-to-right sweep after the configured spawn '
           'delay.',
         ),
         value: doc.shimmer.spawn,
-        onChanged: (bool value) => _store.mutateBubbleStyle(
+        onChanged: (bool value) => _mutate(
           'bubble spawn shimmer',
           (GlossBubbleStyleDoc edited) => edited.shimmer.spawn = value,
         ),
       ),
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('At fly-away'),
-        trailing: const HuiFieldHelp('bubble.shimmer.flyAway'),
-        help: huiText(
-          'Run a second complete sweep beginning flyAwayLeadMs before '
-          'expiry, alongside the configured motion expressions.',
-        ),
+        docKey: 'bubble.shimmer.flyAway',
         value: doc.shimmer.flyAway,
-        onChanged: (bool value) => _store.mutateBubbleStyle(
+        onChanged: (bool value) => _mutate(
           'bubble fly-away shimmer',
           (GlossBubbleStyleDoc edited) => edited.shimmer.flyAway = value,
         ),
       ),
-      HuiField(
+      Field(
         label: huiText('Band color'),
-        trailing: const HuiFieldHelp('bubble.shimmer.color'),
-        help: huiText(
-          'Every lit glyph in the wave. Exactly six RGB digits in #RRGGBB form.',
-        ),
+        forId: 'bubble-shimmer-color',
+        docKey: 'bubble.shimmer.color',
         defaultValue: glossBubbleShimmerDefaultColor,
         onReset: doc.shimmer.color == glossBubbleShimmerDefaultColor
             ? null
@@ -463,28 +587,27 @@ class _BubbleInspectorState extends State<BubbleInspector> {
                 (GlossBubbleShimmer shimmer) =>
                     shimmer.color = glossBubbleShimmerDefaultColor,
               ),
-        control: dom.div(<Widget>[
-          HuiColorField(
-            value: doc.shimmer.color,
-            format: HuiColorFormat.rgb,
-            label: huiText('shimmer band colour'),
-            placeholder: glossBubbleShimmerDefaultColor,
-            onChanged: (String value) => _store.mutateBubbleStyle(
-              'bubble shimmer color',
-              (GlossBubbleStyleDoc edited) => edited.shimmer.color = value,
-            ),
+        problems: _issuesFor(r'$.shimmer.color'),
+        child: ColorField(
+          id: 'bubble-shimmer-color',
+          value: doc.shimmer.color,
+          format: HuiColorFormat.rgb,
+          label: huiText('shimmer band colour'),
+          placeholder: glossBubbleShimmerDefaultColor,
+          onChanged: (String value) => _mutate(
+            'bubble shimmer color',
+            (GlossBubbleStyleDoc edited) => edited.shimmer.color = value,
           ),
-          HuiInlineIssues(_issuesFor(r'$.shimmer.color')),
-        ]),
+        ),
       ),
-      _clampedNumber(
+      _intField(
         label: huiText('Band width'),
-        help: huiText(
+        id: 'bubble-shimmer-width',
+        tip: huiText(
           'Visible characters lit at once. The original Gloss width is 3. 1..16.',
         ),
-        value: doc.shimmer.width,
-        effective: doc.shimmer.effectiveWidth,
         path: r'$.shimmer.width',
+        value: doc.shimmer.width,
         defaultValue: '3',
         onReset: doc.shimmer.width == 3
             ? null
@@ -497,16 +620,12 @@ class _BubbleInspectorState extends State<BubbleInspector> {
           (GlossBubbleShimmer shimmer) => shimmer.width = value,
         ),
       ),
-      _clampedNumber(
+      _intField(
         label: huiText('Sweep duration'),
-        helpKey: 'bubble.shimmer.durationMs',
-        help: huiText(
-          'Milliseconds for the band to cross the complete wrapped message. '
-          'Shorter durations refresh and travel faster. 100..10000.',
-        ),
-        value: doc.shimmer.durationMs,
-        effective: doc.shimmer.effectiveDurationMs,
+        id: 'bubble-shimmer-duration',
+        docKey: 'bubble.shimmer.durationMs',
         path: r'$.shimmer.durationMs',
+        value: doc.shimmer.durationMs,
         unit: HuiDurationUnit.milliseconds,
         step: 50,
         defaultValue: '$glossBubbleShimmerDefaultDurationMs ms',
@@ -522,14 +641,14 @@ class _BubbleInspectorState extends State<BubbleInspector> {
           (GlossBubbleShimmer shimmer) => shimmer.durationMs = value,
         ),
       ),
-      _clampedNumber(
+      _intField(
         label: huiText('Spawn delay'),
-        help: huiText(
+        id: 'bubble-shimmer-spawn-delay',
+        tip: huiText(
           'Milliseconds after the bubble appears before the first sweep.',
         ),
-        value: doc.shimmer.spawnDelayMs,
-        effective: doc.shimmer.effectiveSpawnDelayMs,
         path: r'$.shimmer.spawnDelayMs',
+        value: doc.shimmer.spawnDelayMs,
         unit: HuiDurationUnit.milliseconds,
         step: 50,
         defaultValue: '$glossBubbleShimmerDefaultSpawnDelayMs ms',
@@ -546,16 +665,16 @@ class _BubbleInspectorState extends State<BubbleInspector> {
           (GlossBubbleShimmer shimmer) => shimmer.spawnDelayMs = value,
         ),
       ),
-      _clampedNumber(
+      _intField(
         label: huiText('Fly-away lead'),
-        help: huiText(
+        id: 'bubble-shimmer-fly-away-lead',
+        tip: huiText(
           'Milliseconds before expiry when the second sweep starts from '
           'the left edge. Match or exceed the sweep duration to show a '
           'complete pass.',
         ),
-        value: doc.shimmer.flyAwayLeadMs,
-        effective: doc.shimmer.effectiveFlyAwayLeadMs,
         path: r'$.shimmer.flyAwayLeadMs',
+        value: doc.shimmer.flyAwayLeadMs,
         unit: HuiDurationUnit.milliseconds,
         step: 50,
         defaultValue: '$glossBubbleShimmerDefaultFlyAwayLeadMs ms',
@@ -576,184 +695,135 @@ class _BubbleInspectorState extends State<BubbleInspector> {
   );
 
   void _editShimmer(String label, void Function(GlossBubbleShimmer s) edit) =>
-      _store.mutateBubbleStyle(
+      _mutate(
         'bubble shimmer $label',
         (GlossBubbleStyleDoc edited) => edit(edited.shimmer),
       );
 
-  /// Every silently-clamped integer in this document, in one shape: the value,
-  /// what the server will actually run, and the field help when there is one.
-  /// Time-valued ones read back in seconds.
-  ///
-  /// The shimmer group used to have its own near-identical copy of this, which
-  /// differed only in never mounting field help and never showing a unit.
-  Widget _clampedNumber({
+  /// A whole number; time-valued ones read back in seconds. Out-of-range
+  /// values show validation's clamp warning, which names what Gloss runs.
+  Widget _intField({
     required String label,
-    required String help,
-    required int value,
-    required int effective,
+    required String id,
     required String path,
+    required int value,
     required void Function(int value) onChanged,
-    String? helpKey,
+    String? docKey,
+    String? tip,
     String? defaultValue,
     void Function()? onReset,
     HuiDurationUnit? unit,
     double step = 1,
-  }) => HuiField(
+  }) => Field(
     label: label,
-    trailing: helpKey == null ? null : HuiFieldHelp(helpKey),
-    help: help,
+    forId: id,
+    docKey: docKey,
+    tip: tip,
     defaultValue: defaultValue,
     onReset: onReset,
-    control: dom.div(<Widget>[
-      if (unit == null)
-        HuiNumberField(
-          value: value.toDouble(),
-          step: step,
-          decimals: 0,
-          integer: true,
-          onChanged: (double parsed) => onChanged(parsed.round()),
-        )
-      else
-        HuiDurationField(
-          value: value.toDouble(),
-          unit: unit,
-          step: step,
-          onChanged: (double parsed) => onChanged(parsed.round()),
-        ),
-      if (value != effective)
-        HuiNote(
-          huiText('The server silently runs {effective}.', <String, Object?>{
-            'effective': effective,
-          }),
-        ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
-
-  Widget _behavior(GlossBubbleStyleDoc doc) => InspectorSection(
-    title: huiText('Behavior'),
-    children: <Widget>[
-      HuiSwitchRow(
-        label: huiText('Follow player'),
-        help: huiText(
-          'Bubbles track the sender\'s eyes as they move; off keeps them '
-          'where the message was sent.',
-        ),
-        trailing: const HuiFieldHelp('bubble.followPlayer'),
-        value: doc.followPlayer,
-        onChanged: (bool value) => _store.mutateBubbleStyle(
-          'bubble followPlayer',
-          (GlossBubbleStyleDoc edited) {
-            edited.followPlayer = value;
-            edited.absentKeys.remove('followPlayer');
-          },
-        ),
-      ),
-      HuiSwitchRow(
-        label: huiText('Hide own'),
-        help: huiText('The sender does not see their own bubbles.'),
-        trailing: const HuiFieldHelp('bubble.hideOwn'),
-        value: doc.hideOwn,
-        onChanged: (bool value) => _store.mutateBubbleStyle('bubble hideOwn', (
-          GlossBubbleStyleDoc edited,
-        ) {
-          edited.hideOwn = value;
-          edited.absentKeys.remove('hideOwn');
-        }),
-      ),
-    ],
+    problems: _issuesFor(path),
+    child: unit == null
+        ? NumberField(
+            id: id,
+            value: value.toDouble(),
+            step: step,
+            decimals: 0,
+            integer: true,
+            onChanged: (double parsed) => onChanged(parsed.round()),
+          )
+        : DurationField(
+            id: id,
+            value: value.toDouble(),
+            unit: unit,
+            step: step,
+            onChanged: (double parsed) => onChanged(parsed.round()),
+          ),
   );
 
   Widget _selection(GlossBubbleStyleDoc doc) {
     final GlossBubbleSelect? select = doc.select;
-    return InspectorSection(
+    return AppSection(
       title: huiText('Selection'),
-      sectionKey: 'bubble.selection',
-      children: <Widget>[
-        if (select == null) ...<Widget>[
-          HuiNote(
-            huiText(
-              'No select rule: players reach this style only by explicit '
-              'choice, or as the fallback when the document is named '
-              '"default".',
-            ),
-          ),
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.sm,
-            icon: ArcaneIcon.plus(size: IconSize.sm),
-            onPressed: () => _store.mutateBubbleStyle(
+      memoryKey: 'bubble.selection',
+      actions: <Widget>[
+        if (select == null)
+          AppIconButton(
+            icon: ArcaneIcon.plus(),
+            label: huiText('Add select rule'),
+            tipAtEnd: true,
+            onPressed: () => _mutate(
               'add select',
               (GlossBubbleStyleDoc edited) => edited.select = GlossBubbleSelect(
                 when: "viewer.world == 'world'",
               ),
             ),
-            label: huiText('Add select rule'),
-          ),
-          HuiInlineIssues(_issuesFor(r'$.select')),
-        ] else ...<Widget>[
-          HuiField(
-            label: huiText('When'),
-            trailing: const HuiFieldHelp('condition.when'),
-            help: huiText(
-              'Typed condition evaluated for the player. Errors fail closed.',
+          )
+        else
+          AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText('Remove select rule'),
+            tipAtEnd: true,
+            onPressed: () => _mutate(
+              'remove select',
+              (GlossBubbleStyleDoc edited) => edited.select = null,
             ),
-            control: dom.div(<Widget>[
-              TextInput(
-                value: select.when,
-                size: ComponentSize.sm,
-                fullWidth: true,
-                placeholder: huiText(
-                  "viewer.world == 'world' && inGroup('viewer', 'vip')",
-                ),
-                onChanged: (String value) => _store.mutateBubbleStyle(
-                  'select condition',
-                  (GlossBubbleStyleDoc edited) {
+          ),
+      ],
+      children: <Widget>[
+        if (select == null)
+          ArcaneFieldDescription.child(
+            TipLabel(
+              label: Text(huiText('No select rule')),
+              tip: huiText(
+                'No select rule: players reach this style only by explicit '
+                'choice, or as the fallback when the document is named '
+                '"default".',
+              ),
+            ),
+          )
+        else ...<Widget>[
+          Field(
+            label: huiText('When'),
+            forId: 'bubble-select-when',
+            docKey: 'condition.when',
+            problems: _issuesFor(r'$.select.when'),
+            child: TextInput(
+              id: 'bubble-select-when',
+              value: select.when,
+              size: controlSize(Density.dense),
+              fullWidth: true,
+              placeholder: huiText(
+                "viewer.world == 'world' && inGroup('viewer', 'vip')",
+              ),
+              styles: technicalInputStyles,
+              attributes: technicalInputAttributes,
+              onChanged: (String value) =>
+                  _mutate('select condition', (GlossBubbleStyleDoc edited) {
                     final GlossBubbleSelect? live = edited.select;
                     if (live != null) live.when = value;
-                  },
-                ),
-                styles: huiTechnicalInputStyles,
-                attributes: huiTechnicalInputAttributes,
-              ),
-              HuiInlineIssues(_issuesFor(r'$.select.when')),
-            ]),
-          ),
-          HuiField(
-            label: huiText('Priority'),
-            trailing: const HuiFieldHelp('bubble.select.priority'),
-            help: huiText(
-              'Highest matching priority wins; ties go to the smaller '
-              'style id.',
+                  }),
             ),
-            control: dom.div(<Widget>[
-              HuiNumberField(
+          ),
+          AdvancedOnly(
+            child: Field(
+              label: huiText('Priority'),
+              forId: 'bubble-select-priority',
+              docKey: 'bubble.select.priority',
+              problems: _issuesFor(r'$.select.priority'),
+              child: NumberField(
+                id: 'bubble-select-priority',
                 value: select.priority.toDouble(),
                 step: 1,
                 decimals: 0,
                 integer: true,
-                onChanged: (double parsed) => _store.mutateBubbleStyle(
-                  'select priority',
-                  (GlossBubbleStyleDoc edited) {
-                    final GlossBubbleSelect? live = edited.select;
-                    if (live != null) live.priority = parsed.round();
-                  },
-                ),
+                onChanged: (double parsed) =>
+                    _mutate('select priority', (GlossBubbleStyleDoc edited) {
+                      final GlossBubbleSelect? live = edited.select;
+                      if (live != null) live.priority = parsed.round();
+                    }),
               ),
-            ]),
-          ),
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.sm,
-            icon: ArcaneIcon.trash2(size: IconSize.sm),
-            onPressed: () => _store.mutateBubbleStyle(
-              'remove select',
-              (GlossBubbleStyleDoc edited) => edited.select = null,
             ),
-            label: huiText('Remove select rule'),
           ),
-          HuiInlineIssues(_issuesFor(r'$.select')),
         ],
       ],
     );

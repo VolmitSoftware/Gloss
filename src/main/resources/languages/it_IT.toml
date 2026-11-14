@@ -51,6 +51,7 @@
 #   {expected}  Revisione attesa al salvataggio della modifica
 #   {experience}  Quantità di esperienza guadagnata
 #   {failed}  Numero di operazioni fallite
+#   {folders}  Cartelle che un token dell’editor può modificare
 #   {from}  Valore di origine o inizio di un intervallo
 #   {fuel}  Combustibile rimanente nel contenitore
 #   {group}  Categoria dell’editor di lingua
@@ -69,6 +70,7 @@
 #   {labels}  Numero di etichette testuali
 #   {legacy}  Identificatore dell’origine dell’importazione
 #   {level}  Livello visualizzato
+#   {lifetime}  Tempo di inutilizzo prima della scadenza di un token dell’editor
 #   {limit}  Limite consentito
 #   {line}  Numero di riga nel messaggio
 #   {locale}  Codice della lingua
@@ -79,6 +81,7 @@
 #   {message}  Messaggio di risposta o diagnostica
 #   {migrated}  Numero di voci convertite
 #   {minimum}  Valore minimo consentito
+#   {minutes}  Tempo in minuti
 #   {mode}  Modalità operativa o di visualizzazione selezionata
 #   {name}  Nome dell’oggetto
 #   {oldBoard}  Identificatore precedente del pannello
@@ -108,9 +111,9 @@
 #   {roll}  Angolo di rollio in gradi
 #   {rotation}  Rotazione dell’elemento visualizzato
 #   {scale}  Scala dell’elemento visualizzato o dell’anteprima
+#   {scopes}  Azioni consentite da un token dell’editor
 #   {seconds}  Tempo in secondi
 #   {section}  Sezione dell’editor delle lingue
-#   {session}  Identificatore della sessione dell’editor
 #   {severity}  Gravità della diagnostica
 #   {skipped}  Numero di voci saltate
 #   {slots}  Numero di slot per gli oggetti
@@ -118,12 +121,12 @@
 #   {special}  Numero di elementi di visualizzazione speciali
 #   {state}  Stato attuale
 #   {style}  Stile di visualizzazione
-#   {subject}  Oggetto della sessione dell’editor web
 #   {target}  Plugin che riceve la selezione della lingua
 #   {temporary}  Numero di oggetti temporanei
 #   {text}  Testo visualizzato
 #   {title}  Titolo visualizzato
 #   {to}  Valore di destinazione o fine di un intervallo
+#   {token}  ID del token dell’editor
 #   {total}  Numero totale di voci
 #   {type}  Tipo di valore o oggetto atteso
 #   {updated}  Messaggi modificati da un aggiornamento della lingua
@@ -295,16 +298,11 @@ preview = "Strumenti per i documenti di anteprima"
 "preview.dump" = "Genera una volta un documento di anteprima e stampa i conteggi dei suoi elementi"
 "preview.list" = "Elenca i documenti di anteprima e le loro regole di corrispondenza"
 "preview.reset" = "Ripristina le anteprime predefinite incluse (non rimuove i documenti utente aggiuntivi che potrebbero sovrapporsi)"
-web = "Apri e gestisci l'editor web di Gloss"
-"web.open" = "Apri un editor Gloss ospitato vuoto"
-"web.edit" = "Apri un documento Gloss in tempo reale"
-"web.edit.document" = "Apri questo documento in tempo reale nell'editor web"
-"web.workspace" = "Apri l'intero spazio di lavoro Gloss in tempo reale"
-"web.sessions" = "Gestisci le sessioni attive dell'editor web"
-"web.sessions.list" = "Elenca le sessioni attive dell'editor web"
-"web.sessions.pull" = "Controlla ora una sessione dell'editor web"
-"web.sessions.revoke" = "Revoca un link di accesso all'editor web"
-"web.sessions.status" = "Mostra una sessione dell'editor web"
+editor = "Associa l'editor web a questo server"
+"editor.pair" = "Crea un link monouso per associare un browser"
+"editor.status" = "Mostra listener, relay e impronta dell'editor"
+"editor.tokens" = "Elenca i browser associati"
+"editor.revoke" = "Termina un'associazione o annulla un link"
 language = "Scegli la tua lingua o quella predefinita del server"
 
 "import.mode" = "preview oppure apply"
@@ -334,7 +332,6 @@ panel_y = "Y assoluta o ~relativa"
 panel_yaw = "Yaw assoluto o ~relativo"
 panel_z = "Z assoluta o ~relativa"
 content_menu = "ID del menu caricato"
-web_subject = "ID del documento Gloss in tempo reale"
 hologram_id = "ID del nuovo ologramma e del menu radice"
 hologram_text = "Testo MiniMessage facoltativo"
 image_path = "File all'interno della cartella immagini di Gloss"
@@ -355,7 +352,11 @@ row_x = "X della riga, assoluta o ~relativa"
 row_y = "Y della riga, assoluta o ~relativa"
 row_z = "Z della riga, assoluta o ~relativa"
 source_menu = "ID del menu di origine caricato"
-web_session = "ID della sessione dell'editor web"
+editor_label = "Nome mostrato nell'elenco dei token"
+editor_scopes = "Cosa può fare l'editor, separato da virgole"
+editor_folders = "Limita a queste cartelle, separate da virgole"
+editor_expires = "Durata senza utilizzo, ad esempio 7d, 12h o 30m"
+editor_token = "ID del token, o all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cNon disponi del permesso."
@@ -391,6 +392,7 @@ lines = "{count} righe"
 header = "&8[&dGloss&8] &d{id} &7in &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8scala &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7si trova nel mondo &f{world}&7, che non è caricato."
 
 [command.board]
 exists = "&8[&dGloss&8] &cLa scoreboard '&f{id}&c' esiste già."
@@ -505,13 +507,12 @@ execution_failed = "Impossibile eseguire il comando {command}: {reason}"
 menu_name_required = "Il nome del menu non può essere vuoto"
 hologram_id_required = "L'ID dell'ologramma non può essere vuoto"
 panel_id_required = "L'ID del pannello non può essere vuoto"
-web_subject_required = "L'ID del documento nell'editor web non può essere vuoto"
-web_session_required = "L'ID della sessione dell'editor web non può essere vuoto"
 panel_player_required = "Il giocatore di destinazione non può essere vuoto"
 row_icon_type_required = "Il tipo di icona non può essere vuoto"
 row_style_property_required = "La proprietà dello stile non può essere vuota"
 import_source_required = "L'origine dell'importazione legacy non può essere vuota"
 import_source_unknown = "Origine dell'importazione legacy sconosciuta: {source}"
+editor_token_required = "Indica un ID del token, o all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cNon disponi del permesso &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cOperazione sul contenuto del menu &f{menu}&c non rius
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cQuesto comando è disponibile solo per i giocatori."
 
-[gloss.message.web]
-header = "Editor web"
-open_hover = "Fai clic per aprire l'editor web di Gloss."
-open = "&8[&dGloss&8]: &7Editor web: &f{url}"
-preparing = "&8[&dGloss&8]: &7Preparazione di una sessione sicura dell'editor in tempo reale per &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cLa modifica web in tempo reale non è disponibile. Controlla la configurazione della sincronizzazione e la connessione al relay."
-open_failed = "&8[&dGloss&8]: &cImpossibile aprire &f{kind}={subject}&c nell'editor web in tempo reale: {reason}"
-open_console = "&8[&dGloss&8]: &7Link di accesso all'editor per &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eQuesto URL consente di pubblicare modifiche sul server fino alla revoca o alla scadenza. Mantienilo segreto."
+[gloss.message.editor]
+link_ready = "Link pronto. Aprilo entro {minutes} minuti"
+link_console = "&8[&dGloss&8]: &aLink pronto. Aprilo entro {minutes} minuti: &f{url}"
+link_details = "&8[&dGloss&8]: &7Ambiti {scopes}; {folders}; scade dopo {lifetime} di inutilizzo; token {token}"
+all_folders = "tutte le cartelle"
+some_folders = "cartelle {folders}"
 open_label = "Apri editor"
-copy_label = "Copia link"
+open_hover = "Apri nel browser"
+copy_label = "Copia"
+copy_hover = "Copia il link"
 revoke_label = "Revoca"
-link_hover = "Apri l'editor, copia il link di accesso o revoca la sessione {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Nessuna sessione dell'editor web attiva."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7scade tra=&f{seconds}s &7pubblicazione=&f{revision} &7in attesa=&f{pending}"
-revoked = "&8[&dGloss&8]: &aRevocata la sessione dell'editor web &f{session}&a."
-pulled = "&8[&dGloss&8]: &aControllata la sessione dell'editor web &f{session}&a."
-unknown = "&8[&dGloss&8]: &cSessione dell'editor web &f{session}&c sconosciuta o scaduta."
-failed = "&8[&dGloss&8]: &cOperazione dell'editor web non riuscita per &f{session}&c: {reason}"
+revoke_hover = "Annulla questo link o disconnetti l'editor associato"
+details_label = "Dettagli"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cL'editor non è attivo; imposta [editor] enabled = true in gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7Nessun token dell'editor."
+unknown_token = "&8[&dGloss&8]: &cNessun token &f{token}&c."
+revoked_one = "&8[&dGloss&8]: &aRevocato 1 token; le sue connessioni sono state chiuse."
+revoked_many = "&8[&dGloss&8]: &aRevocati {count} token; le loro connessioni sono state chiuse."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Analisi di &f{source}&7 per un'anteprima della migrazione senza modificare i dati..."

@@ -1,0 +1,229 @@
+{
+  "metaHash": "sha256:17320c77a80af47809522c8d926ce811e3d2a0500ce191c7292247d2425485d3",
+  "meta": {
+    "format": "gloss-editor-meta",
+    "version": 1,
+    "kinds": [
+      {
+        "kind": "animation",
+        "storage": "animations",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:shared"
+      },
+      {
+        "kind": "behavior",
+        "storage": "behaviors",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:shared"
+      },
+      {
+        "kind": "bubble-style",
+        "storage": "bubbles",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:chat"
+      },
+      {
+        "kind": "channel",
+        "storage": "channels",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:chat"
+      },
+      {
+        "kind": "connections",
+        "storage": "connections.json",
+        "layout": "single",
+        "versioned": true,
+        "singletonId": "connections",
+        "scope": "publish:chat"
+      },
+      {
+        "kind": "container-preview",
+        "storage": "previews",
+        "layout": "folder",
+        "versioned": false,
+        "singletonId": null,
+        "scope": "publish:screens"
+      },
+      {
+        "kind": "damage-indicators",
+        "storage": "damage-indicators",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": "default",
+        "scope": "publish:world"
+      },
+      {
+        "kind": "emoji",
+        "storage": "emoji",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:chat"
+      },
+      {
+        "kind": "entity-overlays",
+        "storage": "entity-overlays",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": "default",
+        "scope": "publish:world"
+      },
+      {
+        "kind": "glyph",
+        "storage": "glyphs",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:shared"
+      },
+      {
+        "kind": "hologram",
+        "storage": "holograms",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:world"
+      },
+      {
+        "kind": "inventory",
+        "storage": "inventories",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:screens"
+      },
+      {
+        "kind": "leaderboard",
+        "storage": "leaderboards",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:hud"
+      },
+      {
+        "kind": "marker",
+        "storage": "markers",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:world"
+      },
+      {
+        "kind": "menu",
+        "storage": "menus",
+        "layout": "tree",
+        "versioned": false,
+        "singletonId": null,
+        "scope": "publish:screens"
+      },
+      {
+        "kind": "motd",
+        "storage": "motd.json",
+        "layout": "single",
+        "versioned": true,
+        "singletonId": "motd",
+        "scope": "publish:hud"
+      },
+      {
+        "kind": "nameplate",
+        "storage": "nameplates",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:players"
+      },
+      {
+        "kind": "names",
+        "storage": "names.json",
+        "layout": "single",
+        "versioned": true,
+        "singletonId": "names",
+        "scope": "publish:shared"
+      },
+      {
+        "kind": "nametag",
+        "storage": "nametags",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:players"
+      },
+      {
+        "kind": "panel",
+        "storage": "panels",
+        "layout": "tree",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:screens"
+      },
+      {
+        "kind": "presets",
+        "storage": "presets.json",
+        "layout": "single",
+        "versioned": true,
+        "singletonId": "presets",
+        "scope": "publish:shared"
+      },
+      {
+        "kind": "real-drops",
+        "storage": "real-drops",
+        "layout": "real-drops",
+        "versioned": true,
+        "singletonId": "default",
+        "scope": "publish:world"
+      },
+      {
+        "kind": "scoreboard",
+        "storage": "boards",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:hud"
+      },
+      {
+        "kind": "strings",
+        "storage": "strings",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:shared"
+      },
+      {
+        "kind": "surface",
+        "storage": "surfaces",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:hud"
+      },
+      {
+        "kind": "tablist",
+        "storage": "tablist.json",
+        "layout": "single",
+        "versioned": true,
+        "singletonId": "tablist",
+        "scope": "publish:hud"
+      },
+      {
+        "kind": "waypoint",
+        "storage": "waypoints",
+        "layout": "folder",
+        "versioned": true,
+        "singletonId": null,
+        "scope": "publish:world"
+      }
+    ],
+    "schemas": {
+      "hologram": {}
+    },
+    "defaults": {}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "response",
+  "id": 9,
+  "status": 503,
+  "body": {
+    "error": {
+      "code": "server-offline",
+      "message": "the server is not connected to the relay"
+    }
+  }
+}

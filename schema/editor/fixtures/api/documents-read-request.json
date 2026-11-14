@@ -1,0 +1,12 @@
+{
+  "refs": [
+    {
+      "kind": "hologram",
+      "id": "welcome"
+    },
+    {
+      "kind": "menu",
+      "id": "shop/gone"
+    }
+  ]
+}

@@ -27,8 +27,6 @@ final class ContainerPreviewDocumentType extends DocumentTypeAdapter {
   @override
   String get noun => huiText('preview');
 
-  @override
-  String get createLabel => huiText('New preview document');
 
   @override
   String get pluralLabel => huiText('Previews');
@@ -53,9 +51,6 @@ final class ContainerPreviewDocumentType extends DocumentTypeAdapter {
 
   @override
   bool get undoable => true;
-
-  @override
-  bool get sourcePreserving => false;
 
   @override
   String? get syncWireKind => 'container-preview';
@@ -108,9 +103,6 @@ final class ContainerPreviewDocumentType extends DocumentTypeAdapter {
 
   @override
   String exportJson(DocumentStateView state) => snapshot(state);
-
-  @override
-  String formattedJson(DocumentStateView state) => snapshot(state);
 
   @override
   List<HuiIssue> validate(DocumentStateView state) {

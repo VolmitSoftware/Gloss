@@ -30,17 +30,32 @@ final class WorkspaceMenuImportRoute extends WorkspaceRoute {
   final WorkspaceMenuImportEnvelope envelope;
 }
 
-final class WorkspaceSyncRoute extends WorkspaceRoute {
-  const WorkspaceSyncRoute({
-    required this.sessionId,
-    required this.editorToken,
-    required this.relayEndpoint,
-  });
+/// `#/` or no hash: the start page.
+final class WorkspaceStartRoute extends WorkspaceRoute {
+  const WorkspaceStartRoute();
+}
 
-  final String sessionId;
-  final String editorToken;
+/// `#/pair/<code>` (a pairing link) or `#/pair` once the code was read.
+final class WorkspacePairRoute extends WorkspaceRoute {
+  const WorkspacePairRoute(this.code);
 
-  final Uri relayEndpoint;
+  /// The `GLS1.` code, or empty once it moved into memory.
+  final String code;
+}
+
+/// `#/workspace`: the browser workspace with no document named.
+final class WorkspaceLocalRoute extends WorkspaceRoute {
+  const WorkspaceLocalRoute();
+}
+
+/// `#/server/<id>`, or `#/server/<id>/document/<documentId>`: a paired
+/// server's workspace.
+final class WorkspaceServerRoute extends WorkspaceRoute {
+  const WorkspaceServerRoute(this.serverId, {this.documentId});
+
+  /// The first 16 hex digits of the server's fingerprint.
+  final String serverId;
+  final String? documentId;
 }
 
 final class WorkspaceMenuImportEnvelope {
@@ -75,6 +90,14 @@ final class WorkspaceRouteResult {
 String workspaceDocumentHash(String workspaceId, String documentId) =>
     '#/workspace/$workspaceId/document/$documentId';
 
+/// The hash of a paired server's workspace, or of one document in it.
+String serverWorkspaceHash(String serverId, [String? documentId]) =>
+    documentId == null
+    ? '#/server/$serverId'
+    : '#/server/$serverId/document/$documentId';
+
+final RegExp _serverIdPattern = RegExp(r'^[0-9a-f]{16}$');
+
 String workspaceMenuImportHash(WorkspaceMenuImportEnvelope envelope) {
   final List<int> encoded = utf8.encode(jsonEncode(envelope.toJson()));
   final List<int> compressed = const GZipEncoder().encodeBytes(encoded);
@@ -83,11 +106,39 @@ String workspaceMenuImportHash(WorkspaceMenuImportEnvelope envelope) {
 
 WorkspaceRouteResult parseWorkspaceRoute(String rawHash) {
   final String hash = rawHash.trim();
-  if (hash.isEmpty || hash == '#') return const WorkspaceRouteResult();
+  if (hash.isEmpty || hash == '#' || hash == '#/') {
+    return const WorkspaceRouteResult(route: WorkspaceStartRoute());
+  }
   if (!hash.startsWith('#/')) {
     return const WorkspaceRouteResult(error: 'The editor link is malformed.');
   }
+  if (hash == '#/pair') {
+    return const WorkspaceRouteResult(route: WorkspacePairRoute(''));
+  }
+  if (hash.startsWith('#/pair/')) {
+    return WorkspaceRouteResult(
+      route: WorkspacePairRoute(hash.substring('#/pair/'.length)),
+    );
+  }
+  if (hash == '#/workspace') {
+    return const WorkspaceRouteResult(route: WorkspaceLocalRoute());
+  }
   final List<String> segments = hash.substring(2).split('/');
+  if (segments[0] == 'server' &&
+      (segments.length == 2 ||
+          (segments.length == 4 && segments[2] == 'document'))) {
+    final String serverId = segments[1];
+    final String? documentId = segments.length == 4 ? segments[3] : null;
+    if (!_serverIdPattern.hasMatch(serverId) ||
+        (documentId != null && !isWorkspaceUuid(documentId))) {
+      return const WorkspaceRouteResult(
+        error: 'The workspace link contains an invalid id.',
+      );
+    }
+    return WorkspaceRouteResult(
+      route: WorkspaceServerRoute(serverId, documentId: documentId),
+    );
+  }
   if (segments.length == 4 &&
       segments[0] == 'workspace' &&
       segments[2] == 'document') {
@@ -110,122 +161,7 @@ WorkspaceRouteResult parseWorkspaceRoute(String rawHash) {
       segments[1] == WorkspaceMenuImportEnvelope.kind) {
     return _decodeMenuEnvelope(segments[2]);
   }
-  if (segments.length == 3 && segments[0] == 'sync') {
-    return _decodeSyncRoute(segments[1], segments[2]);
-  }
   return const WorkspaceRouteResult(error: 'The editor link is not supported.');
-}
-
-WorkspaceRouteResult _decodeSyncRoute(String sessionId, String tokenAndQuery) {
-  final int question = tokenAndQuery.indexOf('?');
-  if (question <= 0 || tokenAndQuery.indexOf('?', question + 1) >= 0) {
-    return const WorkspaceRouteResult(
-      error: 'The server sync link is malformed.',
-    );
-  }
-  final String editorToken = tokenAndQuery.substring(0, question);
-  final String query = tokenAndQuery.substring(question + 1);
-  if (!_syncCapabilityPattern.hasMatch(sessionId) ||
-      !_syncCapabilityPattern.hasMatch(editorToken)) {
-    return const WorkspaceRouteResult(
-      error: 'The server sync link contains an invalid capability.',
-    );
-  }
-  final Uri queryUri;
-  try {
-    queryUri = Uri.parse('https://editor.invalid/?$query');
-  } catch (_) {
-    return const WorkspaceRouteResult(
-      error: 'The server sync relay is malformed.',
-    );
-  }
-  if (queryUri.queryParametersAll.length != 1 ||
-      queryUri.queryParametersAll['relay']?.length != 1) {
-    return const WorkspaceRouteResult(
-      error: 'The server sync link must name exactly one relay.',
-    );
-  }
-  final String encodedRelay = queryUri.queryParameters['relay'] ?? '';
-  if (query != 'relay=$encodedRelay' ||
-      encodedRelay.isEmpty ||
-      encodedRelay.length > _maxRelayEncodingLength ||
-      !_unpaddedBase64UrlPattern.hasMatch(encodedRelay)) {
-    return const WorkspaceRouteResult(
-      error: 'The server sync relay is empty or too large.',
-    );
-  }
-  final String decodedRelay;
-  try {
-    final int padding = (4 - encodedRelay.length % 4) % 4;
-    final String suffix = List<String>.filled(padding, '=').join();
-    final List<int> bytes = base64Url.decode('$encodedRelay$suffix');
-    decodedRelay = utf8.decode(bytes, allowMalformed: false);
-    if (base64Url.encode(bytes).replaceAll('=', '') != encodedRelay) {
-      throw const FormatException('Non-canonical relay encoding.');
-    }
-  } catch (_) {
-    return const WorkspaceRouteResult(
-      error: 'The server sync relay is not valid base64url UTF-8.',
-    );
-  }
-  final Uri? relay = validateEditorSyncRelay(decodedRelay);
-  if (relay == null) {
-    return const WorkspaceRouteResult(
-      error:
-          'The server sync relay must use HTTPS (localhost may use HTTP) and end in /v3.',
-    );
-  }
-  return WorkspaceRouteResult(
-    route: WorkspaceSyncRoute(
-      sessionId: sessionId,
-      editorToken: editorToken,
-      relayEndpoint: relay,
-    ),
-  );
-}
-
-Uri? validateEditorSyncRelay(String raw) {
-  if (raw.isEmpty || raw.length > _maxRelayDecodedLength) return null;
-  final Uri relay;
-  try {
-    relay = Uri.parse(raw);
-  } catch (_) {
-    return null;
-  }
-  if (!relay.hasAuthority ||
-      relay.host.isEmpty ||
-      relay.userInfo.isNotEmpty ||
-      relay.query.isNotEmpty ||
-      relay.fragment.isNotEmpty) {
-    return null;
-  }
-  final bool local =
-      relay.host == 'localhost' ||
-      relay.host == '127.0.0.1' ||
-      relay.host == '::1';
-  if (relay.scheme != 'https' && !(relay.scheme == 'http' && local)) {
-    return null;
-  }
-  String path = relay.path;
-  while (path.length > 1 && path.endsWith('/')) {
-    path = path.substring(0, path.length - 1);
-  }
-  if (!path.endsWith('/v3')) return null;
-  return relay.replace(path: path);
-}
-
-bool isValidEditorSyncCapability(String value) =>
-    _syncCapabilityPattern.hasMatch(value);
-
-String workspaceSyncHash({
-  required String sessionId,
-  required String editorToken,
-  required Uri relayEndpoint,
-}) {
-  final String relay = base64Url
-      .encode(utf8.encode(relayEndpoint.toString()))
-      .replaceAll('=', '');
-  return '#/sync/$sessionId/$editorToken?relay=$relay';
 }
 
 WorkspaceRouteResult _decodeMenuEnvelope(String payload) {
@@ -463,7 +399,3 @@ final class _DecodedEnvelopeTooLarge implements Exception {
 const int _maxEncodedEnvelopeLength = 48_000;
 const int _maxDecodedEnvelopeLength = 2 * 1024 * 1024;
 const int _maxMenuJsonLength = 2 * 1024 * 1024;
-const int _maxRelayEncodingLength = 2048;
-const int _maxRelayDecodedLength = 1024;
-final RegExp _syncCapabilityPattern = RegExp(r'^[A-Za-z0-9_-]{22,128}$');
-final RegExp _unpaddedBase64UrlPattern = RegExp(r'^[A-Za-z0-9_-]+$');

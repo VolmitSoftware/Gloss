@@ -73,8 +73,13 @@ import '../mc/mc_asset_loader.dart';
 import '../mc/mc_gl.dart';
 import '../mc/mc_gl_renderer.dart';
 import '../render/icon_sprites.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/dialog.dart';
+import '../../ui/field.dart';
 import 'preview_player.dart';
 import 'preview_pose.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// Sprites rasterize at twice the scene scale and NEVER at a camera-derived
@@ -121,11 +126,8 @@ class _PreviewStageState extends State<PreviewStage>
   String get _stageId => '$_uid-stage';
   String get _glHostId => '$_uid-gl';
   String get _sceneId => '$_uid-scene';
-  String get _bannerId => '$_uid-banner';
-  String get _hintId => '$_uid-hint';
-  String get _clickHintId => '$_uid-click-hint';
-  String get _axisHintId => '$_uid-axis-hint';
   String get _crosshairId => '$_uid-crosshair';
+  String get _fieldInputId => '$_uid-field';
 
   late final IconSpriteRasterizer _rasterizer = IconSpriteRasterizer(
     onReady: _onSpritesStale,
@@ -148,8 +150,6 @@ class _PreviewStageState extends State<PreviewStage>
   web.HTMLElement? _perspective;
   web.HTMLElement? _camera;
   web.HTMLElement? _menuGroup;
-  web.HTMLElement? _banner;
-  web.HTMLElement? _hint;
   web.HTMLElement? _crosshair;
   final List<_QuadNode> _quads = <_QuadNode>[];
   web.ResizeObserver? _resizeObserver;
@@ -279,83 +279,64 @@ class _PreviewStageState extends State<PreviewStage>
   late final Widget _stageTree = dom.div(
     id: _stageId,
     classes: 'hui-preview-stage',
-    attributes: <String, String>{'tabindex': '0', 'role': 'application'},
+    attributes: <String, String>{
+      'tabindex': '0',
+      'role': 'application',
+      'data-game-drawn': '',
+    },
     <Widget>[
       // First child, so the world composites UNDER the CSS scene. Jaspr
       // renders it empty; the canvas inside it is this state's.
       dom.div(id: _glHostId, classes: 'hui-mc-gl-host', const <Widget>[]),
       dom.div(id: _sceneId, classes: 'hui-preview-scene', const <Widget>[]),
-      dom.div(
-        id: _crosshairId,
-        classes: 'hui-preview-crosshair',
-        const <Widget>[],
-      ),
-      dom.div(id: _bannerId, classes: 'hui-preview-banner', const <Widget>[]),
-      dom.div(classes: 'hui-preview-hint', <Widget>[
-        dom.span(
-          id: _hintId,
-          classes: 'hui-preview-hint-item',
-          const <Widget>[],
-        ),
-        dom.span(
-          id: _clickHintId,
-          classes: 'hui-preview-hint-item',
-          const <Widget>[],
-        ),
-        dom.span(
-          id: _axisHintId,
-          classes: 'hui-preview-hint-item hui-preview-hint-note',
-          const <Widget>[],
-        ),
-      ]),
+      dom.div(id: _crosshairId, const <Widget>[]),
     ],
   );
+
+  void _cancelField() {
+    _sim.cancelField();
+    setState(() {});
+  }
+
+  void _saveField() {
+    _sim.answerField(_fieldAnswer);
+    _canvasDirty = true;
+    _wake();
+    _markDirty();
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     _schedulePostFrame();
+    final String? prompt = _sim.pendingField?.prompt;
     return dom.div(
       styles: const dom.Styles(raw: <String, String>{'display': 'contents'}),
       <Widget>[
         _stageTree,
-        ArcaneDialog(
+        AppDialog(
           id: 'hui-preview-field-dialog',
-          isOpen: _sim.pendingField != null,
-          onClose: () {
-            _sim.cancelField();
-            setState(() {});
-          },
+          open: _sim.pendingField != null,
+          onClose: _cancelField,
           title: huiText('Preview'),
-          maxWidth: 480,
-          actions: <Widget>[
-            Button(
-              variant: ButtonVariant.outline,
-              label: huiText('Cancel'),
-              onPressed: () {
-                _sim.cancelField();
-                setState(() {});
-              },
-            ),
-            Button(
-              label: huiText('Save'),
-              onPressed: () {
-                _sim.answerField(_fieldAnswer);
-                _canvasDirty = true;
-                _wake();
-                _markDirty();
-                setState(() {});
-              },
-            ),
-          ],
+          footer: DialogFooter(
+            cancel: RowAction(huiText('Cancel'), _cancelField),
+            primary: RowAction(huiText('Save'), _saveField),
+          ),
           children: <Widget>[
-            Text(
-              '${huiText('Preview')} (${_sim.pendingField?.prompt ?? 'sign'})',
-            ),
-            TextInput(
-              value: _fieldAnswer,
-              onChanged: (String value) => _fieldAnswer = value,
-              placeholder: huiText('Value'),
-              fullWidth: true,
+            Field(
+              label: prompt == null || prompt.isEmpty
+                  ? huiText('Value')
+                  : prompt,
+              forId: _fieldInputId,
+              child: TextInput(
+                id: _fieldInputId,
+                value: _fieldAnswer,
+                onChanged: (String value) => _fieldAnswer = value,
+                onSubmitted: (String _) => _saveField(),
+                size: controlSize(Density.regular),
+                fullWidth: true,
+              ),
             ),
           ],
         ),
@@ -503,19 +484,11 @@ class _PreviewStageState extends State<PreviewStage>
   void onInputReset() => resetCamera();
 
   @override
-  void onInputClick(String trigger) {
-    onInputEngaged();
-    _fireClick(trigger);
-  }
-
-  /// The billboard note retires itself the moment the preview is being used. The
-  /// setter is a no-op once set, so a 60 fps drag costs one comparison.
-  @override
-  void onInputEngaged() => _store.previewBannerDismissed = true;
+  void onInputClick(String trigger) => _fireClick(trigger);
 
   /// The stage's own overlay controls.
   ///
-  /// They write the same store flags the toolbar does, so the two surfaces can
+  /// They write the same store flags the frame's menu does, so the two surfaces can
   /// never disagree, and they exist because a 3D viewport that needs the mouse
   /// for the camera also needs a way to change what it draws without leaving
   /// it.
@@ -738,9 +711,7 @@ class _PreviewStageState extends State<PreviewStage>
     _pose.live.update(
       hoveredId: primary,
       hoveredIds: result.hoveredIds.length,
-      hoverTicks: ticks,
       hoverPushBlocks: pushBlocks,
-      highlightModifier: modifier,
       distanceToCenter: result.distanceToCenter,
       isOpen: result.isOpen,
       closeReason: _sim.closeReason,
@@ -1051,8 +1022,6 @@ class _PreviewStageState extends State<PreviewStage>
 
     _stage = stage;
     _perspective = sceneElement as web.HTMLElement;
-    _banner = web.document.getElementById(_bannerId) as web.HTMLElement?;
-    _hint = web.document.getElementById(_hintId) as web.HTMLElement?;
     _crosshair = web.document.getElementById(_crosshairId) as web.HTMLElement?;
     final web.HTMLElement? crosshair = _crosshair;
     if (crosshair != null) _styleCrosshair(crosshair);
@@ -1254,8 +1223,7 @@ class _PreviewStageState extends State<PreviewStage>
     final List<McSceneNode> icons = _renderQuads(preview, basis.position);
     _renderWorld(icons);
     _renderCrosshair();
-    _renderHint();
-    _renderBanner();
+    _renderLabel();
   }
 
   /// One GL frame: the shared world, the block grid, and every icon that
@@ -1635,10 +1603,8 @@ class _PreviewStageState extends State<PreviewStage>
         : huiPlural(
             'preview.placeholder.refreshTicks',
             refreshTicks,
-            oneEnglish:
-                '{tokens}: server refresh cadence is {count} tick. The editor has no PlaceholderAPI, so it is drawn verbatim.',
-            otherEnglish:
-                '{tokens}: server refresh cadence is {count} ticks. The editor has no PlaceholderAPI, so it is drawn verbatim.',
+            oneEnglish: '{tokens}: server refresh cadence is {count} tick. The editor has no PlaceholderAPI, so it is drawn verbatim.',
+            otherEnglish: '{tokens}: server refresh cadence is {count} ticks. The editor has no PlaceholderAPI, so it is drawn verbatim.',
             arguments: <String, Object?>{'tokens': tokens},
           );
   }
@@ -1652,169 +1618,22 @@ class _PreviewStageState extends State<PreviewStage>
     crosshair.style.setProperty('display', visible ? 'block' : 'none');
   }
 
-  void _renderHint() {
-    final web.HTMLElement? hint = _hint;
-    if (hint == null) return;
+  /// The stage's accessible name, written when the locale changes. The
+  /// visible controls text is the frame's status tip.
+  void _renderLabel() {
+    final web.HTMLElement? stage = _stage;
     final String locale = huiLocalizations.activeLocale;
-    if (_renderedChromeLocale != locale) {
-      _renderedChromeLocale = locale;
-      _stage?.setAttribute(
-        'aria-label',
-        huiText(
-          'Gloss menu preview. Drag to orbit, scroll to dolly, space or middle-drag to pan, 0 resets to the open position, left or right click fires the nearest hovered component, 1 to 6 toggle overlays. In Player mode WASD walks and clicking takes the pointer for mouselook.',
-        ),
-      );
-      web.document.getElementById(_clickHintId)?.textContent = huiText(
-        'Left or right click fires the nearest hitbox',
-      );
-      web.document.getElementById(_axisHintId)?.textContent = huiText(
-        '+X moves right; +Y moves up.',
-      );
-    }
-    final String text = _playerMode
-        ? huiText(
-            'WASD walks - left/right click activates, Shift selects sneak bindings - Esc releases - 0 returns to the open spot - 1-6 overlays - K pause',
-          )
-        : huiText(
-            'Drag orbits - right click activates, Shift selects sneak bindings - scroll dollies - space-drag pans - 0 resets - 1-6 overlays - K pause',
-          );
-    if (hint.textContent == text) return;
-    hint.textContent = text;
-  }
-
-  /// The scene's one teaching label and situational runtime notes.
-  ///
-  /// The billboard line is one sentence and closes for good — by its own button or
-  /// by the first drag, dolly or click, because someone driving the stage has
-  /// stopped reading it. The long version lives behind the toolbar's facing
-  /// help beside the preview controls. The situational notes below
-  /// are NOT dismissible: they report state the user turned on, and vanish
-  /// when it is turned off.
-  ///
-  /// The session readout is not here — that is `preview_hud.dart`'s chrome
-  /// strip, which lives in the view's grid where a screen reader can reach it.
-  void _renderBanner() {
-    final web.HTMLElement? banner = _banner;
-    if (banner == null) return;
-    final bool locked = _input.pointerLocked;
-    final bool sphere = _store.previewShowDistanceSphere;
-    final bool paused = _pose.paused;
-    final bool dismissed = _store.previewBannerDismissed;
-    final bool follows = _store.menu.followPlayer;
-    final String range = sphere ? huiPreviewRangeSummary(_sim) : '';
-    // `pointerLockAvailable` belongs in the signature: it flips asynchronously,
-    // from a `pointerlockerror` that changes no other value here, and without
-    // it the banner keeps telling a browser that already refused to click and
-    // take the pointer.
-    final String signature =
-        '${huiLocalizations.activeLocale}|$_playerMode|$locked|$paused|$follows|'
-        '$range|${_input.pointerLockAvailable}|$dismissed';
-    if (banner.getAttribute('data-signature') == signature) return;
-    banner.setAttribute('data-signature', signature);
-    _clear(banner);
-    if (!dismissed) {
-      final web.HTMLElement head = huiPreviewElement('hui-preview-banner-head');
-      head.append(
-        _text('hui-preview-banner-mode', huiText('Runtime billboards')),
-      );
-      head.append(_bannerCloseButton());
-      banner.append(head);
-      banner.append(
-        _text(
-          'hui-preview-banner-body',
-          follows
-              ? huiText(
-                  'Icons honor fixed, vertical, horizontal and center facing. Follow player also updates the menu position and yaw.',
-                )
-              : huiText(
-                  'Icons honor fixed, vertical, horizontal and center facing; their click planes use the same billboard rule.',
-                ),
-        ),
-      );
-    }
-    if (paused) {
-      _note(
-        banner,
-        '#ffd479',
-        huiText(
-          'Paused (K). Animated frames and obfuscated glyphs are frozen and the preview schedules no work at all; hover and clicks still run.',
-        ),
-      );
-    }
-    if (sphere) {
-      // The rings show the boundary; only a number can say WHY it is not the
-      // maxDistance the file asked for (`MenuSession.java:147-151`).
-      _note(
-        banner,
-        '#ff7a7a',
-        huiText('maxDistance {range}', <String, Object?>{'range': range}),
-      );
-    }
-    if (_playerMode) {
-      _note(
-        banner,
-        '#7fd4ff',
-        locked
-            ? huiText(
-                'Player mode: the mouse looks, WASD walks at 4.3 blocks a second, and the crosshair is the look ray the runtime hit-tests. Escape releases the pointer.',
-              )
-            : _input.pointerLockAvailable
-            ? huiText(
-                'Player mode: click the stage to take the pointer, then the mouse looks and WASD walks. Escape gives it back.',
-              )
-            : huiText(
-                'Player mode: this browser refused the pointer lock, so the cursor is the aim instead. WASD still walks.',
-              ),
-      );
-    }
-    // Nothing left to say: the box goes, rather than sitting there empty on
-    // top of the menu it is meant to explain.
-    banner.classList.toggle('is-hidden', banner.childElementCount == 0);
-  }
-
-  /// Closes the billboard note for good. The stage swallows pointerdown to start
-  /// a drag, so the press is stopped here before it becomes a camera move.
-  web.HTMLElement _bannerCloseButton() {
-    final web.HTMLButtonElement button =
-        web.document.createElement('button') as web.HTMLButtonElement;
-    button
-      ..className = 'hui-preview-banner-close'
-      ..type = 'button'
-      ..textContent = '×';
-    button.setAttribute('aria-label', huiText('Dismiss the billboard note'));
-    button.setAttribute(
-      'title',
+    if (stage == null || _renderedChromeLocale == locale) return;
+    _renderedChromeLocale = locale;
+    stage.setAttribute(
+      'aria-label',
       huiText(
-        'Dismiss. The full billboard explanation stays in the preview toolbar.',
+        'Gloss menu preview. Drag to orbit, scroll to dolly, space or middle-drag to pan, 0 resets to the open position, left or right click fires the nearest hovered component, 1 to 6 toggle overlays. In Player mode WASD walks and clicking takes the pointer for mouselook.',
       ),
     );
-    button.addEventListener(
-      'pointerdown',
-      ((web.Event event) => event.stopPropagation()).toJS,
-    );
-    button.addEventListener(
-      'click',
-      ((web.Event event) {
-        event.stopPropagation();
-        _store.previewBannerDismissed = true;
-      }).toJS,
-    );
-    return button;
-  }
-
-  static void _note(web.HTMLElement banner, String color, String text) {
-    final web.HTMLElement node = _text('hui-preview-banner-body', text);
-    node.style.setProperty('color', huiPreviewAlpha(color, .82));
-    banner.append(node);
   }
 
   // --- small DOM helpers -----------------------------------------------------
-
-  static web.HTMLElement _text(String classes, String value) {
-    final web.HTMLElement node = huiPreviewElement(classes);
-    node.textContent = value;
-    return node;
-  }
 
   /// `replaceChildren()` in package:web demands an argument, and assigning an
   /// empty `textContent` is the shortest correct way to empty an element.

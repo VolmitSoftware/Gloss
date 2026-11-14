@@ -80,7 +80,7 @@ class _KeyboardShortcutsState extends State<KeyboardShortcuts> {
     // editor shortcuts behind it would act on a hidden surface. Escape is the
     // exception: Dart owns `isOpen`, so it has to do the closing.
     if (key.overlayOpen) {
-      if (key.key == 'Escape' && !key.mod && !key.alt) {
+      if (huiOverlayKey(key) == HuiOverlayKey.closeOverlay) {
         component.onCloseOverlay?.call();
         return true;
       }

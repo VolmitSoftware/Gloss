@@ -3,7 +3,6 @@ package art.arcane.gloss.motd;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
-import art.arcane.gloss.util.common.TextUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -124,7 +123,7 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
         }
 
         public String joined() {
-            return TextUtils.joinLegacyLines(lines);
+            return String.join("\n", lines);
         }
 
         private static List<String> copySample(List<String> sample) {

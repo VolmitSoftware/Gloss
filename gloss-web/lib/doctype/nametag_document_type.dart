@@ -23,8 +23,6 @@ final class NametagDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('nametag');
 
-  @override
-  String get createLabel => huiText('New nametag');
 
   @override
   String get pluralLabel => huiText('Nametags');

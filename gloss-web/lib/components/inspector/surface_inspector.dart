@@ -6,11 +6,12 @@
 /// rebuilds the record out of that kind's fields and drops the rest, so an
 /// editor that offered every field at once would be inviting authors to type
 /// into keys the server throws away. Switching surfaces leaves the old values
-/// in the file — validation names them instead of the editor deleting work.
+/// in the file: validation names them instead of the editor deleting work.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../logic/gloss_show.dart';
 import '../../logic/gloss_text.dart';
@@ -18,13 +19,24 @@ import '../../logic/surface_validation.dart';
 import '../../logic/validation.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/affixed.dart';
+import '../../ui/badge.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/field_tip.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/technical_input.dart';
+import '../../ui/toggle_choice.dart';
 import '../gloss/gloss_text_line.dart';
-import 'field_help.dart';
 import 'gloss_visibility_editor.dart';
-import 'inspector_widgets.dart';
 import 'line_list_section.dart';
 import 'surface_subscriptions_editor.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class SurfaceInspector extends StatefulWidget {
@@ -43,43 +55,78 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
       .where((HuiIssue issue) => issue.path.startsWith(path))
       .toList();
 
+  List<HuiIssue> _issuesAt(String path) =>
+      _store.issues.where((HuiIssue issue) => issue.path == path).toList();
+
+  /// A control id from a validation path: `$.variants[0].when` becomes
+  /// `surface-variants-0-when`.
+  String _idFor(String path) =>
+      'surface-${path.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '')}';
+
+  ComponentSize _size(BuildContext context) =>
+      controlSize(DensityScope.of(context));
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      DensityScope.dense(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
     final GlossSurfaceDoc? doc = _store.surfaceDoc;
     if (doc == null) return const dom.div(<Widget>[]);
-    return dom.div(classes: 'hui-inspector-body is-surface', <Widget>[
-      _header(doc),
-      GlossVisibilityEditor(
-        raw: doc.extras['show'],
-        sectionKey: 'surface.visibility',
-        issues: _store.issues
-            .where((HuiIssue issue) => issue.path == r'$.show')
-            .toList(),
-        onChanged: (Object? value) => _store.mutateSurface(
-          'visibility',
-          (GlossSurfaceDoc edited) => setGlossShow(edited.extras, value),
-        ),
-      ),
-      _kind(doc),
-      _selection(doc),
-      _delivery(doc),
-      SurfaceSubscriptionsEditor(store: _store),
-      _presentation(
-        doc,
-        doc.presentation,
-        r'$.presentation',
-        huiText('Default presentation'),
-        (void Function(GlossSurfacePresentation) mutate) =>
-            _store.mutateSurface(
-              'surface default presentation',
-              (GlossSurfaceDoc edited) => mutate(edited.presentation),
+    return DenseBox(
+      classes: 'hui-inspector-body is-surface',
+      children: <Widget>[
+        PaneHeader(
+          kind: huiText('Surface'),
+          title: _store.menuId,
+          tip: huiText(
+            'One line of the HUD, composed per viewer. The highest-priority '
+            'matching variant supplies the whole presentation.',
+          ),
+          status: AdvancedOnly(
+            child: StatusBadge(
+              huiText('revision {revision}', <String, Object?>{
+                'revision': doc.revision,
+              }),
             ),
-      ),
-      _variants(doc),
-    ]);
+          ),
+        ),
+        GlossVisibilityEditor(
+          raw: doc.extras['show'],
+          sectionKey: 'surface.visibility',
+          issues: _store.issues
+              .where((HuiIssue issue) => issue.path == r'$.show')
+              .toList(),
+          onChanged: (Object? value) => _store.mutateSurface(
+            'visibility',
+            (GlossSurfaceDoc edited) => setGlossShow(edited.extras, value),
+          ),
+        ),
+        _kind(doc),
+        _selection(context, doc),
+        _delivery(context, doc),
+        SurfaceSubscriptionsEditor(store: _store),
+        AppSection(
+          title: huiText('Default presentation'),
+          memoryKey: 'surface.presentation',
+          children: _presentation(
+            context,
+            doc,
+            doc.presentation,
+            r'$.presentation',
+            (void Function(GlossSurfacePresentation) mutate) =>
+                _store.mutateSurface(
+                  'surface default presentation',
+                  (GlossSurfaceDoc edited) => mutate(edited.presentation),
+                ),
+          ),
+        ),
+        _variants(context, doc),
+      ],
+    );
   }
 
-  Widget _delivery(GlossSurfaceDoc doc) {
+  Widget _delivery(BuildContext context, GlossSurfaceDoc doc) {
     final Object? raw = doc.extras['delivery'];
     final Map<String, Object?> policy = raw is Map
         ? Map<String, Object?>.from(raw)
@@ -93,146 +140,174 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
           next[key] = value;
           edited.extras['delivery'] = next;
         });
-    Widget choice(String key, String fallback, List<String> values) => HuiField(
-      label: huiText(key),
-      control: ArcaneSelect(
+    Widget choice(
+      String key,
+      String label,
+      String fallback,
+      List<String> values,
+    ) => Field(
+      label: label,
+      problems: _issuesFor(r'$.delivery.' + key),
+      child: ToggleChoice<String>(
+        label: label,
         value: policy[key] is String ? policy[key]! as String : fallback,
-        options: <ArcaneSelectOption>[
-          for (final String value in values)
-            ArcaneSelectOption(value: value, label: huiText(value)),
+        options: <ChoiceOption<String>>[
+          for (final String value in values) ChoiceOption<String>(value, value),
         ],
         onChanged: (String value) => change(key, value),
       ),
     );
-    Widget number(String key, int fallback) => HuiField(
-      label: huiText(key),
-      control: TextInput(
-        value: '${policy[key] ?? fallback}',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        attributes: <String, String>{'aria-label': key, 'inputmode': 'numeric'},
-        onChanged: (String value) {
-          final int? parsed = int.tryParse(value);
-          if (parsed != null) change(key, parsed);
-        },
-      ),
-    );
-    return InspectorSection(
+    Widget number(String key, String label, int fallback, {String? suffix}) {
+      final Object? value = policy[key];
+      final String id = 'surface-delivery-$key';
+      return Field(
+        label: label,
+        forId: id,
+        problems: _issuesFor(r'$.delivery.' + key),
+        child: NumberField(
+          id: id,
+          value: (value is num ? value : fallback).toDouble(),
+          integer: true,
+          step: 1,
+          suffix: suffix,
+          onChanged: (double next) => change(key, next.round()),
+        ),
+      );
+    }
+
+    final List<HuiIssue> policyIssues = _issuesFor(r'$.delivery');
+    return AppSection(
       title: huiText('Delivery and events'),
+      memoryKey: 'surface.delivery',
       children: <Widget>[
-        HuiSwitchRow(
+        SwitchField(
+          id: 'surface-automatic',
           label: huiText('Automatic selection'),
           value: doc.extras['automatic'] != false,
+          problems: _issuesAt(r'$.automatic'),
           onChanged: (bool value) => _store.mutateSurface(
             'automatic selection',
             (GlossSurfaceDoc edited) => edited.extras['automatic'] = value,
           ),
         ),
         if (doc.resolvedSurface == glossSurfaceKindBossbar)
-          HuiField(
+          Field(
             label: huiText('Bossbar group'),
-            control: TextInput(
+            forId: 'surface-group',
+            problems: _issuesAt(r'$.group'),
+            child: TextInput(
+              id: 'surface-group',
               value: doc.extras['group'] is String
                   ? doc.extras['group']! as String
                   : 'main',
-              size: ComponentSize.sm,
+              size: _size(context),
               fullWidth: true,
-              attributes: const <String, String>{'aria-label': 'Bossbar group'},
+              styles: technicalInputStyles,
+              attributes: technicalInputAttributes,
               onChanged: (String value) => _store.mutateSurface(
                 'bossbar group',
                 (GlossSurfaceDoc edited) => edited.extras['group'] = value,
               ),
             ),
           ),
-        choice('mode', 'replace', <String>['queue', 'replace', 'drop']),
-        choice('preempt', 'always', <String>['higher', 'always', 'never']),
-        choice('overflow', 'reject', <String>['drop-oldest', 'reject']),
-        choice('deduplicate', 'none', <String>['none', 'purpose', 'content']),
-        number('maxPending', 32),
-        number('cooldownTicks', 0),
-        number('expireTicks', 1200),
-        HuiInlineIssues(_issuesFor(r'$.delivery')),
+        MoreFields(
+          memoryKey: 'surface.more',
+          open: policyIssues.isNotEmpty,
+          children: <Widget>[
+            choice('mode', huiText('Mode'), 'replace', <String>[
+              'queue',
+              'replace',
+              'drop',
+            ]),
+            choice('preempt', huiText('Preempt'), 'always', <String>[
+              'higher',
+              'always',
+              'never',
+            ]),
+            choice('overflow', huiText('Overflow'), 'reject', <String>[
+              'drop-oldest',
+              'reject',
+            ]),
+            choice('deduplicate', huiText('Deduplicate'), 'none', <String>[
+              'none',
+              'purpose',
+              'content',
+            ]),
+            number('maxPending', huiText('Max pending'), 32),
+            number(
+              'cooldownTicks',
+              huiText('Cooldown'),
+              0,
+              suffix: huiText('ticks'),
+            ),
+            number(
+              'expireTicks',
+              huiText('Expires after'),
+              1200,
+              suffix: huiText('ticks'),
+            ),
+            ..._problemLines(_issuesAt(r'$.delivery')),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _header(GlossSurfaceDoc doc) =>
-      dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-        dom.div(classes: 'hui-inspector-header is-surface', <Widget>[
-          HuiEyebrow(huiText('Surface')),
-          dom.div(classes: 'hui-inspector-title-row', <Widget>[
-            dom.h2(classes: 'hui-inspector-title hui-ltr', <Widget>[
-              Text(_store.menuId),
-            ]),
-            const HuiFieldHelp('surface.id'),
-          ]),
-        ]),
-        dom.p(classes: 'hui-inspector-lede', <Widget>[
-          Text(
-            huiText(
-              'One line of the HUD, composed per viewer. The highest-priority '
-              'matching variant supplies the whole presentation.',
-            ),
-          ),
-        ]),
-        HuiRevisionRow(revision: doc.revision),
-      ]);
-
-  Widget _kind(GlossSurfaceDoc doc) => InspectorSection(
+  Widget _kind(GlossSurfaceDoc doc) => AppSection(
     title: huiText('Client surface'),
+    memoryKey: 'surface.kind',
+    tip: huiText(
+      'Changing the surface leaves the other fields in the file. Gloss '
+      'keeps only the ones this surface uses and drops the rest without '
+      'saying so, which the Problems list calls out.',
+    ),
     children: <Widget>[
-      HuiField(
+      Field(
         label: huiText('Surface'),
-        trailing: const HuiFieldHelp('surface.surface'),
-        control: dom.div(<Widget>[
-          HuiSegmented(
-            value: doc.resolvedSurface,
-            segments: <HuiSegment>[
-              HuiSegment(
-                value: glossSurfaceKindActionbar,
-                label: huiText('Action bar'),
-              ),
-              HuiSegment(
-                value: glossSurfaceKindBossbar,
-                label: huiText('Boss bar'),
-              ),
-              HuiSegment(
-                value: glossSurfaceKindTitle,
-                label: huiText('Title card'),
-              ),
-            ],
-            onChanged: (String value) => _store.mutateSurface(
-              'surface kind',
-              (GlossSurfaceDoc edited) => edited.surface = value,
+        docKey: 'surface.surface',
+        problems: _issuesFor(r'$.surface'),
+        child: ToggleChoice<String>(
+          label: huiText('Surface'),
+          value: doc.resolvedSurface,
+          options: <ChoiceOption<String>>[
+            ChoiceOption<String>(
+              glossSurfaceKindActionbar,
+              huiText('Action bar'),
             ),
+            ChoiceOption<String>(glossSurfaceKindBossbar, huiText('Boss bar')),
+            ChoiceOption<String>(glossSurfaceKindTitle, huiText('Title card')),
+          ],
+          onChanged: (String value) => _store.mutateSurface(
+            'surface kind',
+            (GlossSurfaceDoc edited) => edited.surface = value,
           ),
-          HuiInlineIssues(_issuesFor(r'$.surface')),
-        ]),
-      ),
-      HuiNote(
-        huiText(
-          'Changing the surface leaves the other fields in the file. Gloss '
-          'keeps only the ones this surface uses and drops the rest without '
-          'saying so, which the Problems list calls out.',
         ),
       ),
     ],
   );
 
-  Widget _selection(GlossSurfaceDoc doc) => InspectorSection(
+  Widget _selection(BuildContext context, GlossSurfaceDoc doc) => AppSection(
     title: huiText('Surface selection'),
+    memoryKey: 'surface.selection',
+    tip: huiText(
+      'A document with no condition takes false, so it never reaches '
+      'anyone until you write one. Highest priority wins its lane.',
+    ),
     children: <Widget>[
-      _integerField(
-        label: huiText('Priority'),
-        trailing: const HuiFieldHelp('surface.select.priority'),
-        value: doc.select.priority,
-        path: r'$.select.priority',
-        onChanged: (int value) => _store.mutateSurface(
-          'surface select priority',
-          (GlossSurfaceDoc edited) => edited.select.priority = value,
+      AdvancedOnly(
+        child: _integerField(
+          label: huiText('Priority'),
+          docKey: 'surface.select.priority',
+          value: doc.select.priority,
+          path: r'$.select.priority',
+          onChanged: (int value) => _store.mutateSurface(
+            'surface select priority',
+            (GlossSurfaceDoc edited) => edited.select.priority = value,
+          ),
         ),
       ),
       _conditionField(
+        context,
         label: huiText('When'),
         value: doc.select.when,
         path: r'$.select.when',
@@ -241,24 +316,21 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
           (GlossSurfaceDoc edited) => edited.select.when = value,
         ),
       ),
-      HuiNote(
-        huiText(
-          'A document with no condition takes false, so it never reaches '
-          'anyone until you write one. Highest priority wins its lane.',
-        ),
-      ),
     ],
   );
 
-  Widget _variants(GlossSurfaceDoc doc) => InspectorSection(
+  Widget _variants(BuildContext context, GlossSurfaceDoc doc) => AppSection(
     title: huiText('Conditional variants'),
-    children: <Widget>[
-      for (int index = 0; index < doc.variants.length; index++)
-        _variant(doc, index),
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        icon: ArcaneIcon.plus(size: IconSize.sm),
+    memoryKey: 'surface.variants',
+    count: doc.variants.length,
+    tip: huiText(
+      'Variants are complete presentations. Matching variants never '
+      'merge; the highest priority wins and the default is the fallback.',
+    ),
+    actions: <Widget>[
+      AppIconButton(
+        icon: ArcaneIcon.plus(),
+        label: huiText('Add variant'),
         onPressed: () => _store.mutateSurface(
           'add surface variant',
           (GlossSurfaceDoc edited) => edited.variants.add(
@@ -270,275 +342,292 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
             ),
           ),
         ),
-        label: huiText('Add variant'),
       ),
-      HuiNote(
-        huiText(
-          'Variants are complete presentations. Matching variants never '
-          'merge; the highest priority wins and the default is the fallback.',
+    ],
+    children: <Widget>[
+      if (doc.variants.isEmpty)
+        ArcaneFieldDescription(
+          huiText('No variants. The default presentation applies.'),
         ),
-      ),
+      for (int index = 0; index < doc.variants.length; index++)
+        _variant(context, doc, index),
     ],
   );
 
-  Widget _variant(GlossSurfaceDoc doc, int index) {
+  Widget _variant(BuildContext context, GlossSurfaceDoc doc, int index) {
     final GlossSurfaceVariant variant = doc.variants[index];
     final String path =
         r'$.variants['
         '$index]';
-    return dom.div(classes: 'hui-surface-variant', <Widget>[
-      dom.div(classes: 'hui-inspector-title-row', <Widget>[
-        HuiEyebrow(
-          huiText('Variant {id}', <String, Object?>{
-            'id': variant.id.isEmpty ? index + 1 : variant.id,
-          }),
-        ),
-        HuiIconButton(
+    final String idField = _idFor('$path.id');
+    return AppSection(
+      title: huiText('Variant {id}', <String, Object?>{
+        'id': variant.id.isEmpty ? index + 1 : variant.id,
+      }),
+      memoryKey: 'surface.variant.$index',
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
           label: huiText('Delete variant'),
-          icon: ArcaneIcon.trash2(size: IconSize.sm),
           onPressed: () => _store.mutateSurface(
             'delete surface variant',
             (GlossSurfaceDoc edited) => edited.variants.removeAt(index),
           ),
         ),
-      ]),
-      HuiField(
-        label: huiText('Id'),
-        control: dom.div(<Widget>[
-          TextInput(
-            value: variant.id,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            onChanged: (String value) => _store.mutateSurface(
-              'surface variant id',
-              (GlossSurfaceDoc edited) => edited.variants[index].id = value,
-            ),
-            styles: huiTechnicalInputStyles,
-            attributes: huiTechnicalInputAttributes,
-          ),
-          HuiInlineIssues(_issuesFor('$path.id')),
-        ]),
-      ),
-      _integerField(
-        label: huiText('Priority'),
-        value: variant.priority,
-        path: '$path.priority',
-        onChanged: (int value) => _store.mutateSurface(
-          'surface variant priority',
-          (GlossSurfaceDoc edited) => edited.variants[index].priority = value,
-        ),
-      ),
-      _conditionField(
-        label: huiText('When'),
-        value: variant.when,
-        path: '$path.when',
-        onChanged: (String value) => _store.mutateSurface(
-          'surface variant condition',
-          (GlossSurfaceDoc edited) => edited.variants[index].when = value,
-        ),
-      ),
-      _presentation(
-        doc,
-        variant.presentation,
-        '$path.presentation',
-        huiText('Variant presentation'),
-        (void Function(GlossSurfacePresentation) mutate) =>
-            _store.mutateSurface(
-              'surface variant presentation',
-              (GlossSurfaceDoc edited) =>
-                  mutate(edited.variants[index].presentation),
-            ),
-      ),
-    ]);
-  }
-
-  Widget _presentation(
-    GlossSurfaceDoc doc,
-    GlossSurfacePresentation presentation,
-    String path,
-    String title,
-    void Function(void Function(GlossSurfacePresentation)) mutate,
-  ) {
-    final String surface = doc.resolvedSurface;
-    return InspectorSection(
-      title: title,
+      ],
       children: <Widget>[
-        if (surface == glossSurfaceKindActionbar)
-          _lineField(
-            label: huiText('Text'),
-            docKey: 'surface.presentation.text',
-            value: presentation.text ?? '',
-            path: '$path.text',
-            placeholder: huiText(r'&7Welcome, &f{{ player.name }}'),
-            onChanged: (String value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.text = value;
-                }),
-          ),
-        if (surface != glossSurfaceKindActionbar)
-          _lineField(
-            label: huiText('Title'),
-            docKey: 'surface.presentation.title',
-            value: presentation.title ?? '',
-            path: '$path.title',
-            placeholder: huiText('&d&lWELCOME BACK'),
-            onChanged: (String value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.title = value;
-                }),
-          ),
-        if (surface == glossSurfaceKindTitle)
-          _lineField(
-            label: huiText('Subtitle'),
-            docKey: 'surface.presentation.subtitle',
-            value: presentation.subtitle ?? '',
-            path: '$path.subtitle',
-            placeholder: huiText('&7{{ viewer.name }}'),
-            onChanged: (String value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.subtitle = value;
-                }),
-          ),
-        if (surface == glossSurfaceKindBossbar) ...<Widget>[
-          for (final String flag in <String>[
-            'darken_sky',
-            'play_boss_music',
-            'create_fog',
-          ])
-            HuiSwitchRow(
-              label: huiText(flag),
-              value: presentation.flags?.contains(flag) ?? false,
-              onChanged: (bool value) =>
-                  mutate((GlossSurfacePresentation edited) {
-                    final Set<String> flags = <String>{...?edited.flags};
-                    if (value) {
-                      flags.add(flag);
-                    } else {
-                      flags.remove(flag);
-                    }
-                    edited.flags = flags.toList();
-                  }),
+        AdvancedOnly(
+          child: Field(
+            label: huiText('Id'),
+            forId: idField,
+            problems: _issuesFor('$path.id'),
+            child: TextInput(
+              id: idField,
+              value: variant.id,
+              size: _size(context),
+              fullWidth: true,
+              onChanged: (String value) => _store.mutateSurface(
+                'surface variant id',
+                (GlossSurfaceDoc edited) => edited.variants[index].id = value,
+              ),
+              styles: technicalInputStyles,
+              attributes: technicalInputAttributes,
             ),
-          _lineField(
-            label: huiText('Progress'),
-            docKey: 'surface.presentation.progress',
-            value: presentation.progress ?? '',
-            path: '$path.progress',
-            placeholder: huiText('{{ viewer.health / viewer.maxHealth }}'),
-            preview: false,
-            onChanged: (String value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.progress = value.isEmpty ? null : value;
-                }),
           ),
-          _nameField(
-            label: huiText('Colour'),
-            docKey: 'surface.presentation.color',
-            value: presentation.color,
-            allowed: glossSurfaceColors,
-            fallback: glossSurfaceDefaultColor,
-            path: '$path.color',
-            onChanged: (String? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.color = value;
-                }),
-          ),
-          _nameField(
-            label: huiText('Notch style'),
-            docKey: 'surface.presentation.style',
-            value: presentation.style,
-            allowed: glossSurfaceStyles,
-            fallback: glossSurfaceDefaultStyle,
-            path: '$path.style',
-            onChanged: (String? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.style = value;
-                }),
-          ),
-        ],
-        if (surface == glossSurfaceKindTitle) ...<Widget>[
-          _optionalIntField(
-            label: huiText('Fade in'),
-            docKey: 'surface.presentation.fadeInTicks',
-            value: presentation.fadeInTicks,
-            fallback: glossSurfaceDefaultFadeInTicks,
-            path: '$path.fadeInTicks',
-            onChanged: (int? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.fadeInTicks = value;
-                }),
-          ),
-          _optionalIntField(
-            label: huiText('Stay'),
-            docKey: 'surface.presentation.stayTicks',
-            value: presentation.stayTicks,
-            fallback: glossSurfaceDefaultStayTicks,
-            path: '$path.stayTicks',
-            onChanged: (int? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.stayTicks = value;
-                }),
-          ),
-          _optionalIntField(
-            label: huiText('Fade out'),
-            docKey: 'surface.presentation.fadeOutTicks',
-            value: presentation.fadeOutTicks,
-            fallback: glossSurfaceDefaultFadeOutTicks,
-            path: '$path.fadeOutTicks',
-            onChanged: (int? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.fadeOutTicks = value;
-                }),
-          ),
-          _nameField(
-            label: huiText('Trigger'),
-            docKey: 'surface.presentation.trigger',
-            value: presentation.trigger,
-            allowed: glossSurfaceTriggers,
-            fallback: glossSurfaceDefaultTrigger,
-            path: '$path.trigger',
-            onChanged: (String? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.trigger = value;
-                }),
-          ),
-          _optionalIntField(
-            label: huiText('Repeat every'),
-            docKey: 'surface.presentation.repeatTicks',
-            value: presentation.repeatTicks,
-            fallback: null,
-            path: '$path.repeatTicks',
-            onChanged: (int? value) =>
-                mutate((GlossSurfacePresentation edited) {
-                  edited.repeatTicks = value;
-                }),
-          ),
-        ],
-        _slots(presentation, path, mutate),
-        _nameField(
-          label: huiText('Compositor lane'),
-          docKey: 'surface.presentation.priority',
-          value: presentation.priority,
-          allowed: glossSurfacePriorities,
-          fallback: glossSurfaceDefaultPriority,
-          path: '$path.priority',
-          onChanged: (String? value) =>
-              mutate((GlossSurfacePresentation edited) {
-                edited.priority = value;
-              }),
         ),
-        _optionalIntField(
-          label: huiText('Lifetime'),
-          docKey: 'surface.presentation.ttlTicks',
-          value: presentation.ttlTicks,
-          fallback: null,
-          path: '$path.ttlTicks',
-          onChanged: (int? value) => mutate((GlossSurfacePresentation edited) {
-            edited.ttlTicks = value;
-          }),
+        AdvancedOnly(
+          child: _integerField(
+            label: huiText('Priority'),
+            value: variant.priority,
+            path: '$path.priority',
+            onChanged: (int value) => _store.mutateSurface(
+              'surface variant priority',
+              (GlossSurfaceDoc edited) =>
+                  edited.variants[index].priority = value,
+            ),
+          ),
+        ),
+        _conditionField(
+          context,
+          label: huiText('When'),
+          value: variant.when,
+          path: '$path.when',
+          onChanged: (String value) => _store.mutateSurface(
+            'surface variant condition',
+            (GlossSurfaceDoc edited) => edited.variants[index].when = value,
+          ),
+        ),
+        ..._presentation(
+          context,
+          doc,
+          variant.presentation,
+          '$path.presentation',
+          (void Function(GlossSurfacePresentation) mutate) =>
+              _store.mutateSurface(
+                'surface variant presentation',
+                (GlossSurfaceDoc edited) =>
+                    mutate(edited.variants[index].presentation),
+              ),
         ),
       ],
     );
+  }
+
+  /// The fields of one presentation, flat, so the default section and each
+  /// variant section hold them without another level.
+  List<Widget> _presentation(
+    BuildContext context,
+    GlossSurfaceDoc doc,
+    GlossSurfacePresentation presentation,
+    String path,
+    void Function(void Function(GlossSurfacePresentation)) mutate,
+  ) {
+    final String surface = doc.resolvedSurface;
+    return <Widget>[
+      if (surface == glossSurfaceKindActionbar)
+        _lineField(
+          context,
+          label: huiText('Text'),
+          docKey: 'surface.presentation.text',
+          value: presentation.text ?? '',
+          path: '$path.text',
+          placeholder: huiText(r'&7Welcome, &f{{ player.name }}'),
+          onChanged: (String value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.text = value;
+              }),
+        ),
+      if (surface != glossSurfaceKindActionbar)
+        _lineField(
+          context,
+          label: huiText('Title'),
+          docKey: 'surface.presentation.title',
+          value: presentation.title ?? '',
+          path: '$path.title',
+          placeholder: huiText('&d&lWELCOME BACK'),
+          onChanged: (String value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.title = value;
+              }),
+        ),
+      if (surface == glossSurfaceKindTitle)
+        _lineField(
+          context,
+          label: huiText('Subtitle'),
+          docKey: 'surface.presentation.subtitle',
+          value: presentation.subtitle ?? '',
+          path: '$path.subtitle',
+          placeholder: huiText('&7{{ viewer.name }}'),
+          onChanged: (String value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.subtitle = value;
+              }),
+        ),
+      if (surface == glossSurfaceKindBossbar) ...<Widget>[
+        for (final (String flag, String label) in <(String, String)>[
+          ('darken_sky', huiText('Darken sky')),
+          ('play_boss_music', huiText('Boss music')),
+          ('create_fog', huiText('Create fog')),
+        ])
+          SwitchField(
+            id: '${_idFor(path)}-$flag',
+            label: label,
+            value: presentation.flags?.contains(flag) ?? false,
+            onChanged: (bool value) =>
+                mutate((GlossSurfacePresentation edited) {
+                  final Set<String> flags = <String>{...?edited.flags};
+                  if (value) {
+                    flags.add(flag);
+                  } else {
+                    flags.remove(flag);
+                  }
+                  edited.flags = flags.toList();
+                }),
+          ),
+        _lineField(
+          context,
+          label: huiText('Progress'),
+          docKey: 'surface.presentation.progress',
+          value: presentation.progress ?? '',
+          path: '$path.progress',
+          placeholder: huiText('{{ viewer.health / viewer.maxHealth }}'),
+          preview: false,
+          onChanged: (String value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.progress = value.isEmpty ? null : value;
+              }),
+        ),
+        _nameField(
+          context,
+          label: huiText('Colour'),
+          docKey: 'surface.presentation.color',
+          value: presentation.color,
+          allowed: glossSurfaceColors,
+          fallback: glossSurfaceDefaultColor,
+          path: '$path.color',
+          onChanged: (String? value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.color = value;
+              }),
+        ),
+        _nameField(
+          context,
+          label: huiText('Notch style'),
+          docKey: 'surface.presentation.style',
+          value: presentation.style,
+          allowed: glossSurfaceStyles,
+          fallback: glossSurfaceDefaultStyle,
+          path: '$path.style',
+          onChanged: (String? value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.style = value;
+              }),
+        ),
+      ],
+      if (surface == glossSurfaceKindTitle) ...<Widget>[
+        _optionalIntField(
+          context,
+          label: huiText('Fade in'),
+          docKey: 'surface.presentation.fadeInTicks',
+          value: presentation.fadeInTicks,
+          fallback: glossSurfaceDefaultFadeInTicks,
+          path: '$path.fadeInTicks',
+          onChanged: (int? value) => mutate((GlossSurfacePresentation edited) {
+            edited.fadeInTicks = value;
+          }),
+        ),
+        _optionalIntField(
+          context,
+          label: huiText('Stay'),
+          docKey: 'surface.presentation.stayTicks',
+          value: presentation.stayTicks,
+          fallback: glossSurfaceDefaultStayTicks,
+          path: '$path.stayTicks',
+          onChanged: (int? value) => mutate((GlossSurfacePresentation edited) {
+            edited.stayTicks = value;
+          }),
+        ),
+        _optionalIntField(
+          context,
+          label: huiText('Fade out'),
+          docKey: 'surface.presentation.fadeOutTicks',
+          value: presentation.fadeOutTicks,
+          fallback: glossSurfaceDefaultFadeOutTicks,
+          path: '$path.fadeOutTicks',
+          onChanged: (int? value) => mutate((GlossSurfacePresentation edited) {
+            edited.fadeOutTicks = value;
+          }),
+        ),
+        _nameField(
+          context,
+          label: huiText('Trigger'),
+          docKey: 'surface.presentation.trigger',
+          value: presentation.trigger,
+          allowed: glossSurfaceTriggers,
+          fallback: glossSurfaceDefaultTrigger,
+          path: '$path.trigger',
+          onChanged: (String? value) =>
+              mutate((GlossSurfacePresentation edited) {
+                edited.trigger = value;
+              }),
+        ),
+        _optionalIntField(
+          context,
+          label: huiText('Repeat every'),
+          docKey: 'surface.presentation.repeatTicks',
+          value: presentation.repeatTicks,
+          fallback: null,
+          path: '$path.repeatTicks',
+          onChanged: (int? value) => mutate((GlossSurfacePresentation edited) {
+            edited.repeatTicks = value;
+          }),
+        ),
+      ],
+      _slots(presentation, path, mutate),
+      _nameField(
+        context,
+        label: huiText('Compositor lane'),
+        docKey: 'surface.presentation.priority',
+        value: presentation.priority,
+        allowed: glossSurfacePriorities,
+        fallback: glossSurfaceDefaultPriority,
+        path: '$path.priority',
+        onChanged: (String? value) => mutate((GlossSurfacePresentation edited) {
+          edited.priority = value;
+        }),
+      ),
+      _optionalIntField(
+        context,
+        label: huiText('Lifetime'),
+        docKey: 'surface.presentation.ttlTicks',
+        value: presentation.ttlTicks,
+        fallback: null,
+        path: '$path.ttlTicks',
+        onChanged: (int? value) => mutate((GlossSurfacePresentation edited) {
+          edited.ttlTicks = value;
+        }),
+      ),
+    ];
   }
 
   Widget _slots(
@@ -547,33 +636,31 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
     void Function(void Function(GlossSurfacePresentation)) mutate,
   ) {
     final List<String> selected = presentation.slots ?? const <String>[];
-    return HuiField(
+    return Field(
       label: huiText('Slots'),
-      trailing: const HuiFieldHelp('surface.presentation.slots'),
-      control: dom.div(<Widget>[
-        for (final String slot in glossSurfaceSlots)
-          HuiSwitchRow(
-            label: slot,
-            value: selected.contains(slot),
-            onChanged: (bool value) => mutate((
-              GlossSurfacePresentation edited,
-            ) {
+      docKey: 'surface.presentation.slots',
+      problems: _issuesFor('$path.slots'),
+      child: ToggleChips<String>(
+        label: huiText('Slots'),
+        values: selected.toSet(),
+        options: <ChoiceOption<String>>[
+          for (final String slot in glossSurfaceSlots)
+            ChoiceOption<String>(slot, slot),
+        ],
+        onChanged: (Set<String> picked) =>
+            mutate((GlossSurfacePresentation edited) {
               final List<String> next = <String>[
                 for (final String candidate in glossSurfaceSlots)
-                  if (candidate == slot
-                      ? value
-                      : (edited.slots ?? const <String>[]).contains(candidate))
-                    candidate,
+                  if (picked.contains(candidate)) candidate,
               ];
               edited.slots = next.isEmpty ? null : next;
             }),
-          ),
-        HuiInlineIssues(_issuesFor('$path.slots')),
-      ]),
+      ),
     );
   }
 
-  Widget _lineField({
+  Widget _lineField(
+    BuildContext context, {
     required String label,
     required String docKey,
     required String value,
@@ -581,45 +668,48 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
     required String placeholder,
     required void Function(String) onChanged,
     bool preview = true,
-  }) => HuiField(
-    label: label,
-    trailing: HuiFieldHelp(docKey),
-    control: dom.div(<Widget>[
-      TextInput(
-        value: value,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: placeholder,
-        onChanged: onChanged,
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
-      ),
-      if (preview)
-        dom.div(classes: 'hui-hologram-line-preview', <Widget>[
-          GlossTextLine(
-            render: renderGlossLine(
-              value,
-              animations: _store.workspaceAnimations,
-              emoji: _store.workspaceEmoji,
-              expressionSamples: glossSurfaceSamples,
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: Component.fragment(<Widget>[
+        TextInput(
+          id: id,
+          value: value,
+          size: _size(context),
+          fullWidth: true,
+          placeholder: placeholder,
+          onChanged: onChanged,
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+        ),
+        if (preview && value.isNotEmpty)
+          dom.div(classes: 'hui-line-row-preview', <Widget>[
+            GlossTextLine(
+              render: renderGlossLine(
+                value,
+                animations: _store.workspaceAnimations,
+                emoji: _store.workspaceEmoji,
+                expressionSamples: glossSurfaceSamples,
+              ),
             ),
-          ),
-        ]),
-      if (preview)
-        dom.div(classes: 'hui-surface-chips', <Widget>[
-          ...huiMissingAnimationChips(
-            value,
-            _store.workspaceAnimations,
-            where: 'on the HUD',
-          ),
-        ]),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+            ...huiMissingAnimationChips(
+              value,
+              _store.workspaceAnimations,
+              where: 'on the HUD',
+            ),
+          ]),
+      ]),
+    );
+  }
 
   /// A field whose value is one of a fixed set of wire names, plus the
   /// "leave it out" option that takes the runtime default.
-  Widget _nameField({
+  Widget _nameField(
+    BuildContext context, {
     required String label,
     required String docKey,
     required String? value,
@@ -627,12 +717,18 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
     required String fallback,
     required String path,
     required void Function(String?) onChanged,
-  }) => HuiField(
-    label: label,
-    trailing: HuiFieldHelp(docKey),
-    control: dom.div(<Widget>[
-      ArcaneSelect(
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: ArcaneSelect(
+        id: id,
         value: value ?? '',
+        size: _size(context),
+        fullWidth: true,
         options: <ArcaneSelectOption>[
           ArcaneSelectOption(
             value: '',
@@ -645,99 +741,106 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
         ],
         onChanged: (String next) => onChanged(next.isEmpty ? null : next),
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
-  /// A tick count the file may leave out. Clearing the box removes the key
-  /// rather than writing a zero the server would clamp.
-  Widget _optionalIntField({
+  /// A tick count the file may leave out. Clearing the box (or the reset
+  /// button) removes the key rather than writing a zero the server would
+  /// clamp.
+  Widget _optionalIntField(
+    BuildContext context, {
     required String label,
     required String docKey,
     required int? value,
     required int? fallback,
     required String path,
     required void Function(int?) onChanged,
-  }) => HuiField(
-    label: label,
-    trailing: HuiFieldHelp(docKey),
-    help: fallback == null
-        ? huiText('Leave empty to leave the key out.')
-        : huiText('Leave empty for the default of {value}.', <String, Object?>{
-            'value': fallback,
-          }),
-    control: dom.div(<Widget>[
-      TextInput(
-        value: value == null ? '' : '$value',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        onChanged: (String raw) {
-          if (raw.trim().isEmpty) {
-            onChanged(null);
-            return;
-          }
-          final int? parsed = int.tryParse(raw);
-          if (parsed != null) onChanged(parsed);
-        },
-        styles: huiTechnicalInputStyles,
-        attributes: <String, String>{
-          ...huiTechnicalInputAttributes,
-          'inputmode': 'numeric',
-        },
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      tip: fallback == null
+          ? tipWithDoc(huiText('Leave empty to leave the key out.'), docKey)
+          : null,
+      problems: _issuesFor(path),
+      defaultValue: fallback?.toString(),
+      onReset: fallback == null || value == null ? null : () => onChanged(null),
+      child: Affixed(
+        suffix: huiText('ticks'),
+        child: TextInput(
+          id: id,
+          value: value == null ? '' : '$value',
+          size: _size(context),
+          fullWidth: true,
+          placeholder: fallback?.toString(),
+          onChanged: (String raw) {
+            if (raw.trim().isEmpty) {
+              onChanged(null);
+              return;
+            }
+            final int? parsed = int.tryParse(raw);
+            if (parsed != null) onChanged(parsed);
+          },
+          styles: technicalInputStyles,
+          attributes: <String, String>{
+            ...technicalInputAttributes,
+            'inputmode': 'numeric',
+          },
+        ),
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
   Widget _integerField({
     required String label,
     required int value,
     required String path,
     required void Function(int) onChanged,
-    Widget? trailing,
-  }) => HuiField(
-    label: label,
-    trailing: trailing,
-    control: dom.div(<Widget>[
-      TextInput(
-        value: '$value',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        onChanged: (String raw) {
-          final int? parsed = int.tryParse(raw);
-          if (parsed != null) onChanged(parsed);
-        },
-        styles: huiTechnicalInputStyles,
-        attributes: <String, String>{
-          ...huiTechnicalInputAttributes,
-          'inputmode': 'numeric',
-        },
+    String? docKey,
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: NumberField(
+        id: id,
+        value: value.toDouble(),
+        integer: true,
+        step: 1,
+        onChanged: (double next) => onChanged(next.round()),
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
-  Widget _conditionField({
+  Widget _conditionField(
+    BuildContext context, {
     required String label,
     required String value,
     required String path,
     required void Function(String) onChanged,
-  }) => HuiField(
-    label: label,
-    trailing: const HuiFieldHelp('condition.when'),
-    control: dom.div(<Widget>[
-      TextInput(
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: 'condition.when',
+      problems: _issuesFor(path),
+      child: TextInput(
+        id: id,
         value: value,
-        size: ComponentSize.sm,
+        size: _size(context),
         fullWidth: true,
         placeholder: huiText("viewer.world == 'world'"),
         onChanged: onChanged,
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
+        styles: technicalInputStyles,
+        attributes: technicalInputAttributes,
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
   String _nextVariantId(GlossSurfaceDoc doc) {
     int suffix = doc.variants.length + 1;
@@ -749,3 +852,8 @@ class _SurfaceInspectorState extends State<SurfaceInspector> {
     return id;
   }
 }
+
+/// Problems that belong to a group rather than one field.
+List<Widget> _problemLines(List<HuiIssue> issues) => <Widget>[
+  for (final HuiIssue issue in distinctIssues(issues)) issueNote(issue),
+];

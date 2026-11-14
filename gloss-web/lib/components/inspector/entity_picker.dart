@@ -1,14 +1,15 @@
+/// `entity` icon editor: the living entity type and its click footprint.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../logic/validation.dart';
 import '../../model/model.dart';
-import '../common/common.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
-import 'registry_picker.dart';
+import '../../ui/field.dart';
+import '../../ui/number_field.dart';
+import '../../ui/picker.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class EntityIconEditor extends StatelessWidget {
@@ -16,12 +17,16 @@ class EntityIconEditor extends StatelessWidget {
     required this.icon,
     required this.onChanged,
     this.issues = const <HuiIssue>[],
+    this.idPrefix = 'hui-icon-entity',
     super.key,
   });
 
   final HuiEntityIcon icon;
   final void Function(String label, HuiEntityIcon icon) onChanged;
   final List<HuiIssue> issues;
+
+  /// Unique per icon slot: a toggle shows two of these at once.
+  final String idPrefix;
 
   List<HuiIssue> _issuesFor(String suffix) =>
       issues.where((HuiIssue issue) => issue.path.endsWith(suffix)).toList();
@@ -33,93 +38,67 @@ class EntityIconEditor extends StatelessWidget {
         height ?? icon.height,
       )..extras = huiDeepCopyMap(icon.extras);
 
-  List<RegistryOption> _search(String query, int limit) {
+  /// Registry ids as they are: invariant, so no English detail line.
+  List<PickerOption> _search(String query) {
     final String normalized = query.trim().toLowerCase();
-    final List<RegistryOption> results = <RegistryOption>[];
-    for (final String entityType in huiSpawnableLivingEntityTypes) {
-      if (normalized.isNotEmpty && !entityType.contains(normalized)) continue;
-      results.add(RegistryOption(entityType));
-      if (results.length >= limit) break;
-    }
-    return results;
+    return <PickerOption>[
+      for (final String entityType in huiSpawnableLivingEntityTypes)
+        if (normalized.isEmpty || entityType.contains(normalized))
+          PickerOption(entityType),
+    ];
   }
 
+  Widget _size({
+    required String label,
+    required String key,
+    required double value,
+    required HuiEntityIcon Function(double) edit,
+  }) => Field(
+    label: label,
+    forId: '$idPrefix-$key',
+    docKey: 'icon.entity.$key',
+    problems: _issuesFor('.$key'),
+    child: NumberField(
+      id: '$idPrefix-$key',
+      value: value,
+      min: 0.01,
+      max: 64,
+      step: 0.05,
+      suffix: huiText('blocks'),
+      onChanged: (double next) => onChanged('entity $key', edit(next)),
+    ),
+  );
+
   @override
-  Widget build(
-    BuildContext context,
-  ) => dom.div(classes: 'hui-icon-entity', <Widget>[
-    HuiField(
+  Widget build(BuildContext context) => Component.fragment(<Widget>[
+    Field(
       label: huiText('Entity type'),
       required: true,
-      trailing: const HuiFieldHelp('icon.entity.entity'),
-      help: huiText(
-        'Spawnable living registry id. No server entity or physical '
-        'collision is created.',
+      forId: '$idPrefix-type',
+      docKey: 'icon.entity.entity',
+      problems: _issuesFor('.entity'),
+      child: Picker(
+        id: '$idPrefix-type',
+        value: icon.entity,
+        placeholder: huiText('minecraft:parrot'),
+        searchPlaceholder: huiText('Search living entities'),
+        lowercase: true,
+        search: _search,
+        onChanged: (String value) =>
+            onChanged('entity type', _with(entity: value)),
       ),
-      control: dom.div(<Widget>[
-        RegistryPicker(
-          value: icon.entity,
-          placeholder: huiText('minecraft:parrot'),
-          browseLabel: huiText('Browse entities'),
-          searchPlaceholder: huiText('Search living entities'),
-          showThumbnail: false,
-          search: _search,
-          onChanged: (String value) =>
-              onChanged('entity type', _with(entity: value)),
-        ),
-        HuiInlineIssues(_issuesFor('.entity')),
-      ]),
     ),
-    dom.div(
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'grid',
-          'grid-template-columns': 'repeat(2, minmax(0, 1fr))',
-          'gap': '10px',
-        },
-      ),
-      <Widget>[
-        HuiField(
-          label: huiText('Click width'),
-          trailing: const HuiFieldHelp('icon.entity.width'),
-          control: dom.div(<Widget>[
-            HuiNumberField(
-              value: icon.width,
-              min: 0.01,
-              max: 64,
-              step: 0.05,
-              suffix: huiText('blocks'),
-              onChanged: (double value) =>
-                  onChanged('entity width', _with(width: value)),
-            ),
-            HuiInlineIssues(_issuesFor('.width')),
-          ]),
-        ),
-        HuiField(
-          label: huiText('Click height'),
-          trailing: const HuiFieldHelp('icon.entity.height'),
-          control: dom.div(<Widget>[
-            HuiNumberField(
-              value: icon.height,
-              min: 0.01,
-              max: 64,
-              step: 0.05,
-              suffix: huiText('blocks'),
-              onChanged: (double value) =>
-                  onChanged('entity height', _with(height: value)),
-            ),
-            HuiInlineIssues(_issuesFor('.height')),
-          ]),
-        ),
-      ],
+    _size(
+      label: huiText('Click width'),
+      key: 'width',
+      value: icon.width,
+      edit: (double value) => _with(width: value),
     ),
-    HuiNote(
-      huiText(
-        'The component anchor is the entity\'s feet. Gloss keeps body, pitch and '
-        'head yaw aligned with the menu and disables player pushing. Width and '
-        'height define the editor silhouette and a button or toggle\'s click '
-        'plane, not the client model; decorations have no click plane.',
-      ),
+    _size(
+      label: huiText('Click height'),
+      key: 'height',
+      value: icon.height,
+      edit: (double value) => _with(height: value),
     ),
   ]);
 }

@@ -12,6 +12,7 @@ import 'package:web/web.dart' as web;
 
 import '../../l10n/hui_localizations.dart';
 import '../../logic/canvas_scene.dart';
+import '../../logic/canvas_tags.dart';
 import '../../logic/gloss_particle_preview.dart';
 import '../../logic/gloss_show.dart';
 import '../../logic/gloss_particle_text.dart';
@@ -144,7 +145,20 @@ class CanvasPainter {
     _paintSelectedButtonHitboxes(brush, scene, options);
     _paintOverlapOutlines(brush, scene);
 
-    paintMenuCenter(brush, scene.menuOffset, labelled: options.showAnchors);
+    paintMenuCenter(
+      brush,
+      scene.menuOffset,
+      labelled: options.showAnchors,
+      clearOf: <TagBox>[
+        for (final CanvasItem item in scene.drawOrder)
+          TagBox(
+            left: brush.sx(item.outline.left),
+            top: brush.sy(item.outline.top),
+            width: brush.px(item.outline.w),
+            height: brush.px(item.outline.h),
+          ),
+      ],
+    );
     if (options.showAnchors) {
       _paintAnchors(brush, scene);
     }
@@ -495,17 +509,39 @@ class CanvasPainter {
     CanvasScene scene,
     CanvasFrameOptions options,
   ) {
+    const double fontSize = 10.5;
+    final List<(CanvasItem, String, bool)> shown =
+        <(CanvasItem, String, bool)>[];
+    final List<TagBox> boxes = <TagBox>[];
+    brush.save();
+    brush.setUiFont(fontSize, bold: true);
     for (final CanvasItem item in scene.drawOrder) {
       final bool selected = options.selectedIds.contains(item.selectionId);
       final bool hovered = item.selectionId == options.hoveredId;
       if (!options.showAllIds && !selected && !hovered) continue;
       final HuiRect box = item.outline;
-      brush.setUiFont(10.5, bold: true);
       final double maxWidth = math.max(56, brush.px(box.w) + 48);
+      final String text = brush.ellipsize(item.selectionId, maxWidth);
+      shown.add((item, text, selected));
+      boxes.add(
+        TagBox(
+          left: brush.sx(box.left),
+          top: brush.sy(box.top) - 11 - (fontSize + 8) / 2,
+          width: brush.measure(text) + 10,
+          height: fontSize + 8,
+          pinned: selected || hovered,
+        ),
+      );
+    }
+    brush.restore();
+    // At a small zoom neighbouring tags run together: draw only those that
+    // clear each other, the selection's always.
+    for (final int index in placeTags(boxes)) {
+      final (CanvasItem item, String text, bool selected) = shown[index];
       brush.chip(
-        brush.ellipsize(item.selectionId, maxWidth),
-        brush.sx(box.left),
-        brush.sy(box.top) - 11,
+        text,
+        brush.sx(item.outline.left),
+        brush.sy(item.outline.top) - 11,
         color: selected ? brush.palette.selection : brush.palette.label,
       );
     }

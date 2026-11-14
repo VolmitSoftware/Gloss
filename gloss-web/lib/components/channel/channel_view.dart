@@ -1,18 +1,24 @@
+/// The chat channel surface: one sample message as a chosen viewer reads it
+/// in game chat, with the channel's format, mentions and filters applied.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:gloss_editor/l10n/hui_localizations.dart';
+
 import '../../logic/channel_preview.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
-import '../inspector/inspector_widgets.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/toggle_choice.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_text_line.dart';
 
 class ChannelView extends StatefulWidget {
-  const ChannelView({required this.store, this.gameContext = false, super.key});
+  const ChannelView({required this.store, super.key});
   final EditorStore store;
-  final bool gameContext;
   @override
   State<ChannelView> createState() => _ChannelViewState();
 }
@@ -40,7 +46,12 @@ class _ChannelViewState extends State<ChannelView> {
   @override
   Widget build(BuildContext context) {
     final GlossDoc? active = component.store.glossDoc;
-    if (active is! GlossChannelDoc) return const dom.div(<Widget>[]);
+    if (active is! GlossChannelDoc) {
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.chat,
+        label: huiText('Chat and mention preview'),
+      );
+    }
     final GlossChannelDoc doc = active;
     final ChannelPreview preview = channelPreview(
       doc,
@@ -51,57 +62,61 @@ class _ChannelViewState extends State<ChannelView> {
       animations: component.store.workspaceAnimations,
       emoji: component.store.workspaceEmoji,
     );
-    final Widget chat = dom.div(classes: 'hui-connections-chat', <Widget>[
-      dom.div(
-        classes: 'hui-connections-line',
-        attributes: <String, String>{'title': preview.hoverText},
-        <Widget>[GlossTextLine(render: preview.render)],
-      ),
-    ]);
-    final List<Widget> controls = <Widget>[
-      HuiSegmented(
-        value: _viewer,
-        segments: const <HuiSegment>[
-          HuiSegment(value: 'Steve', label: 'Steve'),
-          HuiSegment(value: 'Morgan', label: 'Morgan'),
-        ],
-        onChanged: (String value) => setState(() => _viewer = value),
-      ),
-      TextInput(
-        value: _message,
-        placeholder: 'Type a message with @Steve',
-        size: ComponentSize.sm,
-        attributes: const <String, String>{
-          'aria-label': 'Preview chat message',
-        },
-        onChanged: (String value) => setState(() => _message = value),
-      ),
-      HuiSwitchRow(
-        label: 'Sender can mention players',
-        value: _allowed,
-        onChanged: (bool value) => setState(() => _allowed = value),
-      ),
-      if (preview.filterNotice != null)
-        dom.p(
-          attributes: const <String, String>{'role': 'status'},
-          <Widget>[Text(preview.filterNotice!)],
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.chat,
+      label: huiText('Chat and mention preview'),
+      title: huiText('Chat'),
+      toggles: <Widget>[
+        ToggleChoice<String>(
+          label: huiText('Viewer'),
+          value: _viewer,
+          options: const <ChoiceOption<String>>[
+            ChoiceOption<String>('Steve', 'Steve'),
+            ChoiceOption<String>('Morgan', 'Morgan'),
+          ],
+          onChanged: (String value) => setState(() => _viewer = value),
         ),
-      Text(
-        preview.mentioned && doc.mentions.sound.isNotEmpty
-            ? 'Tagged player sound: ${doc.mentions.sound}'
-            : 'No mention sound for this viewer',
-      ),
-    ];
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.chat,
-        label: 'Chat and mention preview',
-        controls: controls,
-        child: chat,
-      );
-    }
-    return dom.div(classes: 'hui-connections-stage', <Widget>[
-      dom.div(classes: 'hui-connections-screen', <Widget>[chat, ...controls]),
-    ]);
+      ],
+      controls: <Widget>[
+        // A whole chat line: the field takes the strip's full width.
+        dom.div(classes: 'is-wide', <Widget>[
+          Field(
+            label: huiText('Sample message'),
+            forId: 'hui-channel-sample-message',
+            child: TextInput(
+              id: 'hui-channel-sample-message',
+              value: _message,
+              placeholder: huiText('Type a message with @Steve'),
+              size: controlSize(Density.dense),
+              fullWidth: true,
+              onChanged: (String value) => setState(() => _message = value),
+            ),
+          ),
+        ]),
+      ],
+      actions: <RowAction>[
+        RowAction(
+          huiText('Sender can mention players'),
+          () => setState(() => _allowed = !_allowed),
+          icon: ArcaneIcon.atSign(),
+          iconOnly: true,
+          pressed: _allowed,
+        ),
+      ],
+      status:
+          preview.filterNotice ??
+          (preview.mentioned && doc.mentions.sound.isNotEmpty
+              ? huiText('Tagged player sound: {sound}', <String, Object?>{
+                  'sound': doc.mentions.sound,
+                })
+              : huiText('No mention sound for this viewer')),
+      child: dom.div(classes: 'hui-connections-chat', <Widget>[
+        dom.div(
+          classes: 'hui-connections-line',
+          attributes: <String, String>{'title': preview.hoverText},
+          <Widget>[GlossTextLine(render: preview.render)],
+        ),
+      ]),
+    );
   }
 }

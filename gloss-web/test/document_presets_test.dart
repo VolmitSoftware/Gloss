@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:gloss_editor/doctype/doctype.dart';
+import 'package:gloss_editor/logic/authored_source.dart';
 import 'package:gloss_editor/logic/document_presets.dart';
 import 'package:gloss_editor/model/model.dart';
 import 'package:gloss_editor/state/editor_store.dart';
@@ -71,8 +72,8 @@ void main() {
   });
 
   test('unchanged inherited values stay absent after a nested visual edit', () {
-    final InheritedDocumentSource source = InheritedDocumentSource(_source,
-      '{"schemaVersion":2,"revision":7,"presentation":{"title":"Base","hideNumbers":true,"lines":["Inherited"]}}');
+    final AuthoredSource source = AuthoredSource(_source,
+      '{"schemaVersion":2,"revision":7,"presentation":{"title":"Base","hideNumbers":true,"lines":["Inherited"]}}', inherits: true);
     final Map<String, Object?> edited = jsonDecode(source.encode(
       '{"schemaVersion":2,"revision":7,"presentation":{"title":"Edited","hideNumbers":true,"lines":["Inherited"]}}')) as Map<String, Object?>;
     expect(edited, <String, Object?>{'schemaVersion': 2, 'revision': 7, 'preset': 'compact',

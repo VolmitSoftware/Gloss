@@ -66,10 +66,10 @@ const Map<String, String> huiComponentTypeDescriptions = <String, String>{
   'decoration': 'Display only. Draws an icon but cannot be clicked.',
   'toggle':
       'Two states. Picks an icon from a placeholder value checked once at open.',
-  'list': 'Write the list source.',
-  'slider': 'Step',
-  'field': 'Text',
-  'tabs': 'Pages',
+  'list': 'Repeats a template once per entry of a source, on a grid.',
+  'slider': 'A value between two bounds. A click steps it.',
+  'field': 'Asks the player for text and keeps the answer in a variable.',
+  'tabs': 'A row of buttons that sets one variable; others show by it.',
 };
 
 const Map<String, String> huiIconTypeDescriptions = <String, String>{

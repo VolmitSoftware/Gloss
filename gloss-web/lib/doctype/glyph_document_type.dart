@@ -16,8 +16,6 @@ final class GlyphDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('Glyphs');
   @override
-  String get createLabel => huiText('Glyphs');
-  @override
   String get pluralLabel => huiText('Glyphs');
   @override
   int get tabOrder => 195;

@@ -620,7 +620,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             ? viewerParticleText(viewer, binder, viewerFrame)
             : snapshot.rendered()
             ? override == null
-                ? new ParticleText.Rendered(TextUtils.joinLegacyLines(snapshot.lines()), List.of())
+                ? new ParticleText.Rendered(String.join("\n", snapshot.lines()), List.of())
                 : override
             : service.plugin().text().renderLegacyParticleText(viewer, authoredText(snapshot).authored());
         ParticleFrame frame = particleFrame(viewer, anchor, presentation);
@@ -1475,7 +1475,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private String renderLines(LineSet lines) {
-        return transformLegacy(lines.rendered() ? TextUtils.joinLegacyLines(lines.lines()) : service.renderStaticLines(lines.lines()));
+        return transformLegacy(lines.rendered() ? String.join("\n", lines.lines()) : service.renderStaticLines(lines.lines()));
     }
 
     private boolean replaceLine(int index, String line) {

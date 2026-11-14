@@ -16,8 +16,6 @@ final class BehaviorDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('Behaviors');
   @override
-  String get createLabel => huiText('Behaviors');
-  @override
   String get pluralLabel => huiText('Behaviors');
   @override
   int get tabOrder => 197;

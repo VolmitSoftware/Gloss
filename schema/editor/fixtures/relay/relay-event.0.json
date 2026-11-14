@@ -1,0 +1,21 @@
+{
+  "type": "event",
+  "id": 3,
+  "event": {
+    "type": "catalog",
+    "documents": [
+      {
+        "kind": "hologram",
+        "id": "seed-h005",
+        "path": "holograms/seed-h005.json",
+        "hash": "sha256:9847ba2619f9e2a570e947ae853038c2a1852f5c92f96731c33254836c9537f0",
+        "size": 830,
+        "revision": 5,
+        "summary": {
+          "name": "Welcome"
+        },
+        "source": "server"
+      }
+    ]
+  }
+}

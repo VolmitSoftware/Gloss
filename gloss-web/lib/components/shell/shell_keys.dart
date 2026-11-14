@@ -14,6 +14,7 @@ class ShellKey {
     this.alt = false,
     this.editable = false,
     this.overlayOpen = false,
+    this.menuOpen = false,
   });
 
   /// The `KeyboardEvent.key` value, verbatim.
@@ -31,6 +32,10 @@ class ShellKey {
   /// stands down entirely so Escape and focus stay with the overlay.
   final bool overlayOpen;
 
+  /// True when the open surface is a menu (dropdown or context menu): it
+  /// answers its own keys, Escape included.
+  final bool menuOpen;
+
   /// Command on Apple, Control everywhere else — both are accepted so an
   /// external keyboard on either platform behaves.
   bool get mod => meta || ctrl;
@@ -40,20 +45,17 @@ class ShellKey {
 
 typedef ShellKeyHandler = bool Function(ShellKey key);
 
-/// Which overlay an Escape press belongs to while an Arcane surface is open.
-enum HuiOverlayEscape { confirmDelete, appOverlay }
+/// What the shell does with a key while an Arcane surface is open.
+enum HuiOverlayKey { ignore, closeOverlay }
 
-/// The shell's own delete confirm wins over the app's dialogs and sheet.
-///
-/// Its flag lives in the shell's state, which `app.dart` cannot see, so the
-/// app-level close reported the key as handled and left the confirm on screen:
-/// the one dialog in the editor that ignored Escape. Only one of the two can be
-/// open at a time — arming the confirm is what closes the dialog the user came
-/// from — so this is a precedence rule, not a cascade.
-HuiOverlayEscape huiOverlayEscapeTarget({required bool confirmDeleteOpen}) =>
-    confirmDeleteOpen
-    ? HuiOverlayEscape.confirmDelete
-    : HuiOverlayEscape.appOverlay;
+/// Escape over a dialog or sheet closes it through its owner's state (the
+/// owner keeps `open`, so a runtime-only close would come back on the next
+/// build). A menu answers its own keys: claiming its Escape would leave it
+/// open. Everything else is the surface's.
+HuiOverlayKey huiOverlayKey(ShellKey key) =>
+    key.key == 'Escape' && !key.mod && !key.alt && !key.menuOpen
+    ? HuiOverlayKey.closeOverlay
+    : HuiOverlayKey.ignore;
 
 bool huiClosesMobilePane(ShellKey key, {required bool mobilePaneOpen}) =>
     mobilePaneOpen && key.key == 'Escape' && !key.mod && !key.alt;

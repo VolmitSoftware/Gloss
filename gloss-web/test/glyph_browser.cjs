@@ -1,25 +1,19 @@
 const assert = require('node:assert/strict');
-const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const shell = require('./support/shell.cjs');
 
 async function main() {
-  const browser = await chromium.launch({headless: true,
-    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {})});
+  const browser = await shell.launch();
   try {
-    const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
-    const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    await page.goto(process.env.EDITOR_URL || 'http://127.0.0.1:8107');
-    await page.waitForSelector('#hui-library-new-document', {timeout: 60000});
-    if (await page.getByText('Skip', {exact: true}).isVisible()) await page.getByText('Skip', {exact: true}).click();
+    const {page, errors} = await shell.openEditor(browser);
+    // Simple hides Shared resources, glyphs among them.
+    await shell.setMode(page, 'advanced');
     const source = {schemaVersion: 1, revision: 17, namespace: 'trails', font: 'icons',
       glyphs: [{id: 'coin', image: 'coin.png', height: 8, ascent: 7, frames: 1, fallback: 'C', extension: {keep: true}}],
       overlays: [{id: 'frame', image: 'frame.png', height: 8, ascent: 7, anchor: 'bottom'}],
       space: {enabled: true, range: [-16, 32]},
       waypointStyles: [{id: 'quest', nearDistance: 8, farDistance: 80,
         sprites: [{id: 'near', image: 'near.png', extension: 'retain'}]}], extension: {keep: 3}};
-    await page.getByRole('button', {name: 'Import JSON', exact: true}).click();
-    await page.locator('textarea:visible').last().fill(JSON.stringify(source));
-    await page.getByRole('button', {name: /Replace document$/}).click();
+    await shell.importJson(page, source);
     await page.getByLabel('Namespace', {exact: true}).fill('atlas');
     await page.getByLabel('Glyph image', {exact: true}).fill('icons/coin.png');
     await page.getByLabel('Style ID', {exact: true}).fill('destination');
@@ -31,9 +25,7 @@ async function main() {
     await page.getByRole('button', {name: 'Remove overlay', exact: true}).last().click();
     await page.getByRole('button', {name: 'Add sprite', exact: true}).click();
     await page.getByLabel('Sprite image', {exact: true}).last().fill('waypoints/far.png');
-    await page.getByRole('button', {name: /^Export .* JSON$/}).click();
-    const output = JSON.parse(await page.locator('pre.hui-codeblock:visible').last().innerText());
-    await page.getByRole('button', {name: 'Close', exact: true}).click();
+    const output = await shell.exportJson(page);
     assert.equal(output.namespace, 'atlas');
     assert.equal(output.revision, 17);
     assert.equal(output.glyphs.length, 2);
@@ -46,10 +38,7 @@ async function main() {
     assert.equal(output.waypointStyles[0].sprites.length, 2);
     assert.equal(output.waypointStyles[0].sprites[0].extension, 'retain');
     assert.deepEqual(output.extension, source.extension);
-    for (const width of [1440, 390]) {
-      await page.setViewportSize({width, height: 1000});
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-    }
+    await shell.assertFitsWidths(page, [1440, 390]);
     assert.deepEqual(errors, []);
     console.log('Glyph browser passed: font identity, glyph and overlay lists, waypoint sprites, lossless export, mobile width.');
   } finally { await browser.close(); }

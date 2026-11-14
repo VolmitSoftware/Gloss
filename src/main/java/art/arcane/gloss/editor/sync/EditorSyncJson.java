@@ -15,7 +15,8 @@ import java.util.HexFormat;
 import java.util.List;
 
 public final class EditorSyncJson {
-  public static final int PROTOCOL_VERSION = 3;
+  /** The in-process project format the snapshot builder and validators share. */
+  public static final int PROJECT_VERSION = 3;
   public static final String PROJECT_FORMAT = "gloss-sync-project";
   public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
 

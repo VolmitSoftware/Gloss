@@ -12,9 +12,9 @@
 /// name shows vanilla. The ping bars and the filler players are cosmetic —
 /// the client fills the grid, never the plugin.
 ///
-/// With `gameContext` the tab screen mounts into the shared game-screen frame
-/// as the top-centre overlay the tab key raises; without it the surface keeps
-/// its editor stage and readout.
+/// The tab screen mounts into the shared game-screen frame as the top-centre
+/// overlay the tab key raises, scaled down as one picture when the screen is
+/// too small for it.
 ///
 /// Owns a playback clock while any rendered text plays an animation and the
 /// store's animations toggle is on. Mounted only while the tablist view is
@@ -34,8 +34,9 @@ import '../../model/model.dart';
 import '../../state/editor_store.dart';
 import '../scoreboard/scoreboard_selection.dart';
 import '../gloss/gloss_game_screen.dart';
-import '../gloss/gloss_preview_zoom.dart';
+import '../../ui/action_row.dart';
 import '../gloss/gloss_text_line.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// Animation repaint period, matching the hologram stage.
@@ -79,22 +80,20 @@ const List<_MockPlayer> _players = <_MockPlayer>[
 ];
 
 class TablistView extends StatefulWidget {
-  const TablistView({required this.store, this.gameContext = false, super.key});
+  const TablistView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the tab screen inside the shared Minecraft game-screen frame
-  /// instead of the editor stage. False renders exactly the editor surface.
-  final bool gameContext;
 
   @override
   State<TablistView> createState() => _TablistViewState();
 }
 
 class _TablistViewState extends State<TablistView> {
+  /// The sample viewer every condition is resolved for.
+  static const String _world = 'world';
+  static const double _health = 20;
+
   Timer? _ticker;
-  String _world = 'world';
-  double _health = 20;
 
   EditorStore get _store => component.store;
 
@@ -206,13 +205,10 @@ class _TablistViewState extends State<TablistView> {
     final GlossTablistDoc? doc = _store.tablistDoc;
     if (doc == null) {
       _syncTicker(false);
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.tabOverlay,
-          label: huiText('Tab list in game'),
-        );
-      }
-      return const dom.div(classes: 'hui-tablist-stage is-empty', <Widget>[]);
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.tabOverlay,
+        label: huiText('Tab list in game'),
+      );
     }
     final GlossAnimationResolver animations = _store.workspaceAnimations;
     final GlossEmojiResolver emoji = _store.workspaceEmoji;
@@ -227,20 +223,20 @@ class _TablistViewState extends State<TablistView> {
     final GlossConditionContext viewerContext = _conditionContext();
     final GlossTablistHeaderFooterPresentation headerFooter =
         glossResolveTablistHeaderFooter(doc, viewerContext);
-    final String? headerFooterVariant =
-        glossResolveTablistHeaderFooterVariantId(doc, viewerContext);
 
+    // The header and the footer are one component each, so a colour or format
+    // runs on across their lines.
     List<Widget> pipelineLines(String text) => <Widget>[
-      for (final String line in text.split('\n'))
+      for (final GlossLineRender line in glossDisplayLines(
+        renderGlossLine(
+          text,
+          animations: animations,
+          emoji: emoji,
+          nowMs: nowMs,
+        ),
+      ))
         dom.div(classes: 'hui-tablist-pipeline-line', <Widget>[
-          GlossTextLine(
-            render: renderGlossLine(
-              line,
-              animations: animations,
-              emoji: emoji,
-              nowMs: nowMs,
-            ),
-          ),
+          GlossTextLine(render: line),
         ]),
     ];
 
@@ -339,6 +335,9 @@ class _TablistViewState extends State<TablistView> {
                     animations: animations,
                     emoji: emoji,
                     nowMs: nowMs,
+                    // Layout slots are sent as parsed components; plain list
+                    // names go through the legacy-only Bukkit setter.
+                    richText: layoutVisible,
                   ),
                 ),
               ]),
@@ -361,71 +360,25 @@ class _TablistViewState extends State<TablistView> {
         ),
     ]);
 
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.tabOverlay,
-        label: huiText('Tab list in game'),
-        controls: <Widget>[_playPause()],
-        child: screen,
-      );
-    }
-
-    return dom.div(classes: 'hui-tablist-stage', <Widget>[
-      dom.div(classes: 'hui-tablist-sky', <Widget>[
-        GlossPreviewZoom(
-          label: huiText('Tab list preview'),
-          alignment: GlossPreviewAlignment.top,
-          child: screen,
-        ),
-        dom.div(
-          classes: 'hui-tablist-view-controls',
-          attributes: <String, String>{
-            'role': 'group',
-            'aria-label': huiText('Tab list preview controls'),
-          },
-          <Widget>[_playPause()],
-        ),
-      ]),
-      dom.div(classes: 'hui-tablist-readout', <Widget>[Text(_readout(doc))]),
-      _conditionControls(headerFooterVariant),
-    ]);
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.tabOverlay,
+      label: huiText('Tab list in game'),
+      actions: <RowAction>[_playPause()],
+      child: screen,
+    );
   }
 
   /// The animation transport, the same shape the hologram stage uses. It
   /// drives the store's workspace-wide toggle, so pausing here pauses every
   /// surface that references an animation.
-  Widget _playPause() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: () => _store.animationsPlaying = !_store.animationsPlaying,
-    attributes: <String, String>{
-      'aria-label': _store.animationsPlaying
-          ? huiText('Pause animations')
-          : huiText('Play animations'),
-      'title': _store.animationsPlaying
-          ? huiText('Pause animations')
-          : huiText('Play animations'),
-    },
-    icon: _store.animationsPlaying
-        ? ArcaneIcon.pause(size: IconSize.sm)
-        : ArcaneIcon.play(size: IconSize.sm),
+  RowAction _playPause() => RowAction(
+    _store.animationsPlaying
+        ? huiText('Pause animations')
+        : huiText('Play animations'),
+    () => _store.animationsPlaying = !_store.animationsPlaying,
+    icon: _store.animationsPlaying ? ArcaneIcon.pause() : ArcaneIcon.play(),
+    iconOnly: true,
   );
-
-  String _readout(GlossTablistDoc doc) {
-    final List<String> parts = <String>[
-      doc.headerFooter.enabled
-          ? huiText('header/footer on')
-          : huiText(
-              'header/footer off — the tab screen keeps its vanilla top and '
-              'bottom',
-            ),
-      doc.listNames.enabled
-          ? huiText('conditional list names on')
-          : huiText('list names vanilla'),
-      huiText('ping bars and filler players are client cosmetics'),
-    ];
-    return parts.join(' · ');
-  }
 
   GlossConditionContext _conditionContext({
     String subjectName = 'Cyberpwn',
@@ -460,42 +413,4 @@ class _TablistViewState extends State<TablistView> {
       metrics: <String, double>{'react.tick-ms': 50},
     );
   }
-
-  Widget _conditionControls(String? headerFooterVariant) =>
-      dom.div(classes: 'hui-scoreboard-sim-controls', <Widget>[
-        dom.label(classes: 'hui-scoreboard-sim-field', <Widget>[
-          dom.span(classes: 'hui-scoreboard-sim-label', <Widget>[
-            Text(huiText('Viewer world')),
-          ]),
-          TextInput(
-            value: _world,
-            size: ComponentSize.sm,
-            onChanged: (String value) => setState(() => _world = value),
-          ),
-        ]),
-        dom.label(classes: 'hui-scoreboard-sim-field', <Widget>[
-          dom.span(classes: 'hui-scoreboard-sim-label', <Widget>[
-            Text(huiText('Viewer health')),
-          ]),
-          TextInput(
-            value: '$_health',
-            size: ComponentSize.sm,
-            onChanged: (String value) {
-              final double? parsed = double.tryParse(value);
-              if (parsed != null) {
-                setState(() => _health = parsed.clamp(0, 20));
-              }
-            },
-          ),
-        ]),
-        dom.span(classes: 'hui-scoreboard-sim-verdict', <Widget>[
-          Text(
-            headerFooterVariant == null
-                ? huiText('default header/footer presentation')
-                : huiText('header/footer variant: {id}', <String, Object?>{
-                    'id': headerFooterVariant,
-                  }),
-          ),
-        ]),
-      ]);
 }

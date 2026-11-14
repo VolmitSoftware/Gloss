@@ -19,12 +19,7 @@ import '../components/inspector/entity_overlay_inspector.dart';
 import '../components/inspector/hologram_inspector.dart';
 import '../components/inspector/inspector_session.dart';
 import '../components/inspector/menu_inspector.dart';
-import '../components/inspector/names_inspector.dart';
-import '../components/inspector/presets_editor.dart';
 import '../components/inspector/document_preset_picker.dart';
-import '../components/inspector/catalog_document_inspector.dart';
-import '../components/inspector/glyph_inspector.dart';
-import '../components/inspector/behavior_inspector.dart';
 import '../components/inspector/connections_inspector.dart';
 import '../components/inspector/channel_inspector.dart';
 import '../components/inspector/motd_inspector.dart';
@@ -37,6 +32,7 @@ import '../components/inspector/preview_match_editor.dart';
 import '../components/inspector/real_drop_inspector.dart';
 import '../components/inspector/lane_inspectors.dart';
 import '../components/panels/preview_sim_panel.dart';
+import '../ui/mode.dart';
 import '../model/model.dart';
 import '../services/catalogs.dart';
 import '../services/image_library.dart';
@@ -70,12 +66,6 @@ typedef DocumentInspectorBuilder =
 
 final Map<WorkspaceDocKind, DocumentInspectorBuilder> _builders =
     <WorkspaceDocKind, DocumentInspectorBuilder>{
-      DocumentTypes.presets.kind: (DocumentInspectorScope scope) => <Widget>[PresetsInspector(store: scope.store)],
-      DocumentTypes.strings.kind: (DocumentInspectorScope scope) => <Widget>[StringsInspector(store: scope.store)],
-      DocumentTypes.waypoint.kind: (DocumentInspectorScope scope) => <Widget>[WaypointInspector(store: scope.store)],
-      DocumentTypes.behavior.kind: (DocumentInspectorScope scope) => <Widget>[BehaviorInspector(store: scope.store)],
-      DocumentTypes.glyph.kind: (DocumentInspectorScope scope) => <Widget>[GlyphInspector(store: scope.store)],
-      DocumentTypes.names.kind: (DocumentInspectorScope scope) => <Widget>[NamesInspector(store: scope.store)],
       DocumentTypes.menu.kind: _menuBody,
       DocumentTypes.containerPreview.kind: _previewBody,
       DocumentTypes.panel.kind: _panelBody,
@@ -98,9 +88,20 @@ final Map<WorkspaceDocKind, DocumentInspectorBuilder> _builders =
       DocumentTypes.marker.kind: _markerBody,
     };
 
-/// The inspector body for the active document kind.
-List<Widget> buildDocumentInspector(DocumentInspectorScope scope) =>
-    <Widget>[DocumentPresetPicker(store: scope.store), ..._builders[scope.store.docKind]!(scope)];
+/// The inspector for the active document kind: its body (which opens with
+/// its own `PaneHeader`), then the preset picker in Advanced.
+///
+/// Catalog kinds (names, strings, waypoints, glyphs, behaviors, presets)
+/// register no body: their editable form is the centre view, and the shell
+/// mounts no inspector pane for them (`kindHasInspector`).
+List<Widget> buildDocumentInspector(DocumentInspectorScope scope) {
+  final DocumentInspectorBuilder? body = _builders[scope.store.docKind];
+  if (body == null) return const <Widget>[];
+  return <Widget>[
+    ...body(scope),
+    AdvancedOnly(child: DocumentPresetPicker(store: scope.store)),
+  ];
+}
 
 List<Widget> _panelBody(DocumentInspectorScope scope) => <Widget>[
   PanelInspector(store: scope.store),
@@ -178,30 +179,25 @@ List<Widget> _markerBody(DocumentInspectorScope scope) => <Widget>[
 
 List<Widget> _previewBody(DocumentInspectorScope scope) {
   final EditorStore store = scope.store;
-  final List<Widget> body = <Widget>[
-    // The simulation panel is the card surface's own HUD-ish chrome (task
-    // E8): meaningless in the code view of the same document, where there is
-    // nothing to animate. Every other mode has a card on screen.
-    if (store.view != EditorView.code)
-      PreviewSimPanel(store: store, catalogs: scope.bootCatalogs),
-  ];
   final int? index = store.previewSelectedIndex;
   final HuiPreviewElement? element = store.previewSelectedElement;
-  if (index == null || element == null) {
-    body.add(PreviewMatchEditor(store: store));
-  } else {
-    // Keyed by index so switching selection rebuilds local draft state
-    // instead of carrying the previous element's text across.
-    body.add(
+  return <Widget>[
+    if (index == null || element == null)
+      PreviewMatchEditor(store: store)
+    else
+      // Keyed by index so switching selection rebuilds local draft state
+      // instead of carrying the previous element's text across.
       PreviewElementEditor(
         key: ValueKey<int>(index),
         store: store,
         index: index,
         element: element,
       ),
-    );
-  }
-  return body;
+    // The simulation section follows the editor, whose PaneHeader opens the
+    // pane. It drives the card on screen, so the Code view has none.
+    if (store.view != EditorView.code)
+      PreviewSimPanel(store: store, catalogs: scope.bootCatalogs),
+  ];
 }
 
 List<Widget> _menuBody(DocumentInspectorScope scope) {

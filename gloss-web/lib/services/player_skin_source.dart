@@ -1,8 +1,7 @@
 /// Fetches a player's full skin PNG by username, for the head importer.
 ///
-/// This is the one outbound request the editor makes outside a server-issued
-/// capability link, and it only happens when somebody types a name and asks for
-/// a head. The username is the entire payload; nothing about the workspace is
+/// This is the one outbound request the editor makes to anything but a paired
+/// server, and it only happens when somebody types a name and asks for a head. The username is the entire payload; nothing about the workspace is
 /// sent.
 ///
 /// The bytes are fetched with a plain HTTP request and base64-encoded here

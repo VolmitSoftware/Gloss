@@ -51,6 +51,7 @@
 #   {expected}  편집 저장 시 예상 리비전
 #   {experience}  획득한 경험치량
 #   {failed}  실패한 작업 수
+#   {folders}  편집기 토큰이 변경할 수 있는 폴더
 #   {from}  원본 값 또는 범위 시작
 #   {fuel}  용기에 남은 연료
 #   {group}  언어 편집기 분류
@@ -69,6 +70,7 @@
 #   {labels}  텍스트 라벨 수
 #   {legacy}  가져오기 원본 식별자
 #   {level}  표시 레벨
+#   {lifetime}  편집기 토큰이 만료되기 전 미사용 시간
 #   {limit}  허용 한도
 #   {line}  메시지 내 줄 번호
 #   {locale}  언어 코드
@@ -79,6 +81,7 @@
 #   {message}  응답 또는 진단 메시지
 #   {migrated}  변환한 항목 수
 #   {minimum}  허용 최솟값
+#   {minutes}  시간(분)
 #   {mode}  선택한 작업 또는 표시 모드
 #   {name}  객체 이름
 #   {oldBoard}  이전 보드 식별자
@@ -108,9 +111,9 @@
 #   {roll}  롤 각도
 #   {rotation}  표시 회전
 #   {scale}  표시 또는 미리 보기 배율
+#   {scopes}  편집기 토큰이 허용하는 작업
 #   {seconds}  시간(초)
 #   {section}  언어 편집기 섹션
-#   {session}  편집 세션 식별자
 #   {severity}  진단 심각도
 #   {skipped}  건너뛴 항목 수
 #   {slots}  아이템 슬롯 수
@@ -118,12 +121,12 @@
 #   {special}  특수 표시 요소 수
 #   {state}  현재 상태
 #   {style}  표시 스타일
-#   {subject}  웹 편집 세션에서 편집하는 대상
 #   {target}  언어 선택을 적용할 플러그인
 #   {temporary}  임시 객체 수
 #   {text}  표시되는 텍스트
 #   {title}  표시 제목
 #   {to}  대상 값 또는 범위 끝
+#   {token}  편집기 토큰 ID
 #   {total}  전체 항목 수
 #   {type}  예상 값 또는 객체 유형
 #   {updated}  언어 업데이트로 변경된 메시지
@@ -295,16 +298,11 @@ preview = "미리보기 문서 도구"
 "preview.dump" = "미리보기 문서를 한 번 빌드하고 요소 개수 출력"
 "preview.list" = "미리보기 문서와 일치 규칙 목록 표시"
 "preview.reset" = "기본 제공 미리보기 기본값 복원 (이를 가리는 추가 사용자 문서는 제거되지 않음)"
-web = "Gloss 웹 편집기 열기 및 관리"
-"web.open" = "호스팅된 빈 Gloss 편집기 열기"
-"web.edit" = "실시간 Gloss 문서 하나 열기"
-"web.edit.document" = "이 실시간 문서를 웹 편집기에서 열기"
-"web.workspace" = "전체 실시간 Gloss 작업 공간 열기"
-"web.sessions" = "활성 웹 편집기 세션 관리"
-"web.sessions.list" = "활성 웹 편집기 세션 목록"
-"web.sessions.pull" = "웹 편집기 세션의 업데이트 즉시 확인"
-"web.sessions.revoke" = "웹 편집 권한 취소"
-"web.sessions.status" = "웹 편집기 세션 하나 표시"
+editor = "웹 편집기를 이 서버와 페어링"
+"editor.pair" = "브라우저를 페어링할 일회용 링크 만들기"
+"editor.status" = "편집기 리스너, 중계 서버, 지문 표시"
+"editor.tokens" = "페어링된 브라우저 목록"
+"editor.revoke" = "페어링 종료 또는 링크 취소"
 language = "개인 언어 또는 서버 기본 언어 선택"
 
 "import.mode" = "preview 또는 apply"
@@ -334,7 +332,6 @@ panel_y = "절대 또는 ~상대 Y"
 panel_yaw = "절대 또는 ~상대 요"
 panel_z = "절대 또는 ~상대 Z"
 content_menu = "불러온 메뉴 ID"
-web_subject = "실시간 Gloss 문서 ID"
 hologram_id = "새 홀로그램 및 루트 메뉴 ID"
 hologram_text = "선택 사항인 MiniMessage 텍스트"
 image_path = "Gloss 이미지 폴더 아래의 파일"
@@ -355,7 +352,11 @@ row_x = "절대 또는 ~상대 행 X"
 row_y = "절대 또는 ~상대 행 Y"
 row_z = "절대 또는 ~상대 행 Z"
 source_menu = "불러온 원본 메뉴 ID"
-web_session = "웹 편집기 세션 ID"
+editor_label = "토큰 목록에 표시할 이름"
+editor_scopes = "편집기에 허용할 작업, 쉼표로 구분"
+editor_folders = "이 폴더로 제한, 쉼표로 구분"
+editor_expires = "미사용 시 유효 기간, 예: 7d, 12h 또는 30m"
+editor_token = "토큰 ID 또는 all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &c권한이 없습니다."
@@ -391,6 +392,7 @@ lines = "줄 {count}개"
 header = "&8[&dGloss&8] &d{id} &7위치: &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8배율 &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id}&7은(는) 로드되지 않은 월드 &f{world}&7에 있습니다."
 
 [command.board]
 exists = "&8[&dGloss&8] &c스코어보드 '&f{id}&c'이(가) 이미 있습니다."
@@ -505,13 +507,12 @@ execution_failed = "명령어 {command} 실행에 실패했습니다: {reason}"
 menu_name_required = "메뉴 이름은 비워 둘 수 없습니다"
 hologram_id_required = "홀로그램 ID는 비워 둘 수 없습니다"
 panel_id_required = "패널 ID는 비워 둘 수 없습니다"
-web_subject_required = "웹 편집기 문서 ID는 비워 둘 수 없습니다"
-web_session_required = "웹 편집기 세션 ID는 비워 둘 수 없습니다"
 panel_player_required = "대상 플레이어는 비워 둘 수 없습니다"
 row_icon_type_required = "아이콘 유형은 비워 둘 수 없습니다"
 row_style_property_required = "스타일 속성은 비워 둘 수 없습니다"
 import_source_required = "기존 데이터 가져오기 원본은 비워 둘 수 없습니다"
 import_source_unknown = "알 수 없는 기존 데이터 가져오기 원본: {source}"
+editor_token_required = "토큰 ID 또는 all을 지정하세요"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &c권한 &f{permission}&c이 없습니다."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &c메뉴 &f{menu}&c의 콘텐츠 작업에 실패했습
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &c이 명령어는 플레이어만 사용할 수 있습니다."
 
-[gloss.message.web]
-header = "웹 편집기"
-open_hover = "클릭하여 Gloss 웹 편집기를 엽니다."
-open = "&8[&dGloss&8]: &7웹 편집기: &f{url}"
-preparing = "&8[&dGloss&8]: &7&f{subject}&7의 보안 편집기 동기화 세션을 준비하는 중..."
-unavailable = "&8[&dGloss&8]: &c실시간 웹 편집을 사용할 수 없습니다. 편집기 동기화 설정과 중계 서버 연결을 확인하세요."
-open_failed = "&8[&dGloss&8]: &c실시간 웹 편집기에서 &f{kind}={subject}&c을(를) 열 수 없습니다: {reason}"
-open_console = "&8[&dGloss&8]: &7편집 권한 링크(&f{subject}&7): &f{url}"
-capability_warning = "&8[&dGloss&8]: &e이 URL로 권한이 취소되거나 만료될 때까지 서버에 변경 사항을 게시할 수 있습니다. 비밀로 보관하세요."
+[gloss.message.editor]
+link_ready = "링크가 준비되었습니다. {minutes}분 안에 여세요"
+link_console = "&8[&dGloss&8]: &a링크가 준비되었습니다. {minutes}분 안에 여세요: &f{url}"
+link_details = "&8[&dGloss&8]: &7범위 {scopes}; {folders}; {lifetime} 동안 사용하지 않으면 만료; 토큰 {token}"
+all_folders = "모든 폴더"
+some_folders = "폴더 {folders}"
 open_label = "편집기 열기"
-copy_label = "링크 복사"
-revoke_label = "권한 취소"
-link_hover = "편집기를 열거나, 편집 권한 링크를 복사하거나, 세션 {session}의 권한을 취소합니다."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7활성 편집기 동기화 세션이 없습니다."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7만료까지=&f{seconds}초 &7게시 리비전=&f{revision} &7대기 중=&f{pending}"
-revoked = "&8[&dGloss&8]: &a편집기 동기화 세션 &f{session}&a의 권한을 취소했습니다."
-pulled = "&8[&dGloss&8]: &a편집기 동기화 세션 &f{session}&a의 업데이트를 확인했습니다."
-unknown = "&8[&dGloss&8]: &c편집기 동기화 세션 &f{session}&c을(를) 알 수 없거나 만료되었습니다."
-failed = "&8[&dGloss&8]: &c편집기 동기화 세션 &f{session}&c의 작업에 실패했습니다: {reason}"
+open_hover = "브라우저에서 열기"
+copy_label = "복사"
+copy_hover = "링크 복사"
+revoke_label = "취소"
+revoke_hover = "이 링크를 취소하거나 페어링된 편집기의 연결을 끊습니다"
+details_label = "자세히"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &c편집기가 실행 중이 아닙니다. gloss.toml에서 [editor] enabled = true로 설정하세요"
+tokens_empty = "&8[&dGloss&8]: &7편집기 토큰이 없습니다."
+unknown_token = "&8[&dGloss&8]: &c토큰 &f{token}&c이(가) 없습니다."
+revoked_one = "&8[&dGloss&8]: &a토큰 1개를 취소하고 연결을 닫았습니다."
+revoked_many = "&8[&dGloss&8]: &a토큰 {count}개를 취소하고 연결을 닫았습니다."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7원본을 변경하지 않는 마이그레이션 미리보기를 위해 &f{source}&7을(를) 검사하는 중..."

@@ -51,6 +51,7 @@
 #   {expected}  Muokkausta tallennettaessa odotettu versio
 #   {experience}  Saadun kokemuksen määrä
 #   {failed}  Epäonnistuneiden toimintojen määrä
+#   {folders}  Kansiot, joita editorin käyttötunnus saa muuttaa
 #   {from}  Lähdearvo tai alueen alku
 #   {fuel}  Säiliön jäljellä oleva polttoaine
 #   {group}  Kielieditorin luokka
@@ -69,6 +70,7 @@
 #   {labels}  Tekstimerkintöjen määrä
 #   {legacy}  Tuonnin lähteen tunniste
 #   {level}  Näytettävä taso
+#   {lifetime}  Käyttämätön aika ennen editorin käyttötunnuksen vanhenemista
 #   {limit}  Sallittu raja
 #   {line}  Rivinumero viestissä
 #   {locale}  Kielitunnus
@@ -79,6 +81,7 @@
 #   {message}  Palaute- tai diagnostiikkaviesti
 #   {migrated}  Muunnettujen merkintöjen määrä
 #   {minimum}  Pienin sallittu arvo
+#   {minutes}  Aika minuutteina
 #   {mode}  Valittu toiminta- tai näyttötila
 #   {name}  Kohteen nimi
 #   {oldBoard}  Edellisen taulun tunniste
@@ -108,9 +111,9 @@
 #   {roll}  Kallistuskulma asteina
 #   {rotation}  Näyttökohteen kierto
 #   {scale}  Näyttökohteen tai esikatselun mittakaava
+#   {scopes}  Editorin käyttötunnuksen sallimat toiminnot
 #   {seconds}  Aika sekunteina
 #   {section}  Kielieditorin osio
-#   {session}  Editori-istunnon tunniste
 #   {severity}  Diagnostiikan vakavuustaso
 #   {skipped}  Ohitettujen merkintöjen määrä
 #   {slots}  Esinepaikkojen määrä
@@ -118,12 +121,12 @@
 #   {special}  Erikoisnäyttöelementtien määrä
 #   {state}  Nykyinen tila
 #   {style}  Näyttötyyli
-#   {subject}  Verkkoeditori-istunnon kohde
 #   {target}  Kielivalinnan vastaanottava lisäosa
 #   {temporary}  Tilapäisten kohteiden määrä
 #   {text}  Näytettävä teksti
 #   {title}  Näytettävä otsikko
 #   {to}  Kohdearvo tai alueen loppu
+#   {token}  Editorin käyttötunnuksen tunniste
 #   {total}  Merkintöjen kokonaismäärä
 #   {type}  Odotettu arvo- tai kohdetyyppi
 #   {updated}  Kielipäivityksen muuttamat viestit
@@ -295,16 +298,11 @@ preview = "Esikatseludokumenttien työkalut"
 "preview.dump" = "Koosta esikatseludokumentti kerran ja tulosta sen elementtimäärät"
 "preview.list" = "Luettele esikatseludokumentit ja niiden osumasäännöt"
 "preview.reset" = "Palauta mukana toimitetut esikatseluoletukset (ei poista ylimääräisiä käyttäjän dokumentteja, jotka voivat peittää ne)"
-web = "Avaa ja hallitse Glossin verkkoeditoria"
-"web.open" = "Avaa tyhjä palvelussa toimiva Gloss-editori"
-"web.edit" = "Avaa yksi reaaliaikainen Gloss-dokumentti"
-"web.edit.document" = "Avaa tämä reaaliaikainen dokumentti verkkoeditorissa"
-"web.workspace" = "Avaa koko reaaliaikainen Gloss-työtila"
-"web.sessions" = "Hallitse verkkoeditorin aktiivisia istuntoja"
-"web.sessions.list" = "Luettele verkkoeditorin aktiiviset istunnot"
-"web.sessions.pull" = "Tarkista verkkoeditorin istunto nyt"
-"web.sessions.revoke" = "Peru verkkoeditorin käyttölinkki"
-"web.sessions.status" = "Näytä yksi verkkoeditorin istunto"
+editor = "Liitä verkkoeditori tähän palvelimeen"
+"editor.pair" = "Luo kertakäyttöinen linkki selaimen liittämiseen"
+"editor.status" = "Näytä editorin kuuntelija, välityspalvelin ja sormenjälki"
+"editor.tokens" = "Luettele liitetyt selaimet"
+"editor.revoke" = "Päätä liitos tai peru linkki"
 language = "Valitse oma kielesi tai palvelimen oletuskieli"
 
 "import.mode" = "preview tai apply"
@@ -334,7 +332,6 @@ panel_y = "Absoluuttinen tai ~suhteellinen Y"
 panel_yaw = "Absoluuttinen tai ~suhteellinen suuntakulma"
 panel_z = "Absoluuttinen tai ~suhteellinen Z"
 content_menu = "Ladatun valikon tunnus"
-web_subject = "Reaaliaikaisen Gloss-dokumentin tunnus"
 hologram_id = "Uuden hologrammin ja juurivalikon tunnus"
 hologram_text = "Valinnainen MiniMessage-teksti"
 image_path = "Tiedosto Glossin kuvakansion alla"
@@ -355,7 +352,11 @@ row_x = "Rivin absoluuttinen tai ~suhteellinen X"
 row_y = "Rivin absoluuttinen tai ~suhteellinen Y"
 row_z = "Rivin absoluuttinen tai ~suhteellinen Z"
 source_menu = "Ladatun lähdevalikon tunnus"
-web_session = "Verkkoeditorin istuntotunnus"
+editor_label = "Käyttötunnusluettelossa näkyvä nimi"
+editor_scopes = "Mitä editori saa tehdä, pilkuilla eroteltuna"
+editor_folders = "Rajaa näihin kansioihin, pilkuilla eroteltuna"
+editor_expires = "Voimassaolo ilman käyttöä, esimerkiksi 7d, 12h tai 30m"
+editor_token = "Käyttötunnuksen tunniste tai all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cSinulla ei ole oikeutta."
@@ -391,6 +392,7 @@ lines = "{count} riviä"
 header = "&8[&dGloss&8] &d{id} &7sijainnissa &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8skaala &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7on maailmassa &f{world}&7, jota ei ole ladattu."
 
 [command.board]
 exists = "&8[&dGloss&8] &cTulostaulu '&f{id}&c' on jo olemassa."
@@ -505,13 +507,12 @@ execution_failed = "Komennon {command} suoritus epäonnistui: {reason}"
 menu_name_required = "Valikon nimi ei voi olla tyhjä"
 hologram_id_required = "Hologrammin tunnus ei voi olla tyhjä"
 panel_id_required = "Paneelin tunnus ei voi olla tyhjä"
-web_subject_required = "Verkkoeditorin dokumenttitunnus ei voi olla tyhjä"
-web_session_required = "Verkkoeditorin istuntotunnus ei voi olla tyhjä"
 panel_player_required = "Kohdepelaaja ei voi olla tyhjä"
 row_icon_type_required = "Kuvakkeen tyyppi ei voi olla tyhjä"
 row_style_property_required = "Tyylin ominaisuus ei voi olla tyhjä"
 import_source_required = "Vanhojen tietojen tuontilähde ei voi olla tyhjä"
 import_source_unknown = "Tuntematon vanhojen tietojen tuontilähde: {source}"
+editor_token_required = "Anna käyttötunnuksen tunniste tai all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cSinulla ei ole oikeutta &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cValikon &f{menu}&c sisältötoiminto epäonnistui: {r
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cTämä komento on vain pelaajien käytettävissä."
 
-[gloss.message.web]
-header = "Verkkoeditori"
-open_hover = "Avaa Glossin verkkoeditori napsauttamalla."
-open = "&8[&dGloss&8]: &7Verkkoeditori: &f{url}"
-preparing = "&8[&dGloss&8]: &7Valmistellaan suojattua reaaliaikaista editori-istuntoa kohteelle &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cReaaliaikainen verkkomuokkaus ei ole käytettävissä. Tarkista synkronointiasetukset ja yhteys välityspalvelimeen."
-open_failed = "&8[&dGloss&8]: &cKohdetta &f{kind}={subject}&c ei voitu avata reaaliaikaisessa verkkoeditorissa: {reason}"
-open_console = "&8[&dGloss&8]: &7Editorin käyttölinkki kohteelle &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eTällä URL-osoitteella voi julkaista muutoksia palvelimelle, kunnes käyttöoikeus perutaan tai vanhenee. Pidä osoite salassa."
+[gloss.message.editor]
+link_ready = "Linkki valmis. Avaa se {minutes} minuutin kuluessa"
+link_console = "&8[&dGloss&8]: &aLinkki valmis. Avaa se {minutes} minuutin kuluessa: &f{url}"
+link_details = "&8[&dGloss&8]: &7Oikeudet {scopes}; {folders}; vanhenee {lifetime} käyttämättömyyden jälkeen; käyttötunnus {token}"
+all_folders = "kaikki kansiot"
+some_folders = "kansiot {folders}"
 open_label = "Avaa editori"
-copy_label = "Kopioi linkki"
-revoke_label = "Peru käyttöoikeus"
-link_hover = "Avaa editori, kopioi käyttölinkki tai peru istunto {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Aktiivisia verkkoeditorin istuntoja ei ole."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7vanhenee=&f{seconds}s &7julkaisu=&f{revision} &7odottavia=&f{pending}"
-revoked = "&8[&dGloss&8]: &aVerkkoeditorin istunto &f{session}&a peruttiin."
-pulled = "&8[&dGloss&8]: &aVerkkoeditorin istunto &f{session}&a tarkistettiin."
-unknown = "&8[&dGloss&8]: &cTuntematon tai vanhentunut verkkoeditorin istunto &f{session}&c."
-failed = "&8[&dGloss&8]: &cVerkkoeditorin toiminto epäonnistui istunnolle &f{session}&c: {reason}"
+open_hover = "Avaa selaimessa"
+copy_label = "Kopioi"
+copy_hover = "Kopioi linkki"
+revoke_label = "Peru"
+revoke_hover = "Peru tämä linkki tai katkaise sen liittämä editori"
+details_label = "Tiedot"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cEditori ei ole käynnissä; aseta [editor] enabled = true tiedostossa gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7Ei editorin käyttötunnuksia."
+unknown_token = "&8[&dGloss&8]: &cKäyttötunnusta &f{token}&c ei ole."
+revoked_one = "&8[&dGloss&8]: &a1 käyttötunnus peruttiin; sen yhteydet suljettiin."
+revoked_many = "&8[&dGloss&8]: &a{count} käyttötunnusta peruttiin; niiden yhteydet suljettiin."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Tutkitaan lähdettä &f{source}&7 siirron esikatselua varten muuttamatta tietoja..."

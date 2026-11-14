@@ -12,6 +12,7 @@ import 'dart:math' as math;
 import 'package:web/web.dart' as web;
 
 import '../../l10n/hui_localizations.dart';
+import '../../logic/canvas_tags.dart';
 import '../../logic/viewport_math.dart';
 import '../../model/vec3.dart';
 import '../../state/editor_store.dart' show HuiBackdropMode;
@@ -216,10 +217,13 @@ void paintPlayerReference(CanvasBrush brush) {
 }
 
 /// Yellow menu-centre marker, mirroring the plugin's `debugPosition` particle.
+/// Its tag takes the first corner beside the marker that covers none of
+/// [clearOf] (the components on screen), and is left out when none is clear.
 void paintMenuCenter(
   CanvasBrush brush,
   Vec3 menuOffset, {
   bool labelled = true,
+  List<TagBox> clearOf = const <TagBox>[],
 }) {
   final CanvasPalette palette = brush.palette;
   brush.save();
@@ -229,14 +233,36 @@ void paintMenuCenter(
   brush.crosshair(menuOffset.x, menuOffset.y, 9);
   brush.ring(menuOffset.x, menuOffset.y, 4.5);
   brush.restore();
-  if (labelled) {
-    brush.chip(
-      huiText('menu centre'),
-      brush.sx(menuOffset.x) + 12,
-      brush.sy(menuOffset.y) - 12,
-      color: palette.menuCenter,
-    );
-  }
+  if (!labelled) return;
+  const double fontSize = 10.5;
+  const double height = fontSize + 8;
+  final String text = huiText('menu centre');
+  brush.save();
+  brush.setUiFont(fontSize, bold: true);
+  final double width = brush.measure(text) + 10;
+  brush.restore();
+  final double x = brush.sx(menuOffset.x);
+  final double y = brush.sy(menuOffset.y);
+  // (chip x, chip middle y, aligned right): up-right, down-right, up-left,
+  // down-left of the marker.
+  final List<(double, double, bool)> corners = <(double, double, bool)>[
+    (x + 12, y - 12, false),
+    (x + 12, y + 12, false),
+    (x - 12, y - 12, true),
+    (x - 12, y + 12, true),
+  ];
+  final int? spot = clearSpot(<TagBox>[
+    for (final (double cx, double cy, bool right) in corners)
+      TagBox(
+        left: right ? cx - width : cx,
+        top: cy - height / 2,
+        width: width,
+        height: height,
+      ),
+  ], clearOf);
+  if (spot == null) return;
+  final (double cx, double cy, bool right) = corners[spot];
+  brush.chip(text, cx, cy, color: palette.menuCenter, alignRight: right);
 }
 
 class _Limb {

@@ -32,9 +32,9 @@ public class EditorSyncContentSnapshotBuilderTest {
     Path data = temp.newFolder("empty-workspace").toPath();
 
     EditorSyncProject project = new EditorSyncContentSnapshotBuilder(data)
-        .open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024);
+        .open(1024 * 1024);
 
-    assertEquals(EditorSyncKind.WORKSPACE, project.kind());
+    assertEquals("workspace", project.json().get("kind").getAsString());
     assertTrue(project.json().getAsJsonArray("documents").isEmpty());
     assertTrue(project.json().getAsJsonArray("images").isEmpty());
     JsonObject constraints = project.json().getAsJsonObject("constraints");
@@ -48,18 +48,35 @@ public class EditorSyncContentSnapshotBuilderTest {
   }
 
   @Test
-  public void focusedMenuOpenAndSubjectIdsIgnoreMalformedUnrelatedKinds() throws Exception {
-    Path data = temp.newFolder("focused-isolation").toPath();
+  public void aMalformedDocumentRefusesTheWholeProjectButOnlyWarnsInTheListing() throws Exception {
+    Path data = temp.newFolder("malformed-isolation").toPath();
     write(data.resolve("menus/shop.json"), "{\"components\":[]}");
     write(data.resolve("holograms/broken.json"), "not json");
     EditorSyncContentSnapshotBuilder builder = new EditorSyncContentSnapshotBuilder(data);
 
-    EditorSyncProject menu = builder.open(EditorSyncKind.MENU, "shop", 1024 * 1024);
+    EditorSyncContentSnapshotBuilder.Listing listing = builder.list(true, 1024 * 1024);
 
-    assertEquals(List.of("shop"), builder.subjectIds(EditorSyncKind.MENU));
-    assertEquals(1, menu.json().getAsJsonArray("documents").size());
-    assertThrows(RuntimeException.class,
-        () -> builder.open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024));
+    assertEquals(1, listing.documents().size());
+    assertEquals("shop", listing.documents().getFirst().id());
+    assertTrue(listing.warnings().stream().anyMatch(warning -> warning.startsWith("unreadable|hologram|broken||")));
+    assertThrows(RuntimeException.class, () -> builder.open(1024 * 1024));
+  }
+
+  @Test
+  public void aListingReadsAgainOnlyTheFilesThatChanged() throws Exception {
+    Path data = temp.newFolder("cached-listing").toPath();
+    write(data.resolve("menus/shop.json"), "{\"components\":[]}");
+    write(data.resolve("menus/other.json"), "{\"components\":[]}");
+    EditorSyncContentSnapshotBuilder builder = new EditorSyncContentSnapshotBuilder(data);
+    EditorSyncDocuments.Entry before = builder.list(true, 1024 * 1024).documents().getFirst();
+
+    write(data.resolve("menus/shop.json"), "{\"offset\":[0,0,1],\"components\":[]}");
+    Files.setLastModifiedTime(data.resolve("menus/shop.json"),
+        java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 5000L));
+    List<EditorSyncDocuments.Entry> after = builder.list(true, 1024 * 1024).documents();
+
+    assertTrue(before == after.getFirst());
+    assertEquals("{\"offset\":[0,0,1],\"components\":[]}", after.get(1).json());
   }
 
   @Test
@@ -69,9 +86,7 @@ public class EditorSyncContentSnapshotBuilderTest {
     write(data.resolve("tablist.json"), "{\"schemaVersion\":1,\"revision\":1}");
     EditorSyncContentSnapshotBuilder builder = new EditorSyncContentSnapshotBuilder(data);
 
-    assertTrue(builder.subjectIds(EditorSyncKind.ANIMATION).isEmpty());
-    assertTrue(builder.subjectIds(EditorSyncKind.TABLIST).isEmpty());
-    assertTrue(builder.open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024)
+    assertTrue(builder.open(1024 * 1024)
         .json().getAsJsonArray("documents").isEmpty());
   }
 
@@ -84,8 +99,7 @@ public class EditorSyncContentSnapshotBuilderTest {
     ImageIO.write(source, "png", image.toFile());
     EditorSyncContentSnapshotBuilder builder = new EditorSyncContentSnapshotBuilder(data);
 
-    EditorSyncProject workspace = builder.open(
-        EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024);
+    EditorSyncProject workspace = builder.open(1024 * 1024);
 
     assertEquals("archive/unreferenced.png",
         workspace.json().getAsJsonArray("images").get(0).getAsJsonObject()
@@ -104,7 +118,7 @@ public class EditorSyncContentSnapshotBuilderTest {
             .toJson(panel));
 
     EditorSyncProject project = new EditorSyncContentSnapshotBuilder(data)
-        .open(EditorSyncKind.PANEL, "spawn", 1024 * 1024);
+        .open(1024 * 1024);
     EditorSyncDocuments.Entry panelEntry = EditorSyncDocuments.parse(project.json()).stream()
         .filter(entry -> entry.kind().equals("panel"))
         .findFirst()

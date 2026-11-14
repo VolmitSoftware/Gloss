@@ -23,8 +23,6 @@ final class NameplateDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('nameplate');
 
-  @override
-  String get createLabel => huiText('New nameplate');
 
   @override
   String get pluralLabel => huiText('Nameplates');

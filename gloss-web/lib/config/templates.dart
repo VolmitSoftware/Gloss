@@ -40,7 +40,7 @@ class HuiTemplate {
 const List<HuiTemplate> huiTemplates = <HuiTemplate>[
   HuiTemplate(
     id: 'blank',
-    name: 'Blank hologram',
+    name: 'Blank menu',
     description:
         'The richer starter menu from /gloss menu new: a title, hint, and '
         'Close button. For the quickest in-game hologram, run '

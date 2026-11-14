@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <title>Gloss Editor</title>
   <meta name="description" content="Visual web editor for creating and previewing Gloss menu configurations.">
-  <meta id="gloss-theme-color" name="theme-color" content="#111310">
+  <meta id="gloss-theme-color" name="theme-color" content="#0a0a0a">
   <meta property="og:title" content="Gloss Editor">
   <meta property="og:description" content="Visual web editor for creating and previewing Gloss menu configurations.">
   <meta property="og:image" content="assets/brand/icon-512x512.png">
@@ -76,7 +76,7 @@
       root.classList.remove('light', 'dark');
       root.classList.add(mode);
       document.getElementById('gloss-theme-color').setAttribute(
-        'content', mode === 'light' ? '#f6f5f0' : '#111310'
+        'content', mode === 'light' ? '#ffffff' : '#0a0a0a'
       );
       root.lang = localeTags[locale];
       root.dir = locale === 'he_IL' ? 'rtl' : 'ltr';
@@ -90,6 +90,7 @@
   <link rel="preload" href="assets/fonts/geist/Geist-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/minecraft/Minecraft-Regular.ttf" as="font" type="font/ttf" crossorigin>
 
+  <link rel="stylesheet" href="styles/00-kit.css">
   <link rel="stylesheet" href="styles/01-foundations.css">
   <link rel="stylesheet" href="styles/02-shell.css">
   <link rel="stylesheet" href="styles/03-canvas.css">
@@ -100,14 +101,14 @@
   <link rel="stylesheet" href="styles/08-preview-card.css">
   <link rel="stylesheet" href="styles/09-workspace.css">
   <link rel="stylesheet" href="styles/10-gloss.css">
-  <link rel="stylesheet" href="styles/11-tooltip-overlay.css">
   <link rel="stylesheet" href="styles/12-gloss-fidelity.css">
   <link rel="stylesheet" href="styles/13-mc-stage.css">
 
   <style>
     html, body { margin: 0; padding: 0; min-height: 100vh; }
-    html.dark body { background: #111310; color: #e8ebe3; }
-    html.light body { background: #f6f5f0; color: #242822; }
+    /* Midnight's page colours, before the theme loads. */
+    html.dark body { background: #0a0a0a; color: #f7f4ec; }
+    html.light body { background: #ffffff; color: #0a0a0a; }
     .hui-boot { position: fixed; inset: 0; display: grid; place-items: center; z-index: 999; }
     .hui-boot-spinner { width: 28px; height: 28px; border-radius: 50%;
       border: 2px solid rgba(128,128,128,.25); border-top-color: currentColor;
@@ -118,7 +119,6 @@
 <body>
   <div class="hui-boot" id="loading"><div class="hui-boot-spinner"></div></div>
   <div id="app"></div>
-  <script defer src="tooltip-overlay.js"></script>
   <script defer src="vendor/re2js/re2js.js"></script>
   <script defer src="channel-filters.js"></script>
   <script defer src="main.client.dart.js"></script>

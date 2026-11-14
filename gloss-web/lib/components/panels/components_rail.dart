@@ -9,22 +9,167 @@
 /// and read without touching the artboard.
 library;
 
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:arcane_jaspr/core/dom_value.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show ListenableBuilder;
-import 'package:web/web.dart' as web;
+import 'package:jaspr/jaspr.dart'
+    show Component, EventCallback, ListenableBuilder;
 
 import '../../config/defaults.dart';
+import '../../doctype/document_type.dart';
 import '../../logic/validation.dart';
 import '../../model/model.dart';
 import '../../services/catalogs.dart';
 import '../../services/showcase_randomizer.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
-import 'drag_data.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/empty_state.dart';
+import '../../ui/info_tip.dart';
+import '../../ui/list_row.dart';
+import '../../ui/menu.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/skeleton.dart';
 import 'preview_elements_rail.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+import '../../ui/toast.dart';
+
+/// The display types come first in the Add menu; the runtime form types
+/// (list, slider, field, tabs) follow a separator.
+const Set<String> _displayTypes = <String>{'button', 'decoration', 'toggle'};
+
+String componentTypeLabel(String type) => switch (type) {
+  'button' => huiText('Button'),
+  'toggle' => huiText('Toggle'),
+  'decoration' => huiText('Decoration'),
+  'list' => huiText('List'),
+  'slider' => huiText('Slider'),
+  'field' => huiText('Text field'),
+  'tabs' => huiText('Tabs'),
+  _ => type,
+};
+
+ArcaneGlyph componentTypeIcon(String type, {bool active = false}) =>
+    switch (type) {
+      'button' => ArcaneIcon.mousePointerClick(),
+      'toggle' => active ? ArcaneIcon.toggleRight() : ArcaneIcon.toggleLeft(),
+      'list' => ArcaneIcon.listIcon(),
+      'slider' => ArcaneIcon.slidersHorizontal(),
+      'field' => ArcaneIcon.textCursorInput(),
+      'tabs' => ArcaneIcon.panelTop(),
+      _ => ArcaneIcon.square(),
+    };
+
+/// "Create random menu" (or preview) for the open document: replaces its
+/// content in one undo step.
+AppMenuEntry railCreateRandomEntry(EditorStore store) {
+  final DocumentTypeAdapter type = store.docType;
+  final String? documentId = store.workspace.activeId;
+  return AppMenuEntry(
+    huiText("Create random {noun}", <String, Object?>{'noun': type.noun}),
+    documentId == null || !canRandomizeShowcase(type)
+        ? null
+        : () => randomizeShowcaseDocument(store, documentId),
+    description: huiText('Replaces its code'),
+    icon: ArcaneIcon.dices(),
+  );
+}
+
+/// The toast after a rail delete; Undo puts the row back.
+void railDeletedToast(EditorStore store, String label) => toastInfo(
+  huiText('Deleted {id}.', <String, Object?>{'id': label}),
+  action: ToastAction(
+    label: huiText('Undo'),
+    onPressed: () => store.performUndo(),
+  ),
+);
+
+/// One rail row: the select target (a ghost button filling the row, named
+/// by the item), an issue dot, and the row's action menu. Right-click opens
+/// the same entries.
+class RailRow extends StatelessWidget {
+  const RailRow({
+    required this.label,
+    required this.icon,
+    required this.current,
+    required this.onSelect,
+    required this.entries,
+    required this.menuId,
+    this.issue,
+    this.onPointerDown,
+    super.key,
+  });
+
+  final String label;
+  final ArcaneGlyph icon;
+
+  /// Selected: `aria-current` on the select target.
+  final bool current;
+  final void Function() onSelect;
+  final List<AppMenuEntry> entries;
+
+  /// The row menu's id; the context menu takes `<menuId>-context`.
+  final String menuId;
+
+  /// The worst problem on the item, drawn as a dot.
+  final HuiSeverity? issue;
+  final void Function(Object? event)? onPointerDown;
+
+  @override
+  Widget build(BuildContext context) {
+    final HuiSeverity? severity = issue;
+    final bool error = severity == HuiSeverity.error;
+    return AppContextMenu(
+      id: '$menuId-context',
+      entries: entries,
+      child: ListRow(
+        label: label,
+        icon: icon,
+        selected: current,
+        onSelect: onSelect,
+        attributes: const <String, String>{'data-rail-row': ''},
+        rowAttributes: const <String, String>{'data-rail-item': ''},
+        events: <String, EventCallback>{'pointerdown': ?onPointerDown},
+        trailing: <Widget>[
+          if (severity == HuiSeverity.error || severity == HuiSeverity.warning)
+            dom.span(
+              attributes: <String, String>{
+                'data-rail-issue': error ? 'error' : 'warning',
+                'role': 'img',
+                'aria-label': error
+                    ? huiText('Has errors')
+                    : huiText('Has warnings'),
+              },
+              const <Widget>[],
+            ),
+          AppMenu(
+            id: menuId,
+            icon: ArcaneIcon.ellipsis(),
+            iconLabel: huiText("Actions for {label}", <String, Object?>{
+              'label': label,
+            }),
+            alignEnd: true,
+            entries: entries,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The worst severity in [issues], or null when there is none worth a dot.
+HuiSeverity? railIssue(List<HuiIssue> issues) {
+  if (issues.any((HuiIssue issue) => issue.severity == HuiSeverity.error)) {
+    return HuiSeverity.error;
+  }
+  if (issues.any((HuiIssue issue) => issue.severity == HuiSeverity.warning)) {
+    return HuiSeverity.warning;
+  }
+  return null;
+}
 
 class ComponentsRail extends StatefulWidget {
   const ComponentsRail({required this.store, super.key});
@@ -36,22 +181,6 @@ class ComponentsRail extends StatefulWidget {
 }
 
 class _ComponentsRailState extends State<ComponentsRail> {
-  /// Two-step delete: the first press arms the row, the check runs it.
-  String? _armedDeleteId;
-  String? _renameId;
-  String _renameDraft = '';
-
-  /// The row whose action menu is open; at most one at a time.
-  String? _menuRowId;
-
-  /// Element id of the tools button that opened [_menuRowId], so closing can
-  /// put focus back where the user left it.
-  String? _menuTriggerId;
-  HuiActionMenuPoint _menuPoint = const HuiActionMenuPoint(8, 8);
-  String? _dragId;
-  int _dropIndex = -1;
-  bool _typesOpen = false;
-
   /// The catalogs the store held when this rail mounted.
   ///
   /// `HuiCatalogs.loaded` is false both before the fetch and after it fails, so
@@ -59,6 +188,10 @@ class _ComponentsRailState extends State<ComponentsRail> {
   /// can: `EditorStore.setCatalogs` swaps in a new one exactly once, whichever
   /// way the fetch went.
   late final HuiCatalogs _bootCatalogs;
+
+  /// Whether the pointer pressing a row held Shift, Ctrl or Cmd. Read at
+  /// pointerdown: the row button's press callback carries no event.
+  bool _extend = false;
 
   EditorStore get _store => component.store;
 
@@ -71,893 +204,189 @@ class _ComponentsRailState extends State<ComponentsRail> {
   bool get _catalogsPending =>
       identical(_store.catalogs, _bootCatalogs) && !_store.catalogs.loaded;
 
-  /// Moves focus to [elementId] once the frame that renders it has been built.
-  ///
-  /// Focus is the mechanism here, not a courtesy. Arcane's button-feedback
-  /// script calls `preventDefault` on mousedown, so clicking a trigger leaves
-  /// focus on `body` — and both popups below listen for Escape inside their own
-  /// subtree, which a body-level keydown never enters. Measured before this
-  /// landed: Escape left the row menu open (its scrim went on swallowing every
-  /// click) and left all three type buttons on screen.
-  void _focusAfterFrame(String elementId) {
-    context.binding.addPostFrameCallback(() {
-      (web.document.getElementById(elementId) as web.HTMLElement?)?.focus();
-    });
-  }
-
-  void _setTypesOpen(bool open) {
-    if (_typesOpen == open) return;
-    setState(() => _typesOpen = open);
-    _focusAfterFrame(open ? _typesPanelId : _typesTriggerId);
-  }
-
-  /// Opens the action menu for [rowId], or closes it when [rowId] is null.
-  ///
-  /// [triggerId] is the tools button focus returns to on close. It is keyed on
-  /// the row's index, so after a reorder focus lands on the same slot rather
-  /// than following the component — which is the list convention and keeps
-  /// focus inside the rail either way.
-  void _setMenuRow(
-    String? rowId,
-    String? triggerId, {
-    HuiActionMenuPoint? point,
-  }) {
-    final String? previous = _menuTriggerId;
-    setState(() {
-      _menuRowId = rowId;
-      _menuTriggerId = rowId == null ? null : triggerId;
-      if (point != null) _menuPoint = point;
-      _armedDeleteId = null;
-    });
-    if (rowId != null) {
-      _focusAfterFrame(_rowMenuId);
-    } else if (previous != null) {
-      _focusAfterFrame(previous);
+  /// Shift is the documented gesture; Ctrl and Cmd come along because every
+  /// list in every other editor accepts them.
+  void _notePointer(Object? event) {
+    bool held(String key) {
+      final JSAny? value = (event as JSObject?)?.getProperty<JSAny?>(key.toJS);
+      return value != null &&
+          value.isA<JSBoolean>() &&
+          (value as JSBoolean).toDart;
     }
+
+    _extend = held('shiftKey') || held('ctrlKey') || held('metaKey');
   }
 
-  /// Closes the row menu without moving focus.
-  void _dismissMenu() => setState(() {
-    _menuRowId = null;
-    _menuTriggerId = null;
-  });
-
-  /// Plain click replaces the selection; shift or Ctrl/Cmd toggles membership.
+  /// A plain press replaces the selection; a modified one toggles membership.
   ///
-  /// The canvas deliberately keeps the group when a member is clicked plainly —
-  /// the click is the start of a group drag. A rail row has no such gesture
-  /// (dragging one reorders that component alone), so here the list convention
-  /// wins and a plain click always collapses to the row that was clicked. It is
-  /// also the only way back to a single selection without reaching for Escape.
-  void _click(Object? event, String id) {
-    if (_multiSelectModifier(event)) {
+  /// The canvas keeps the group when a member is clicked plainly (the click
+  /// starts a group drag). A rail row has no such gesture, so here the list
+  /// convention wins and a plain press collapses to the row pressed. Keyboard
+  /// activation has no pointerdown, so Enter always selects.
+  void _select(String id) {
+    final bool extend = _extend;
+    _extend = false;
+    if (extend) {
       _store.toggleInSelection(id);
     } else {
       _store.select(id);
     }
-    if (_armedDeleteId != null || _menuRowId != null) {
-      setState(() {
-        _armedDeleteId = null;
-        _menuRowId = null;
-        _menuTriggerId = null;
-      });
-    }
   }
 
-  void _add(String type) {
-    _store.addComponent(type);
-    setState(() {
-      _armedDeleteId = null;
-      _menuRowId = null;
-      _menuTriggerId = null;
-      _typesOpen = false;
-    });
-  }
-
-  void _delete(String id) {
-    setState(() => _armedDeleteId = null);
+  void _delete(String id, String label) {
     _store.deleteComponent(id);
+    railDeletedToast(_store, label);
   }
 
-  /// True when the click asked to extend the selection rather than replace it.
-  ///
-  /// Shift is the documented gesture; Ctrl and Cmd come along because every
-  /// list in every other editor accepts them and costs nothing here.
-  bool _multiSelectModifier(Object? event) {
-    try {
-      final web.MouseEvent mouse = event! as web.MouseEvent;
-      return mouse.shiftKey || mouse.ctrlKey || mouse.metaKey;
-    } catch (_) {
-      // Not a mouse event (keyboard activation of the row button): a plain
-      // Enter selects, which is the right default.
-      return false;
-    }
-  }
-
-  void _move(String id, int newIndex) {
-    _store.reorder(id, newIndex);
-    setState(() {
-      _dragId = null;
-      _dropIndex = -1;
-      _menuRowId = null;
-      _menuTriggerId = null;
-    });
-  }
-
-  void _dropOn(int index) {
-    final String? dragged = _dragId;
-    setState(() {
-      _dragId = null;
-      _dropIndex = -1;
-      _menuRowId = null;
-      _menuTriggerId = null;
-    });
-    if (dragged == null) return;
-    _store.reorder(dragged, index);
-  }
-
-  // The shell already renders the scrolling `<aside class="hui-pane hui-rail">`
-  // cell around this slot with its own `aria-label`, so the rail root is a
-  // plain filler div: no second landmark, no second border, no second scroller.
-  //
   // A container-preview document delegates whole to [PreviewElementsRail]:
-  // elements have no id, no drag reorder and no right-click menu, so sharing
-  // this state class's id-keyed bookkeeping would only be friction.
+  // elements have no id, so this state class's id-keyed bookkeeping does not
+  // apply to them.
   @override
-  Widget build(BuildContext context) =>
-      dom.div(classes: 'hui-rail-pane', <Widget>[
-        ListenableBuilder(
-          listenable: _store,
-          builder: (BuildContext inner) => _store.isPreviewDoc
-              ? PreviewElementsRail(store: _store)
-              : _body(),
-        ),
-      ]);
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _store,
+    builder: (BuildContext inner) =>
+        _store.isPreviewDoc ? PreviewElementsRail(store: _store) : _body(),
+  );
 
   Widget _body() {
     final List<HuiComponent> components = _store.components;
-    final int selected = _store.selectionIds.length;
-    return dom.div(classes: 'hui-rail-inner', <Widget>[
-      _header(components.length),
-      if (_typesOpen) _typeChooser(),
-      if (components.isEmpty)
-        // Nothing authored yet AND nothing fetched yet is the one moment the
-        // rail genuinely has nothing to say. Skeleton rows read as "loading";
-        // the empty state reads as "there is nothing here", and showing that
-        // first would be a lie the boot sequence corrects a moment later.
-        _catalogsPending ? _skeleton() : _empty()
-      else ...<Widget>[
-        if (components.length > 1) _hintLine(selected, components.length),
-        dom.div(
-          classes: 'hui-rail-list',
-          attributes: const <String, String>{'role': 'list'},
-          <Widget>[
-            for (int i = 0; i < components.length; i++)
-              _row(i, components[i], components.length),
-          ],
-        ),
-      ],
-    ]);
-  }
-
-  /// Three placeholder rows at the height of a real one. Sized inline: the rail
-  /// stylesheet is not this task's to extend, and a skeleton that lands one
-  /// build ahead of its CSS is worse than no skeleton.
-  Widget _skeleton() => dom.div(
-    classes: 'hui-rail-list',
-    attributes: <String, String>{
-      'aria-busy': 'true',
-      'aria-label': huiText('Loading'),
-    },
-    <Widget>[
-      for (int i = 0; i < 3; i++)
-        dom.div(
-          classes: 'hui-rail-row',
-          styles: dom.Styles(
-            raw: <String, String>{
-              'height': '38px',
-              'opacity': (0.5 - i * 0.13).toStringAsFixed(2),
-              'background': 'var(--hui-panel-soft)',
-              'pointer-events': 'none',
-            },
+    return DenseBox(
+      attributes: const <String, String>{'data-rail': 'components'},
+      children: <Widget>[
+        _head(components.length),
+        if (components.isEmpty)
+          // Nothing authored yet AND nothing fetched yet reads as loading;
+          // the empty state would be a claim the boot sequence corrects a
+          // moment later.
+          _catalogsPending
+              ? const Skeleton(rows: 3)
+              : EmptyState(
+                  message: huiText('No components yet'),
+                  icon: ArcaneIcon.layers(),
+                )
+        else
+          ReorderList(
+            label: huiText('Components'),
+            itemCount: components.length,
+            tools: false,
+            onReorder: (int from, int to) =>
+                _store.reorder(components[from].id, to),
+            itemBuilder: (int index) =>
+                _row(index, components[index], components.length),
           ),
-          const <Widget>[],
-        ),
-    ],
-  );
-
-  /// Heading, count and the add split-button share one line: the rail is
-  /// 240-280px wide and every line spent here is a component row lost.
-  Widget _header(int count) => dom.div(classes: 'hui-rail-header', <Widget>[
-    dom.div(classes: 'hui-rail-heading', <Widget>[
-      HuiEyebrow(huiText('Components')),
-      // Plain text, not an aria-label: "Components 14" already reads
-      // correctly and a labelled <span> has no role to carry a name.
-      // The selection count is NOT here: a two-digit chip steals the
-      // last pixel from the eyebrow and ellipsizes "Components". It
-      // goes on the hint line below, which has a whole row to itself.
-      dom.span(classes: 'hui-rail-count', <Widget>[
-        Text(huiText("{count}", <String, Object?>{'count': count})),
-      ]),
-    ]),
-    _addSplitButton(),
-  ]);
-
-  /// One muted line, and while a group is selected it says so instead: the
-  /// count is the more urgent fact — every command in the palette is about to
-  /// act on all of them — and the ordering rule keeps its hover text either
-  /// way. The full explanation lives there rather than in body copy.
-  Widget _hintLine(int selected, int count) {
-    final bool group = selected > 1;
-    return dom.p(
-      classes: 'hui-rail-hint',
-      // `data-no-tooltip` keeps Arcane's title-to-tooltip upgrade away: it
-      // re-parents the element into a wrapper span, and this subtree belongs
-      // to Jaspr's differ.
-      attributes: <String, String>{
-        'data-no-tooltip': 'true',
-        'title': group
-            ? huiText(
-                'Commands act on all {count}. Shift-click a row to add or remove it; Escape clears the selection.',
-                <String, Object?>{'count': selected},
-              )
-            : huiText(
-                'The nearest hitbox fires; list order breaks an exact-distance tie. Drag a row, use the arrows, or use the right-click menu to change it.',
-              ),
-      },
-      <Widget>[
-        Text(
-          group
-              ? huiText('{selected} of {count} selected', <String, Object?>{
-                  'selected': selected,
-                  'count': count,
-                })
-              : huiText('List order breaks click ties'),
-        ),
       ],
     );
   }
 
-  Widget _addSplitButton() => dom.div(classes: 'hui-rail-add', <Widget>[
-    // No ArcaneTooltip in here: its surface is a 211px absolutely
-    // positioned box that overflows a 240px rail and gives the scroll
-    // container a horizontal scrollbar. The label is visible anyway.
-    Button(
-      variant: ButtonVariant.primary,
-      size: ButtonSize.small,
-      onPressed: () => _add('button'),
-      icon: ArcaneIcon.plus(size: IconSize.sm),
-      label: huiText('Add'),
-      attributes: <String, String>{
-        'aria-label': huiText('Add a button component'),
-      },
-    ),
-    // Was an ArcaneDropdownMenu. That component never opens in this
-    // arcane_jaspr build — its open state lives entirely in the injected
-    // JS runtime and nothing there flips it — so the type list is a
-    // plain disclosure the rail owns, the way the command palette is a
-    // plain dialog for the same class of reason.
-    Button(
-      // Keyed on the state it reports. Arcane's Button renders its
-      // `attributes` one build behind — measured: opening the panel left
-      // `aria-expanded="false"` and closing it left `true` — so the key
-      // forces a fresh element and the disclosure state stays honest.
-      key: ValueKey<bool>(_typesOpen),
-      id: _typesTriggerId,
-      variant: ButtonVariant.primary,
-      size: ButtonSize.small,
-      onPressed: () => _setTypesOpen(!_typesOpen),
-      // The stylesheet trims this half of the split button through
-      // `.hui-rail-add > .arcane-dropdown .arcane-button`, a selector the
-      // dropdown's removal stopped matching. Ten extra pixels here
-      // ellipsize the "Components" eyebrow, so the same declaration is
-      // restored inline — `!important` because the rule it is replacing
-      // is one, and 05-panels-dialogs.css belongs to another task.
-      styles: const ArcaneStyleData(paddingStringCustom: '0 4px !important'),
-      attributes: <String, String>{
-        'aria-label': huiText('Choose a component type'),
-        'aria-expanded': _typesOpen ? 'true' : 'false',
-        'aria-controls': _typesPanelId,
-        // See the row menu's trigger: every `button[aria-expanded]` is
-        // claimed by the legacy accordion binder unless it carries this
-        // (`accordion_scripts.dart:7-16`). This one survives today only
-        // because it is the last child of `.hui-rail-add` and so has no
-        // next sibling for the binder to hide — one added sibling would
-        // break it silently. The opt-out is the guarantee.
-        'data-arcane-interactive': 'true',
-      },
-      icon: _typesOpen
-          ? ArcaneIcon.chevronUp(size: IconSize.sm)
-          : ArcaneIcon.chevronDown(size: IconSize.sm),
-    ),
-  ]);
-
-  static const String _typesPanelId = 'hui-rail-types';
-  static const String _typesTriggerId = 'hui-rail-types-trigger';
-
-  /// At most one row menu is open, so one id is enough.
-  static const String _rowMenuId = 'hui-rail-rowmenu';
-
-  static String _rowMenuTriggerId(int index) => 'hui-rail-rowtools-$index';
-
-  /// In flow under the header rather than floating over the list: an absolutely
-  /// positioned card in a 240px scroll container needs the rail stylesheet to
-  /// contain it, and pushing three rows down for one click does not.
-  Widget _typeChooser() => dom.div(
-    classes: 'hui-rail-types',
-    id: _typesPanelId,
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'display': 'flex',
-        'flex-direction': 'column',
-        'gap': '2px',
-        'padding': '6px',
-        'margin': '0 0 8px',
-        'border': '1px solid var(--hui-border-soft)',
-        'border-radius': 'var(--hui-radius)',
-        'background': 'var(--hui-panel-soft)',
-      },
-    ),
-    attributes: <String, String>{
-      'role': 'group',
-      'aria-label': huiText('Component types'),
-      // Focused on open so the Escape handler below is reachable; never
-      // in the Tab order, which is what -1 buys over 0.
-      'tabindex': '-1',
-    },
-    events: <String, void Function(Object)>{
-      'keydown': (Object event) {
-        if (domEventKey(event) != 'Escape') return;
-        domStopPropagation(event);
-        _setTypesOpen(false);
-      },
-    },
-    <Widget>[
-      for (final String type in huiEditorComponentTypes)
-        dom.button(
-          classes: 'hui-rail-type',
-          styles: const dom.Styles(
-            raw: <String, String>{
-              'display': 'flex',
-              'align-items': 'flex-start',
-              'gap': '8px',
-              'width': '100%',
-              'padding': '7px 8px',
-              'border': '0',
-              'border-radius': '0',
-              'background': 'transparent',
-              'color': 'var(--hui-text)',
-              'text-align': 'left',
-              'cursor': 'pointer',
-              'font': 'inherit',
-            },
-          ),
-          attributes: <String, String>{
-            'type': 'button',
-            'data-no-tooltip': 'true',
-            'title': huiText(huiComponentTypeDescriptions[type] ?? ''),
-          },
-          events: <String, void Function(Object)>{
-            'click': (Object _) => _add(type),
-          },
-          <Widget>[
-            dom.span(
-              styles: const dom.Styles(
-                raw: <String, String>{
-                  'flex': '0 0 auto',
-                  'margin-top': '2px',
-                  'color': 'var(--hui-accent)',
-                },
-              ),
-              attributes: const <String, String>{'aria-hidden': 'true'},
-              <Widget>[_typeIcon(type, true)],
-            ),
-            dom.span(
-              styles: const dom.Styles(
-                raw: <String, String>{
-                  'display': 'flex',
-                  'flex-direction': 'column',
-                  'gap': '1px',
-                  'min-width': '0',
-                },
-              ),
-              <Widget>[
-                dom.span(
-                  styles: const dom.Styles(
-                    raw: <String, String>{
-                      'font-size': '0.82rem',
-                      'font-weight': '600',
-                    },
-                  ),
-                  <Widget>[Text(_typeLabel(type))],
-                ),
-                dom.span(
-                  styles: const dom.Styles(
-                    raw: <String, String>{
-                      'font-size': '0.72rem',
-                      'line-height': '1.35',
-                      'color': 'var(--hui-muted)',
-                    },
-                  ),
-                  <Widget>[
-                    Text(huiText(huiComponentTypeDescriptions[type] ?? '')),
-                  ],
-                ),
-              ],
-            ),
+  /// Add, the selection count while a group is selected, the ordering tip,
+  /// and the rail's `...` menu, on one dense line.
+  Widget _head(int count) {
+    final int selected = _store.selectionIds.length;
+    final bool group = selected > 1;
+    return ActionRow(
+      dense: true,
+      label: huiText('Components'),
+      moreId: 'hui-rail-more',
+      leading: <Widget>[
+        AppMenu(
+          id: 'hui-rail-add',
+          label: huiText('Add'),
+          icon: ArcaneIcon.plus(),
+          outline: true,
+          entries: <AppMenuEntry>[
+            for (final String type in huiEditorComponentTypes)
+              if (_displayTypes.contains(type)) _addEntry(type),
+            const AppMenuEntry.separator(),
+            for (final String type in huiEditorComponentTypes)
+              if (!_displayTypes.contains(type)) _addEntry(type),
           ],
         ),
-    ],
-  );
+        if (group)
+          dom.span(<Widget>[
+            Component.text(
+              huiText('{selected} of {count} selected', <String, Object?>{
+                'selected': selected,
+                'count': count,
+              }),
+            ),
+          ]),
+        InfoButton(
+          tip: group
+              ? huiText(
+                  'Commands act on all {count}. Shift-click a row to add or remove it; Escape clears the selection.',
+                  <String, Object?>{'count': selected},
+                )
+              : huiText(
+                  'The nearest hitbox fires; list order breaks an exact-distance tie. Drag a row or use its menu to change it.',
+                ),
+        ),
+      ],
+      more: <AppMenuEntry>[railCreateRandomEntry(_store)],
+    );
+  }
 
-  Widget _empty() => dom.div(classes: 'hui-rail-empty', <Widget>[
-    ArcaneEmptyState(
-      title: huiText('No components yet'),
-      description: huiText(
-        'A menu needs at least one component to render. '
-        'Start with a text decoration or a button.',
-      ),
-      icon: ArcaneIcon.layers(size: IconSize.lg),
-      action: Button(
-        variant: ButtonVariant.primary,
-        size: ButtonSize.small,
-        onPressed: () => _add('decoration'),
-        icon: ArcaneIcon.plus(size: IconSize.sm),
-        label: huiText('Add your first component'),
-      ),
-    ),
-  ]);
+  AppMenuEntry _addEntry(String type) => AppMenuEntry(
+    componentTypeLabel(type),
+    () => _store.addComponent(type),
+    icon: componentTypeIcon(type),
+    description: huiText(huiComponentTypeDescriptions[type] ?? ''),
+  );
 
   Widget _row(int index, HuiComponent data, int total) {
     final String id = data.id;
     final String label = id.isEmpty ? huiText('(no id)') : id;
-    final String summary = _summary(data.data);
+    final String type = data.data.type;
     final bool selected = _store.isSelected(id);
-    final bool group = _store.selectionIds.length > 1;
-    final bool primary = _store.selectedId == id;
-    final bool armed = _armedDeleteId == id;
-    final bool menuOpen = _menuRowId == id;
-    final List<HuiIssue> issues = _store.issuesFor(id);
-    final bool hasError = issues.any(
-      (HuiIssue issue) => issue.severity == HuiSeverity.error,
-    );
-    final bool hasWarning = issues.any(
-      (HuiIssue issue) => issue.severity == HuiSeverity.warning,
-    );
-
-    // A div, not an li: the row lives inside a positioning wrapper that carries
-    // the list semantics, so a second listitem here would double them.
-    final Widget row = dom.div(
-      classes: classNames(<String?>[
-        'hui-rail-row',
-        selected ? 'is-selected' : null,
-        armed ? 'is-armed' : null,
-        _dragId == id ? 'is-dragging' : null,
-        _dropIndex == index && _dragId != null && _dragId != id
-            ? 'is-drop-target'
-            : null,
-      ]),
-      attributes: const <String, String>{'draggable': 'true'},
-      events: <String, void Function(Object)>{
-        // Right-click still opens the row menu, the way the dead
-        // ArcaneContextMenu was supposed to.
-        'contextmenu': (Object event) {
-          domPreventDefault(event);
-          _setMenuRow(
-            id,
-            _rowMenuTriggerId(index),
-            point: huiActionMenuEventPoint(event),
-          );
-        },
-        'dragstart': (Object event) {
-          setDragPayload(event, id);
-          setState(() => _dragId = id);
-        },
-        'dragover': (Object event) {
-          domPreventDefault(event);
-          setDropEffectMove(event);
-          if (_dropIndex != index) setState(() => _dropIndex = index);
-        },
-        'drop': (Object event) {
-          domPreventDefault(event);
-          _dropOn(index);
-        },
-        'dragend': (Object _) => setState(() {
-          _dragId = null;
-          _dropIndex = -1;
-        }),
-      },
-      <Widget>[
-        dom.button(
-          classes: 'hui-rail-main',
-          // Both lines are ellipsized in a 240px rail, so the untruncated text
-          // has to stay reachable: the hover text is the only place it fits.
-          // `data-no-tooltip` keeps Arcane's title-to-tooltip upgrade away — it
-          // re-parents the button into a wrapper span behind Jaspr's back, and
-          // the next row rebuild would patch against a node it no longer owns.
-          attributes: <String, String>{
-            'type': 'button',
-            'data-no-tooltip': 'true',
-            'aria-pressed': selected ? 'true' : 'false',
-            'title': huiText(
-              "{label}\n{typeLabel} - {summary}\nShift-click to add or remove it from the selection",
-              <String, Object?>{
-                'label': label,
-                'typeLabel': _typeLabel(data.data.type),
-                'summary': summary,
-              },
-            ),
-          },
-          events: <String, void Function(Object)>{
-            'click': (Object event) => _click(event, id),
-          },
-          <Widget>[
-            // One 22px column for the type glyph, which becomes the drag grip
-            // on hover: two icon columns would not fit next to the text.
-            dom.span(
-              classes: 'hui-rail-mark',
-              attributes: const <String, String>{'aria-hidden': 'true'},
-              <Widget>[
-                dom.span(classes: 'hui-rail-glyph', <Widget>[
-                  _typeIcon(data.data.type, selected),
-                ]),
-                dom.span(classes: 'hui-rail-grip', <Widget>[
-                  ArcaneIcon.gripVertical(size: IconSize.sm),
-                ]),
-              ],
-            ),
-            dom.span(classes: 'hui-rail-text', <Widget>[
-              dom.span(classes: 'hui-rail-id', <Widget>[Text(label)]),
-              dom.span(classes: 'hui-rail-summary', <Widget>[Text(summary)]),
-            ]),
-            // The tint alone cannot say "one of eight" — every member wears the
-            // same one. The check marks membership; the double check marks the
-            // primary, which is the row the inspector is editing and the one a
-            // group nudge snaps to. Decorative: `aria-pressed` on the button
-            // is what a screen reader reads.
-            if (group && selected)
-              dom.span(
-                styles: const dom.Styles(
-                  raw: <String, String>{
-                    'flex': '0 0 auto',
-                    'display': 'inline-flex',
-                    'color': 'var(--hui-accent)',
-                  },
-                ),
-                attributes: const <String, String>{'aria-hidden': 'true'},
-                <Widget>[
-                  primary
-                      ? ArcaneIcon.checkCheck(size: IconSize.sm)
-                      : ArcaneIcon.check(size: IconSize.sm),
-                ],
-              ),
-            if (hasError || hasWarning)
-              dom.span(
-                classes: classNames(<String?>[
-                  'hui-rail-dot',
-                  hasError ? 'is-error' : 'is-warning',
-                ]),
-                attributes: <String, String>{
-                  'aria-label': hasError
-                      ? huiText('Has errors')
-                      : huiText('Has warnings'),
-                },
-                const <Widget>[],
-              ),
-          ],
+    return RailRow(
+      label: label,
+      icon: componentTypeIcon(type, active: selected),
+      current: selected,
+      issue: railIssue(_store.issuesFor(id)),
+      menuId: 'hui-rail-row-$index',
+      onSelect: () => _select(id),
+      onPointerDown: _notePointer,
+      entries: <AppMenuEntry>[
+        AppMenuEntry(
+          huiText('Duplicate'),
+          () => _store.duplicateComponent(id),
+          icon: ArcaneIcon.copy(),
         ),
-        if (armed)
-          dom.div(classes: 'hui-rail-confirm', <Widget>[
-            dom.span(classes: 'hui-rail-confirm-label', <Widget>[
-              Text(huiText('Delete?')),
-            ]),
-            Button(
-              variant: ButtonVariant.destructive,
-              size: ButtonSize.iconSm,
-              onPressed: () => _delete(id),
-              attributes: <String, String>{
-                'aria-label': huiText("Delete {label}", <String, Object?>{
-                  'label': label,
-                }),
-              },
-              icon: ArcaneIcon.check(size: IconSize.sm),
-            ),
-            Button(
-              variant: ButtonVariant.ghost,
-              size: ButtonSize.iconSm,
-              onPressed: () => setState(() => _armedDeleteId = null),
-              attributes: <String, String>{'aria-label': huiText('Keep it')},
-              icon: ArcaneIcon.x(size: IconSize.sm),
-            ),
-          ])
-        else
-          // Hidden until the row is hovered, focused or selected (CSS), so a
-          // long list is not a wall of chevrons. Focus reveals them, so they
-          // stay reachable from the keyboard.
-          dom.div(
-            classes: 'hui-rail-tools',
-            // An open menu is a fourth reason to show the tools, and it is not
-            // expressible in `05-panels-dialogs.css` from here. Plain
-            // properties, so the stylesheet's transition still runs them.
-            styles: menuOpen
-                ? const dom.Styles(
-                    raw: <String, String>{
-                      'opacity': '1',
-                      'visibility': 'visible',
-                      'transform': 'none',
-                    },
-                  )
-                : null,
-            <Widget>[
-              Button(
-                variant: ButtonVariant.ghost,
-                size: ButtonSize.iconSm,
-                disabled: index == 0,
-                onPressed: index == 0 ? null : () => _move(id, index - 1),
-                attributes: <String, String>{
-                  'aria-label': huiText("Move {label} up", <String, Object?>{
-                    'label': label,
-                  }),
-                },
-                icon: ArcaneIcon.chevronUp(size: IconSize.sm),
-              ),
-              Button(
-                variant: ButtonVariant.ghost,
-                size: ButtonSize.iconSm,
-                disabled: index >= total - 1,
-                onPressed: index >= total - 1
-                    ? null
-                    : () => _move(id, index + 1),
-                attributes: <String, String>{
-                  'aria-label': huiText("Move {label} down", <String, Object?>{
-                    'label': label,
-                  }),
-                },
-                icon: ArcaneIcon.chevronDown(size: IconSize.sm),
-              ),
-              Button(
-                // Keyed on the state it reports: Arcane's Button renders its
-                // `attributes` one build behind, so without this the
-                // `aria-expanded` it carries would always be the previous
-                // value.
-                key: ValueKey<bool>(menuOpen),
-                id: _rowMenuTriggerId(index),
-                variant: ButtonVariant.ghost,
-                size: ButtonSize.iconSm,
-                onPressed: () => _setMenuRow(
-                  menuOpen ? null : id,
-                  _rowMenuTriggerId(index),
-                  point: menuOpen
-                      ? null
-                      : huiActionMenuAnchor(_rowMenuTriggerId(index)),
-                ),
-                attributes: <String, String>{
-                  'aria-haspopup': 'menu',
-                  'aria-expanded': menuOpen ? 'true' : 'false',
-                  // Never the word "Menu" with a capital M: the mobile-menu
-                  // binder claims `[aria-label*="Menu"]`
-                  // (`mobile_menu_scripts.dart:7`) and would hijack the click.
-                  'aria-label': huiText(
-                    "Row actions for {label}",
-                    <String, Object?>{'label': label},
-                  ),
-                  // Opts this button out of the legacy accordion binder, which
-                  // claims every `button[aria-expanded]` in a one-shot scan
-                  // 100 ms after boot (`accordion_scripts.dart:7-16`). Left
-                  // bound, it flips the attribute behind Jaspr's back and
-                  // writes `display: none|block` onto the button's next
-                  // sibling. `data-arcane-interactive` is the binder's own
-                  // opt-out — the same trick as `data-no-tooltip` above.
-                  'data-arcane-interactive': 'true',
-                },
-                icon: ArcaneIcon.ellipsisVertical(size: IconSize.sm),
-              ),
-            ],
-          ),
-      ],
-    );
-
-    // The wrapper carries the list semantics and the positioning context for
-    // the menu. It replaces the element `ArcaneContextMenu` used to wrap the
-    // row in, so the list's child structure is unchanged.
-    return dom.div(
-      classes: 'hui-rail-item',
-      styles: const dom.Styles(
-        raw: <String, String>{'position': 'relative', 'min-width': '0'},
-      ),
-      attributes: const <String, String>{'role': 'listitem'},
-      <Widget>[
-        row,
-        if (_renameId == id) _renameEditor(id),
-        if (menuOpen) ..._rowMenu(index, id, label, total),
-      ],
-    );
-  }
-
-  Widget _renameEditor(String id) =>
-      dom.div(classes: 'hui-rail-rename', <Widget>[
-        TextInput(
-          value: _renameDraft,
-          fullWidth: true,
-          size: ComponentSize.sm,
-          onChanged: (String value) => setState(() => _renameDraft = value),
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
-        ),
-        Button(
-          variant: ButtonVariant.primary,
-          size: ButtonSize.iconSm,
-          onPressed: () {
-            final String draft = _renameDraft;
-            setState(() => _renameId = null);
-            _store.renameComponent(id, draft);
-          },
-          attributes: <String, String>{
-            'aria-label': huiText('Save component id'),
-          },
-          icon: ArcaneIcon.check(size: IconSize.sm),
-        ),
-        Button(
-          variant: ButtonVariant.ghost,
-          size: ButtonSize.iconSm,
-          onPressed: () => setState(() => _renameId = null),
-          attributes: <String, String>{'aria-label': huiText('Cancel rename')},
-          icon: ArcaneIcon.x(size: IconSize.sm),
-        ),
-      ]);
-
-  List<Widget> _rowMenu(
-    int index,
-    String id,
-    String label,
-    int total,
-  ) => <Widget>[
-    HuiActionMenu(
-      id: _rowMenuId,
-      label: huiText("Actions for {label}", <String, Object?>{'label': label}),
-      point: _menuPoint,
-      onClose: _dismissMenu,
-      items: <HuiActionMenuItem>[
-        HuiActionMenuItem(
-          label: huiText("Randomize {toLowerCase}", <String, Object?>{
-            'toLowerCase': _typeLabel(
-              _store.menu.componentById(id)!.data.type,
-            ).toLowerCase(),
+        AppMenuEntry(
+          huiText("Randomize {toLowerCase}", <String, Object?>{
+            'toLowerCase': componentTypeLabel(type).toLowerCase(),
           }),
-          icon: ArcaneIcon.dices(size: IconSize.sm),
-          onSelect: () => randomizeMenuComponent(_store, id),
+          () => randomizeMenuComponent(_store, id),
+          icon: ArcaneIcon.dices(),
         ),
-        HuiActionMenuItem(
-          label: huiText('Rename'),
-          icon: ArcaneIcon.pencil(size: IconSize.sm),
-          separatorBefore: true,
-          onSelect: () => setState(() {
-            _renameId = id;
-            _renameDraft = id;
-          }),
+        const AppMenuEntry.separator(),
+        AppMenuEntry(
+          huiText('Move up'),
+          index == 0 ? null : () => _store.reorder(id, index - 1),
+          icon: ArcaneIcon.arrowUp(),
         ),
-        HuiActionMenuItem(
-          label: huiText('Duplicate'),
-          icon: ArcaneIcon.copy(size: IconSize.sm),
-          onSelect: () => _store.duplicateComponent(id),
+        AppMenuEntry(
+          huiText('Move down'),
+          index >= total - 1 ? null : () => _store.reorder(id, index + 1),
+          icon: ArcaneIcon.arrowDown(),
         ),
-        HuiActionMenuItem(
-          label: huiText('Move to top'),
-          icon: ArcaneIcon.arrowUp(size: IconSize.sm),
-          disabled: index == 0,
-          onSelect: () => _move(id, 0),
+        AppMenuEntry(
+          huiText('Move to top'),
+          index == 0 ? null : () => _store.reorder(id, 0),
+          icon: ArcaneIcon.arrowUpToLine(),
         ),
-        HuiActionMenuItem(
-          label: huiText('Move to bottom'),
-          icon: ArcaneIcon.arrowDown(size: IconSize.sm),
-          disabled: index >= total - 1,
-          onSelect: () => _move(id, total - 1),
+        AppMenuEntry(
+          huiText('Move to bottom'),
+          index >= total - 1 ? null : () => _store.reorder(id, total - 1),
+          icon: ArcaneIcon.arrowDownToLine(),
         ),
-        HuiActionMenuItem(
-          label: huiText('Delete'),
-          icon: ArcaneIcon.trash2(size: IconSize.sm),
+        const AppMenuEntry.separator(),
+        AppMenuEntry(
+          huiText('Delete'),
+          () => _delete(id, label),
+          icon: ArcaneIcon.trash2(),
           destructive: true,
-          separatorBefore: true,
-          onSelect: () => setState(() => _armedDeleteId = id),
         ),
       ],
-    ),
-  ];
-
-  Widget _typeIcon(String type, bool active) => switch (type) {
-    'button' => ArcaneIcon.mousePointerClick(size: IconSize.sm),
-    'toggle' =>
-      active
-          ? ArcaneIcon.toggleRight(size: IconSize.sm)
-          : ArcaneIcon.toggleLeft(size: IconSize.sm),
-    _ => ArcaneIcon.square(size: IconSize.sm),
-  };
-
-  String _typeLabel(String type) => switch (type) {
-    'button' => huiText('Button'),
-    'toggle' => huiText('Toggle'),
-    _ => huiText('Decoration'),
-  };
-
-  String _summary(HuiComponentData data) => switch (data) {
-    HuiRuntimeComponentData() => data.type,
-
-    HuiButtonData(
-      icon: final HuiIcon? icon,
-      actions: final List<HuiAction> a,
-    ) =>
-      huiText('{icon} · {actions}', <String, Object?>{
-        'icon': _iconSummary(icon),
-        'actions': huiPlural(
-          'components.summary.actions',
-          a.length,
-          oneEnglish: '{count} action',
-          otherEnglish: '{count} actions',
-        ),
-      }),
-    HuiDecorationData(icon: final HuiIcon? icon) => huiText(
-      '{icon} · not clickable',
-      <String, Object?>{'icon': _iconSummary(icon)},
-    ),
-    HuiToggleData(trueIcon: final HuiIcon? t, falseIcon: final HuiIcon? f) =>
-      huiText('true {trueIcon} / false {falseIcon}', <String, Object?>{
-        'trueIcon': _iconSummary(t),
-        'falseIcon': _iconSummary(f),
-      }),
-  };
-
-  String _iconSummary(HuiIcon? icon) => switch (icon) {
-    null => huiText('no icon'),
-    final HuiTextIcon text => huiText('text "{text}"', <String, Object?>{
-      'text': _plain(text.text),
-    }),
-    final HuiTextImageIcon image => huiText('image {path}', <String, Object?>{
-      'path': image.path.isEmpty ? huiText('(unset)') : image.path,
-    }),
-    final HuiAnimatedImageIcon animated => huiPlural(
-      'components.summary.animated-frames',
-      animated.source.length,
-      oneEnglish: 'animated {count} frame',
-      otherEnglish: 'animated {count} frames',
-    ),
-    final HuiItemIcon item => huiText('item {item}{count}', <String, Object?>{
-      'item': item.item.isEmpty ? huiText('(unset)') : item.item,
-      'count': item.count > 1
-          ? huiText(' x{count}', <String, Object?>{'count': item.count})
-          : '',
-    }),
-    final HuiBlockIcon block => huiText('block {block}', <String, Object?>{
-      'block': block.block.isEmpty ? huiText('(unset)') : block.block,
-    }),
-    final HuiCustomItemIcon custom => huiText(
-      '{provider} {item}{count}',
-      <String, Object?>{
-        'provider': custom.provider,
-        'item': custom.item.isEmpty ? huiText('(unset)') : custom.item,
-        'count': custom.count > 1
-            ? huiText(' x{count}', <String, Object?>{'count': custom.count})
-            : '',
-      },
-    ),
-    final HuiEntityIcon entity => huiText('entity {entity}', <String, Object?>{
-      'entity': entity.entity.isEmpty ? huiText('(unset)') : entity.entity,
-    }),
-    final HuiPlayerHeadIcon head => huiText('head {player}', <String, Object?>{
-      'player': head.player.trim().isEmpty
-          ? huiText('(unset)')
-          : head.player.trim(),
-    }),
-  };
-
-  /// First line only, colour codes and MiniMessage tags removed, ellipsized.
-  String _plain(String raw) {
-    final int newline = raw.indexOf('\n');
-    String line = newline >= 0 ? raw.substring(0, newline) : raw;
-    line = line.replaceAll(_legacyCode, '').replaceAll(_tag, '').trim();
-    if (line.isEmpty) return huiText('(empty)');
-    return line.length <= 22 ? line : '${line.substring(0, 21)}…';
+    );
   }
 }
-
-final RegExp _legacyCode = RegExp('[&§][0-9a-fk-orA-FK-OR]');
-final RegExp _tag = RegExp('<[^<>]*>');

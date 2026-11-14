@@ -1,0 +1,579 @@
+/* The kit (lib/ui): layout for the rows, fields, sections, stage frame and
+   save bar around arcane_jaspr's shadcn controls, which keep their own
+   look. shadcn tokens only; no arcane class selectors, no colour literals. */
+
+:root {
+  --ui-control-h: 2.25rem;
+  --ui-control-h-dense: 2rem;
+  --ui-gap: 0.5rem;
+  --ui-group-gap: 1rem;
+  --shadcn-dialog-close-size: 2rem; /* dialog and sheet Close */
+  --shadcn-dialog-close-inset: 0.5rem;
+  --shadcn-toast-padding: 0.5rem 0.75rem; /* a one-line toast fits the 3rem top bar */
+}
+
+@media (pointer: coarse) { /* touch: each control's hit area reaches 44 px around its 32 or 36 px box, which keeps its size and look */
+  :where(button, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"], summary) { position: relative; }
+  :where(button, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"], summary)::after { content: ""; position: absolute; inset: min(0px, calc((100% - 44px) / 2)); }
+  :where([data-touch-edge="bottom"]) :where(button, [role="button"])::after { inset-block: min(0px, calc(100% - 44px)) 0; } /* a bar on the screen's bottom edge: the hit area grows upward only */
+}
+
+/* Hand-drawn controls read this height; dense parts take the 32 px one. */
+.ui-dense {
+  --ui-control-h: var(--ui-control-h-dense);
+  --arcane-field-control-height: var(--ui-control-h-dense);
+}
+
+.ui-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Action rows: content controls on the left, the actions at the end; 8 px
+   between buttons, 16 px between the groups; one line, never wrapping. */
+
+.ui-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-group-gap);
+  min-width: 0;
+}
+
+.ui-actions-lead {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--ui-gap);
+  min-width: 0;
+}
+
+.ui-actions-end { display: flex; flex: none; align-items: center; gap: var(--ui-gap); }
+
+/* Footers stack on phones: full width, primary on top. */
+@media (max-width: 760px) {
+  .ui-actions.is-footer,
+  .ui-actions.is-footer .ui-actions-end {
+    flex: 1 1 auto;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .ui-actions.is-footer .ui-actions-end > * { width: 100%; }
+}
+
+.ui-form-footer { margin-top: 0.75rem; }
+
+/* Field rows are the library's Field; the kit keeps the default chip and
+   reset beside the label and the tone of warnings and notes. */
+
+.ui-tip-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.ui-field-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.ui-field-default {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.ui-field-problem.is-warning {
+  color: var(--warning);
+}
+
+.ui-field-problem.is-info {
+  color: var(--info);
+}
+
+/* (i) tips */
+
+.ui-info-tip {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  white-space: normal;
+}
+
+.ui-info-citation {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+/* Sections: a heading over fields, never a box. Header actions sit on the
+   title line, outside the summary. */
+
+.ui-section {
+  min-width: 0;
+}
+
+.ui-section.has-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ui-section.has-actions > .ui-section-box {
+  grid-area: 1 / 1 / auto / span 2;
+  min-width: 0;
+}
+
+.ui-section.has-actions > .ui-section-actions {
+  grid-area: 1 / 2;
+  align-self: start;
+  z-index: 1;
+  /* Level with the summary line, clear of its chevron. */
+  margin-top: 0.5rem;
+  padding-inline-end: 2rem;
+}
+
+/* FieldGroup: an always-open group, a plain heading over its fields. */
+.ui-group > .ui-section-head > .ui-section-actions {
+  margin-inline-start: auto;
+}
+
+.ui-section-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-gap);
+}
+
+.ui-section-head,
+.ui-section-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-gap);
+  min-height: var(--ui-control-h-dense);
+}
+
+.ui-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ui-section-count {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+/* Rows in a section 1rem apart, as in the form's field group, set off a
+   little from the heading above and the next section below. */
+.ui-section-body {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding-block: 0.375rem;
+}
+.ui-section-body:empty { padding-block: 0; }
+
+/* Dialog bodies: one type scale; a group after other content starts below a separator. */
+.ui-dialog-body { font-size: var(--font-size-sm); }
+.ui-dialog-body * + .ui-group { padding-top: 1rem; border-top: 1px solid var(--border); }
+.ui-section-description,
+.ui-confirm-message {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+}
+
+/* Tabs and toggle rows scroll sideways instead of wrapping. */
+
+.ui-tabs,
+.ui-toggle-choice,
+.ui-toggle-chips {
+  display: inline-flex;
+  max-width: 100%;
+  overflow-x: auto;
+}
+@media (pointer: coarse) { .ui-toggle-choice, .ui-toggle-chips { max-width: calc(100% + 0.75rem); padding: 0.375rem; margin: -0.375rem; } } /* room for the touch hit areas */
+
+.ui-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.ui-choice.is-unavailable {
+  color: var(--muted-foreground);
+}
+
+.ui-empty {
+  display: grid;
+  justify-items: center;
+  padding: 1.5rem 1rem;
+}
+
+.ui-skeleton { display: grid; gap: 0.5rem; }
+
+/* Pane header (the inspector's head). */
+
+.ui-pane-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.5rem;
+  min-width: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-pane-heading {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.ui-pane-kind {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+.ui-pane-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-gap);
+  min-width: 0;
+}
+
+.ui-pane-title {
+  min-width: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* A selectable list row: the select button fills it; selected takes accent. */
+.ui-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  border-radius: var(--radius);
+}
+
+.ui-list-row.is-selected {
+  background: var(--accent);
+}
+
+.ui-list-row > [data-ui-row] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Number, vector, duration, colour, slider and picker fields. */
+
+.ui-number,
+.ui-affixed,
+.ui-duration,
+.ui-color-field,
+.ui-slider-field {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-gap);
+  min-width: 0;
+}
+
+.ui-number {
+  gap: 0.25rem;
+}
+
+/* A unit or axis letter beside its input, outside the border. */
+.ui-affixed {
+  gap: 0.375rem;
+}
+
+.ui-affix {
+  flex: none;
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.ui-number-input,
+.ui-number:not(.has-steppers),
+.ui-affixed-input,
+.ui-duration > .ui-number,
+.ui-duration > .ui-affixed,
+.ui-color-text,
+.ui-slider-track {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ui-slider-field > .ui-number {
+  flex: 0 0 6rem;
+}
+
+.ui-vec3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.ui-duration-reading {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.ui-color-swatch {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--ui-control-h);
+  height: var(--ui-control-h);
+  overflow: hidden;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--ui-swatch);
+}
+
+.ui-color-swatch.is-clear {
+  background:
+    linear-gradient(var(--ui-swatch), var(--ui-swatch)),
+    repeating-conic-gradient(var(--muted) 0 25%, var(--background) 0 50%) 0 0 / 0.5rem 0.5rem;
+}
+
+.ui-color-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ui-color-swatch:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.ui-picker {
+  min-width: 0;
+}
+
+.ui-picker-image {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+  image-rendering: pixelated;
+}
+
+/* Reorder lists */
+
+.ui-reorder {
+  display: grid;
+  min-width: 0;
+}
+
+.ui-reorder-line {
+  height: 2px;
+  border-radius: 2px;
+}
+
+.ui-reorder-line.is-active {
+  background: var(--primary);
+}
+
+.ui-reorder-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.ui-reorder-row.is-inline { grid-template-columns: minmax(0, 1fr); }
+
+.ui-reorder-row.is-dragging {
+  opacity: 0.55;
+}
+
+.ui-reorder-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 1.25rem;
+  color: var(--muted-foreground);
+  cursor: grab;
+  touch-action: none;
+}
+
+.ui-reorder.is-dragging .ui-reorder-grip {
+  cursor: grabbing;
+}
+
+.ui-reorder-body {
+  min-width: 0;
+}
+
+.ui-reorder-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Stage frame: the body never scrolls. fill takes the pane's height and
+   fits the content inside it; grow fits the width and grows to the content;
+   free leaves the content to size and clip itself. */
+
+.ui-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.ui-stage.is-fill {
+  height: 100%;
+}
+.ui-stage.is-bare { border-color: transparent; background: none; }
+
+.ui-stage-head {
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-stage-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.ui-stage-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+}
+
+.ui-stage-body.is-loading,
+.ui-stage-body.is-empty,
+.ui-stage-body.is-error {
+  min-height: 15rem;
+  padding: 1rem;
+}
+
+.ui-stage-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted-foreground);
+}
+
+.ui-stage-status {
+  padding: 0.375rem 0.75rem;
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+}
+
+.ui-stage:fullscreen {
+  height: 100%;
+}
+
+/* Fit box: the content keeps its natural size and is zoomed to fit. */
+
+.ui-fit {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+}
+
+.ui-fit.is-fill {
+  height: 100%;
+}
+
+.ui-fit.is-end {
+  justify-items: end;
+}
+
+.ui-fit-content {
+  width: max-content;
+  max-width: none;
+}
+
+/* Save and sync bar */
+
+.ui-save-bar {
+  padding: 0.25rem 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--background);
+}
+
+/* The detail takes the room left and shortens first; under 9rem the row's secondary actions drop to icons. */
+.ui-save-state {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-gap);
+  min-width: 9rem;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.ui-save-message,
+.ui-save-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-save-message { font-weight: var(--font-weight-medium); }
+.ui-save-detail { flex: 1 1 0; color: var(--muted-foreground); }
+
+/* A failed or waiting state says what to do next: wrap it rather than cut it off, under the status word on a phone.
+   A phone drops the quiet status word, so the detail gets the room. */
+.ui-save-bar:is(.is-failed, .is-attention) .ui-save-detail { white-space: normal; }
+@media (max-width: 760px) { .ui-save-bar.is-quiet .ui-save-message { display: none; } .ui-save-bar:is(.is-failed, .is-attention) .ui-save-state { flex-wrap: wrap; } .ui-save-bar:is(.is-failed, .is-attention) .ui-save-detail { flex-basis: 100%; } }
+
+.ui-save-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+
+.ui-save-bar.is-busy .ui-save-dot { background: var(--info); }
+.ui-save-bar.is-attention .ui-save-dot { background: var(--warning); }
+.ui-save-bar.is-failed .ui-save-dot { background: var(--destructive); }
+.ui-save-bar.is-done .ui-save-dot { background: var(--success); }
+
+/* Long menus (the library's kind filter) stop short and scroll inside. */
+.ui-menu [role="menu"] { max-height: min(70vh, 32rem); }

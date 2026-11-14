@@ -344,6 +344,27 @@ public enum EditorSyncDocumentKind {
         ? wireSource.getBytes(StandardCharsets.UTF_8) : persistedBytes(id, wireSource);
   }
 
+  /**
+   * The bytes a publish writes over {@code previousFile} (null for a new file). A board is written from its model,
+   * so the file it replaces keeps its own text with only the values the edit changed written in.
+   */
+  byte[] persistedBytes(String id, String wireSource, DocumentPresetCatalog presets, byte[] previousFile) {
+    byte[] written = persistedBytes(id, wireSource, presets);
+    if (this != PANEL || previousFile == null || !presets.resolve("panels", wireSource).equals(wireSource)) {
+      return written;
+    }
+    String previous = new String(previousFile, StandardCharsets.UTF_8);
+    try {
+      PanelDefinition panel = parsePanel(id, wireSource);
+      String edited = EditorSyncAuthoredSource.edit(previous, PERSISTED_GSON.toJsonTree(parsePanel(id, previous)),
+          PERSISTED_GSON.toJsonTree(panel));
+      return edited != null && panel.equals(parsePanel(id, edited)) ? edited.getBytes(StandardCharsets.UTF_8)
+          : written;
+    } catch (RuntimeException unreadable) {
+      return written;
+    }
+  }
+
   byte[] persistedBytes(String id, String wireSource) {
     if (this != PANEL) {
       return wireSource.getBytes(StandardCharsets.UTF_8);
@@ -360,13 +381,6 @@ public enum EditorSyncDocumentKind {
       }
     }
     throw new IllegalArgumentException("unsupported Gloss sync document kind: " + value);
-  }
-
-  static EditorSyncDocumentKind forSubject(EditorSyncKind kind) {
-    if (kind == EditorSyncKind.WORKSPACE) {
-      throw new IllegalArgumentException("workspace is not a document kind");
-    }
-    return parseWireName(kind.wireName());
   }
 
   /** Lane services reload through the registry {@link Gloss} holds, or no-op before they enable. */

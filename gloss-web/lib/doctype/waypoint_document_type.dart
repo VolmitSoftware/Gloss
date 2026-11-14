@@ -16,8 +16,6 @@ final class WaypointDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('Waypoints');
   @override
-  String get createLabel => huiText('Waypoints');
-  @override
   String get pluralLabel => huiText('Waypoints');
   @override
   int get tabOrder => 190;

@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "scope-missing",
+    "message": "This token lacks publish:commands; these documents run console commands: menu shop/main.",
+    "scope": "publish:commands",
+    "documents": [
+      "menu shop/main"
+    ]
+  }
+}

@@ -1,9 +1,16 @@
+/// The flow map: every menu in the panel's scope and the navigation routes
+/// between them.
+///
+/// The map is a diagram drawn in a kit [StageFrame]: the board keeps its
+/// natural size and is zoomed down to fit the frame ([FitBox] hug), so it
+/// never scrolls inside the frame. The list view is the same graph as plain
+/// rows, every route spelled out; it reads as a page and grows with its
+/// content.
 library;
 
 import 'dart:math' as math;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:arcane_jaspr_ascii/arcane_jaspr_ascii.dart';
 import 'package:jaspr/dom.dart' as dom;
 import 'package:jaspr/jaspr.dart' show Listenable, ListenableBuilder;
 
@@ -11,6 +18,18 @@ import '../../logic/workspace_flow_graph.dart';
 import '../../state/editor_store.dart';
 import '../../state/workspace.dart';
 import '../../state/workspace_panel.dart';
+import '../../ui/action_row.dart';
+import '../../ui/alert.dart';
+import '../../ui/badge.dart';
+import '../../ui/density.dart';
+import '../../ui/empty_state.dart';
+import '../../ui/fit_box.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/menu.dart';
+import '../../ui/stage_frame.dart';
+import '../../ui/tone.dart';
+import '../../ui/toggle_choice.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class PanelView extends StatefulWidget {
@@ -45,8 +64,11 @@ class _PanelViewState extends State<PanelView> {
   Widget _body() {
     final WorkspacePanelDecodeResult? decoded = component.store.activePanel;
     if (decoded == null) {
-      return dom.div(classes: 'hui-board-empty', <Widget>[
-        Text(huiText('Open a menu flow map to inspect menu navigation.')),
+      return dom.div(classes: 'hui-flow is-empty', <Widget>[
+        EmptyState(
+          icon: ArcaneIcon.workflow(),
+          message: huiText('Open a menu flow map to inspect menu navigation.'),
+        ),
       ]);
     }
     final WorkspacePanelData panel = decoded.data;
@@ -54,137 +76,162 @@ class _PanelViewState extends State<PanelView> {
       component.store.workspace,
       panel,
     );
-    return dom.div(classes: 'hui-board', <Widget>[
-      _toolbar(panel, graph),
-      if (decoded.warning != null)
-        _notice(decoded.warning!, 'is-warning')
-      else if (graph.scopeMissing)
-        _notice(
-          huiText(
-            'This panel\'s saved folder no longer exists. All menus are shown.',
-          ),
-          'is-warning',
-        ),
-      _summary(graph),
-      dom.div(classes: 'hui-board-body', <Widget>[
-        if (panel.view == WorkspacePanelView.canvas)
-          _canvas(panel, graph)
-        else
-          _list(graph),
-      ]),
+    final String? notice =
+        decoded.warning ??
+        (graph.scopeMissing
+            ? huiText(
+                'This panel\'s saved folder no longer exists. All menus are shown.',
+              )
+            : null);
+    final bool list = panel.view == WorkspacePanelView.list;
+    return dom.div(classes: 'hui-flow${list ? ' is-list' : ''}', <Widget>[
+      if (notice != null) AppAlert(tone: AlertTone.warning, message: notice),
+      if (list) _listPage(panel, graph) else _stage(panel, graph),
     ]);
   }
 
-  Widget _toolbar(WorkspacePanelData panel, WorkspaceFlowGraph graph) =>
-      dom.div(classes: 'hui-board-toolbar', <Widget>[
-        dom.div(classes: 'hui-board-heading', <Widget>[
-          ArcaneIcon.workflow(size: IconSize.md),
-          dom.div(<Widget>[
-            dom.h1(<Widget>[
-              AsciiText(
-                component.store.workspace.active?.title ??
-                    huiText('Menu flow map'),
-                duration: const Duration(milliseconds: 540),
-              ),
-            ]),
-            dom.p(<Widget>[
-              Text(
-                huiPlural(
-                  'panel.flow.menu_count',
-                  graph.documents.length,
-                  oneEnglish: '{count} menu in flow',
-                  otherEnglish: '{count} menus in flow',
-                ),
-              ),
-            ]),
-          ]),
+  String get _title =>
+      component.store.workspace.active?.title ?? huiText('Menu flow map');
+
+  Widget _stage(WorkspacePanelData panel, WorkspaceFlowGraph graph) =>
+      StageFrame(
+        title: _title,
+        fit: StageFit.free,
+        surface: false,
+        toggles: <Widget>[_viewChoice(panel)],
+        more: _scopeEntries(panel),
+        actions: <RowAction>[
+          RowAction(
+            huiText('Arrange'),
+            () => _arrange(panel, graph),
+            icon: ArcaneIcon.wand(),
+          ),
+        ],
+        status: _status(panel, graph),
+        statusTip: _statusTip(graph),
+        state: graph.documents.isEmpty ? StageState.empty : StageState.ready,
+        emptyMessage: huiText('No menu documents are inside this panel scope.'),
+        child: dom.div(classes: 'hui-flow-room', <Widget>[
+          FitBox(hug: true, child: _board(panel, graph)),
         ]),
-        dom.div(classes: 'hui-board-controls', <Widget>[
-          dom.div(classes: 'hui-board-scope', <Widget>[
-            dom.span(<Widget>[Text(huiText('Scope'))]),
-            ArcaneSelect(
-              value: panel.scopeFolderId ?? _allFoldersValue,
-              size: ComponentSize.sm,
-              onChanged: (String value) => _setScope(panel, value),
-              options: <ArcaneSelectOption>[
-                ArcaneSelectOption(
-                  label: huiText('All workspace folders'),
-                  value: _allFoldersValue,
-                ),
-                for (final WorkspaceFolder folder in _sortedFolders(
-                  component.store.workspace,
-                ))
-                  ArcaneSelectOption(
-                    label: _folderPath(component.store.workspace, folder),
-                    value: folder.id,
-                  ),
+      );
+
+  Widget _listPage(WorkspacePanelData panel, WorkspaceFlowGraph graph) =>
+      dom.section(
+        classes: 'hui-flow-page',
+        attributes: <String, String>{'aria-label': _title},
+        <Widget>[
+          dom.header(classes: 'hui-flow-head', <Widget>[
+            ActionRow(
+              dense: true,
+              label: _title,
+              leading: <Widget>[
+                dom.h2(classes: 'hui-flow-title', <Widget>[Text(_title)]),
+                _viewChoice(panel),
               ],
+              more: _scopeEntries(panel),
             ),
           ]),
-          Button.outline(
-            size: ButtonSize.sm,
-            icon: ArcaneIcon.wand(size: IconSize.sm),
-            label: huiText('Arrange'),
-            onPressed: () => _arrange(panel, graph),
-          ),
-          ArcaneToggleGroup(
-            value: panel.view.name,
-            variant: ToggleGroupVariant.outline,
-            size: ToggleGroupSize.sm,
-            onChanged: (String? value) => _setView(panel, value),
-            items: <ToggleGroupItem>[
-              ToggleGroupItem(
-                value: WorkspacePanelView.canvas.name,
-                child: ArcaneIcon.share2(size: IconSize.sm),
-              ),
-              ToggleGroupItem(
-                value: WorkspacePanelView.list.name,
-                child: ArcaneIcon.listTree(size: IconSize.sm),
-              ),
-            ],
-          ),
-        ]),
-      ]);
+          if (graph.documents.isEmpty)
+            dom.p(classes: 'hui-flow-empty', <Widget>[
+              Text(huiText('No menu documents are inside this panel scope.')),
+            ])
+          else
+            DensityScope.dense(
+              child: dom.div(<Widget>[
+                for (final WorkspaceDoc doc in graph.documents)
+                  dom.article(
+                    classes: 'hui-flow-item',
+                    attributes: <String, String>{'aria-label': doc.title},
+                    <Widget>[
+                      _nodeHeader(doc, graph),
+                      _routeList(graph.outgoing(doc.id)),
+                    ],
+                  ),
+              ]),
+            ),
+          dom.footer(classes: 'hui-flow-status', <Widget>[
+            Text(_status(panel, graph)),
+          ]),
+        ],
+      );
 
-  Widget _summary(WorkspaceFlowGraph graph) {
-    final int dangling = graph.edges
-        .where(
-          (WorkspaceFlowEdge edge) =>
-              edge.targetKind == WorkspaceFlowTargetKind.dangling ||
-              edge.targetKind == WorkspaceFlowTargetKind.ambiguous ||
-              edge.targetKind == WorkspaceFlowTargetKind.invalid,
-        )
-        .length;
-    final int external = graph.edges
-        .where(
-          (WorkspaceFlowEdge edge) =>
-              edge.targetKind == WorkspaceFlowTargetKind.external,
-        )
-        .length;
-    final int sinks = graph.edges
-        .where((WorkspaceFlowEdge edge) => _isSink(edge.targetKind))
-        .length;
-    return dom.div(classes: 'hui-board-summary', <Widget>[
-      _metric('${graph.documents.length}', huiText('Menus')),
-      _metric('${graph.edges.length}', huiText('Routes')),
-      _metric('$sinks', huiText('Back / Home / Close')),
-      _metric('$external', huiText('External')),
-      _metric('$dangling', huiText('Needs attention'), danger: dangling > 0),
-      _metric('${graph.cycleDocumentIds.length}', huiText('In cycles')),
-      _metric('${graph.orphanDocumentIds.length}', huiText('No inbound links')),
-    ]);
+  Widget _viewChoice(WorkspacePanelData panel) =>
+      ToggleChoice<WorkspacePanelView>(
+        label: huiText('View'),
+        value: panel.view,
+        onChanged: (WorkspacePanelView view) =>
+            component.store.updatePanel(panel.copyWith(view: view)),
+        options: <ChoiceOption<WorkspacePanelView>>[
+          ChoiceOption<WorkspacePanelView>(
+            WorkspacePanelView.canvas,
+            huiText('Canvas'),
+            icon: ArcaneIcon.share2(),
+            iconOnly: true,
+          ),
+          ChoiceOption<WorkspacePanelView>(
+            WorkspacePanelView.list,
+            huiText('List'),
+            icon: ArcaneIcon.listTree(),
+            iconOnly: true,
+          ),
+        ],
+      );
+
+  /// The folder scope as radio entries of the header's `...` menu.
+  List<AppMenuEntry> _scopeEntries(WorkspacePanelData panel) {
+    final Workspace workspace = component.store.workspace;
+    return <AppMenuEntry>[
+      AppMenuEntry.heading(huiText('Scope')),
+      AppMenuEntry.radio(
+        huiText('All workspace folders'),
+        group: 'hui-flow-scope',
+        value: _allFoldersValue,
+        checked: panel.scopeFolderId == null,
+        onPicked: (String value) => _setScope(panel, value),
+      ),
+      for (final WorkspaceFolder folder in _sortedFolders(workspace))
+        AppMenuEntry.radio(
+          _folderPath(workspace, folder),
+          group: 'hui-flow-scope',
+          value: folder.id,
+          checked: panel.scopeFolderId == folder.id,
+          onPicked: (String value) => _setScope(panel, value),
+        ),
+    ];
   }
 
-  Widget _metric(String value, String label, {bool danger = false}) => dom.div(
-    classes: 'hui-board-metric${danger ? ' is-danger' : ''}',
-    <Widget>[
-      dom.strong(<Widget>[Text(value)]),
-      dom.span(<Widget>[Text(label)]),
-    ],
-  );
+  /// One short line: the scope when it is a folder, the menu and route
+  /// counts, and what needs attention.
+  String _status(WorkspacePanelData panel, WorkspaceFlowGraph graph) {
+    final Workspace workspace = component.store.workspace;
+    final WorkspaceFolder? folder = panel.scopeFolderId == null
+        ? null
+        : workspace.folderById(panel.scopeFolderId!);
+    final int broken = graph.edges.where(_isBroken).length;
+    return <String>[
+      if (folder != null) _folderPath(workspace, folder),
+      huiPlural(
+        'panel.flow.menu_count',
+        graph.documents.length,
+        oneEnglish: '{count} menu in flow',
+        otherEnglish: '{count} menus in flow',
+      ),
+      '${huiText('Routes')}: ${graph.edges.length}',
+      if (broken > 0) '${huiText('Needs attention')}: $broken',
+    ].join(' · ');
+  }
 
-  Widget _canvas(WorkspacePanelData panel, WorkspaceFlowGraph graph) {
-    if (graph.documents.isEmpty) return _emptyGraph();
+  String _statusTip(WorkspaceFlowGraph graph) => <String>[
+    '${huiText('Back / Home / Close')}: '
+        '${graph.edges.where((WorkspaceFlowEdge edge) => _isSink(edge.targetKind)).length}',
+    '${huiText('External')}: '
+        '${graph.edges.where((WorkspaceFlowEdge edge) => edge.targetKind == WorkspaceFlowTargetKind.external).length}',
+    '${huiText('In cycles')}: ${graph.cycleDocumentIds.length}',
+    '${huiText('No inbound links')}: ${graph.orphanDocumentIds.length}',
+  ].join(' · ');
+
+  Widget _board(WorkspacePanelData panel, WorkspaceFlowGraph graph) {
     final Map<String, WorkspacePanelPoint> automatic =
         arrangeWorkspaceFlowGraph(graph);
     final Map<String, WorkspacePanelPoint> positions =
@@ -199,21 +246,25 @@ class _PanelViewState extends State<PanelView> {
       maxY = math.max(maxY, point.y);
     }
     final Map<WorkspaceFlowTargetKind, WorkspacePanelPoint> sinks =
-        _sinkPositions(graph, maxX + 340);
+        _sinkPositions(graph, maxX + _sinkGap);
     for (final WorkspacePanelPoint point in sinks.values) {
       maxY = math.max(maxY, point.y);
     }
-    final double width = math.max(760, maxX + 620);
-    final double height = math.max(480, maxY + 220);
-    return dom.div(classes: 'hui-board-scroll', <Widget>[
-      dom.div(
-        classes: 'hui-board-stage',
+    // The board is as big as what it draws: the zoom that fits it to the
+    // frame is then as large as it can be.
+    final double width =
+        maxX + (sinks.isEmpty ? _nodeWidth : _sinkGap + _sinkWidth) + _margin;
+    final double height = maxY + _nodeHeight + _margin;
+    return DensityScope.dense(
+      child: dom.div(
+        classes: 'hui-flow-board',
         styles: dom.Styles(
           raw: <String, String>{
             'width': '${width.round()}px',
             'height': '${height.round()}px',
           },
         ),
+        attributes: <String, String>{'role': 'group', 'aria-label': _title},
         <Widget>[
           for (final WorkspaceFlowEdge edge in graph.edges)
             if (edge.targetKind == WorkspaceFlowTargetKind.menu ||
@@ -232,24 +283,7 @@ class _PanelViewState extends State<PanelView> {
             _node(doc, graph, positions[doc.id]!),
         ],
       ),
-    ]);
-  }
-
-  Widget _list(WorkspaceFlowGraph graph) {
-    if (graph.documents.isEmpty) return _emptyGraph();
-    return dom.div(classes: 'hui-board-list', <Widget>[
-      for (final WorkspaceDoc doc in graph.documents)
-        dom.article(classes: 'hui-board-list-card', <Widget>[
-          _nodeHeader(doc, graph),
-          _routeList(graph.outgoing(doc.id)),
-          Button.outline(
-            size: ButtonSize.sm,
-            icon: ArcaneIcon.pencil(size: IconSize.sm),
-            label: huiText('Edit menu'),
-            onPressed: () => component.store.openDocument(doc.id),
-          ),
-        ]),
-    ]);
+    );
   }
 
   Widget _node(
@@ -264,55 +298,59 @@ class _PanelViewState extends State<PanelView> {
         'top': '${point.y.round()}px',
       },
     ),
+    attributes: <String, String>{'aria-label': doc.title},
     <Widget>[
       _nodeHeader(doc, graph),
       _routeList(graph.outgoing(doc.id), compact: true),
-      Button.ghost(
-        size: ButtonSize.sm,
-        icon: ArcaneIcon.pencil(size: IconSize.sm),
-        label: huiText('Edit menu'),
-        onPressed: () => component.store.openDocument(doc.id),
-      ),
     ],
   );
 
   Widget _nodeHeader(WorkspaceDoc doc, WorkspaceFlowGraph graph) =>
-      dom.div(classes: 'hui-board-node-header', <Widget>[
-        dom.div(<Widget>[
+      dom.div(classes: 'hui-flow-node-head', <Widget>[
+        dom.div(classes: 'hui-flow-node-name', <Widget>[
           dom.strong(<Widget>[Text(doc.title)]),
           dom.code(<Widget>[Text(doc.runtimeId!)]),
         ]),
-        dom.div(classes: 'hui-board-badges', <Widget>[
-          if (graph.cycleDocumentIds.contains(doc.id))
-            _badge(huiText('Cycle'), 'is-cycle'),
-          if (graph.orphanDocumentIds.contains(doc.id))
-            _badge(huiText('Orphan'), 'is-orphan'),
-          if (graph.invalidDocumentIds.contains(doc.id))
-            _badge(huiText('Invalid JSON'), 'is-danger'),
-          if (graph.duplicateRuntimeIds.contains(doc.runtimeId))
-            _badge(huiText('Duplicate id'), 'is-danger'),
-        ]),
+        AppIconButton(
+          icon: ArcaneIcon.pencil(),
+          label: huiText('Edit menu'),
+          onPressed: () => component.store.openDocument(doc.id),
+        ),
+        if (_badges(doc, graph) case final List<Widget> badges
+            when badges.isNotEmpty)
+          dom.div(classes: 'hui-flow-badges', badges),
       ]);
+
+  List<Widget> _badges(WorkspaceDoc doc, WorkspaceFlowGraph graph) => <Widget>[
+    if (graph.cycleDocumentIds.contains(doc.id))
+      StatusBadge(huiText('Cycle'), tone: BadgeTone.warning),
+    if (graph.orphanDocumentIds.contains(doc.id))
+      StatusBadge(huiText('Orphan')),
+    if (graph.invalidDocumentIds.contains(doc.id))
+      StatusBadge(huiText('Invalid JSON'), tone: BadgeTone.error),
+    if (graph.duplicateRuntimeIds.contains(doc.runtimeId))
+      StatusBadge(huiText('Duplicate id'), tone: BadgeTone.error),
+  ];
 
   Widget _routeList(List<WorkspaceFlowEdge> edges, {bool compact = false}) {
     if (edges.isEmpty) {
-      return dom.p(classes: 'hui-board-no-routes', <Widget>[
+      return dom.p(classes: 'hui-flow-note', <Widget>[
         Text(huiText('No navigation actions')),
       ]);
     }
     final List<WorkspaceFlowEdge> shown = compact && edges.length > 3
         ? edges.take(3).toList(growable: false)
         : edges;
-    return dom.div(classes: 'hui-board-routes', <Widget>[
+    return dom.ul(classes: 'hui-flow-routes', <Widget>[
       for (final WorkspaceFlowEdge edge in shown)
-        dom.div(classes: 'hui-board-route is-${edge.targetKind.name}', <Widget>[
+        dom.li(classes: 'hui-flow-route is-${edge.targetKind.name}', <Widget>[
           dom.code(<Widget>[Text(edge.componentId)]),
           dom.span(<Widget>[Text(_edgeLabel(edge))]),
         ]),
       if (shown.length < edges.length)
-        dom.span(classes: 'hui-board-more-routes', <Widget>[
+        dom.li(classes: 'hui-flow-note', <Widget>[
           Text(
-            huiText("+{value} more", <String, Object?>{
+            huiText('+{value} more', <String, Object?>{
               'value': edges.length - shown.length,
             }),
           ),
@@ -334,7 +372,7 @@ class _PanelViewState extends State<PanelView> {
     final double length = math.sqrt(dx * dx + dy * dy);
     final double degrees = math.atan2(dy, dx) * 180 / math.pi;
     return dom.div(
-      classes: 'hui-board-edge is-${edge.targetKind.name}',
+      classes: 'hui-flow-edge is-${edge.targetKind.name}',
       styles: dom.Styles(
         raw: <String, String>{
           'left': '${x1.round()}px',
@@ -349,7 +387,7 @@ class _PanelViewState extends State<PanelView> {
 
   Widget _sink(WorkspaceFlowTargetKind kind, WorkspacePanelPoint point) =>
       dom.div(
-        classes: 'hui-board-sink is-${kind.name}',
+        classes: 'hui-flow-sink',
         styles: dom.Styles(
           raw: <String, String>{
             'left': '${point.x.round()}px',
@@ -382,23 +420,9 @@ class _PanelViewState extends State<PanelView> {
     return out;
   }
 
-  Widget _emptyGraph() => dom.div(classes: 'hui-board-empty', <Widget>[
-    Text(huiText('No menu documents are inside this panel scope.')),
-  ]);
-
-  Widget _notice(String message, String tone) => dom.div(
-    classes: 'hui-board-notice $tone',
-    attributes: const <String, String>{'role': 'status'},
-    <Widget>[Text(message)],
-  );
-
-  Widget _badge(String label, String tone) =>
-      dom.span(classes: 'hui-board-badge $tone', <Widget>[Text(label)]);
-
   String _nodeClasses(WorkspaceDoc doc, WorkspaceFlowGraph graph) {
-    final List<String> classes = <String>['hui-board-node'];
+    final List<String> classes = <String>['hui-flow-node'];
     if (graph.cycleDocumentIds.contains(doc.id)) classes.add('has-cycle');
-    if (graph.orphanDocumentIds.contains(doc.id)) classes.add('is-orphan');
     if (graph.invalidDocumentIds.contains(doc.id) ||
         graph.duplicateRuntimeIds.contains(doc.runtimeId)) {
       classes.add('has-danger');
@@ -453,15 +477,6 @@ class _PanelViewState extends State<PanelView> {
     _ => ArcaneIcon.circle(size: IconSize.sm),
   };
 
-  void _setView(WorkspacePanelData panel, String? raw) {
-    for (final WorkspacePanelView view in WorkspacePanelView.values) {
-      if (view.name == raw) {
-        component.store.updatePanel(panel.copyWith(view: view));
-        return;
-      }
-    }
-  }
-
   void _setScope(WorkspacePanelData panel, String raw) {
     component.store.updatePanel(
       panel.copyWith(
@@ -480,12 +495,25 @@ class _PanelViewState extends State<PanelView> {
 }
 
 const String _allFoldersValue = '__all__';
+
+/// Node and sink sizes in board pixels; the CSS draws them at these sizes.
 const double _nodeWidth = 228;
+const double _nodeHeight = 196;
+const double _sinkWidth = 122;
+
+/// From the last node column to the sink column.
+const double _sinkGap = 340;
+const double _margin = 40;
 
 bool _isSink(WorkspaceFlowTargetKind kind) =>
     kind == WorkspaceFlowTargetKind.back ||
     kind == WorkspaceFlowTargetKind.home ||
     kind == WorkspaceFlowTargetKind.close;
+
+bool _isBroken(WorkspaceFlowEdge edge) =>
+    edge.targetKind == WorkspaceFlowTargetKind.dangling ||
+    edge.targetKind == WorkspaceFlowTargetKind.ambiguous ||
+    edge.targetKind == WorkspaceFlowTargetKind.invalid;
 
 List<WorkspaceFolder> _sortedFolders(Workspace workspace) {
   final List<WorkspaceFolder> folders = List<WorkspaceFolder>.of(

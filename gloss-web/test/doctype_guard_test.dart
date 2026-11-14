@@ -53,7 +53,6 @@ void main() {
       final DocumentTypeAdapter adapter = DocumentTypeRegistry.of(kind);
       expect(adapter.kind, kind);
       expect(adapter.noun, isNotEmpty);
-      expect(adapter.createLabel, isNotEmpty);
       expect(
         adapter.availableViews,
         isNotEmpty,
@@ -216,40 +215,31 @@ void main() {
         reason: 'adapter and enum must agree for $kind',
       );
     }
-    expect(DocumentTypes.menu.sourcePreserving, isTrue);
     expect(DocumentTypes.panel.transferable, isFalse);
     expect(DocumentTypes.panel.undoable, isTrue);
     expect(DocumentTypes.hologram.hasRuntimeId, isTrue);
     expect(DocumentTypes.hologram.transferable, isTrue);
     expect(DocumentTypes.hologram.undoable, isTrue);
-    expect(DocumentTypes.hologram.sourcePreserving, isFalse);
     expect(DocumentTypes.animation.hasRuntimeId, isTrue);
     expect(DocumentTypes.animation.transferable, isTrue);
     expect(DocumentTypes.animation.undoable, isTrue);
-    expect(DocumentTypes.animation.sourcePreserving, isFalse);
     expect(DocumentTypes.scoreboard.hasRuntimeId, isTrue);
     expect(DocumentTypes.scoreboard.transferable, isTrue);
     expect(DocumentTypes.scoreboard.undoable, isTrue);
-    expect(DocumentTypes.scoreboard.sourcePreserving, isFalse);
     expect(DocumentTypes.motd.hasRuntimeId, isTrue);
     expect(DocumentTypes.motd.transferable, isTrue);
     expect(DocumentTypes.motd.undoable, isTrue);
-    expect(DocumentTypes.motd.sourcePreserving, isFalse);
     expect(DocumentTypes.emoji.hasRuntimeId, isTrue);
     expect(DocumentTypes.emoji.transferable, isTrue);
     expect(DocumentTypes.emoji.undoable, isTrue);
-    expect(DocumentTypes.emoji.sourcePreserving, isFalse);
     expect(DocumentTypes.bubbleStyle.hasRuntimeId, isTrue);
     expect(DocumentTypes.bubbleStyle.transferable, isTrue);
     expect(DocumentTypes.bubbleStyle.undoable, isTrue);
-    expect(DocumentTypes.bubbleStyle.sourcePreserving, isFalse);
     expect(DocumentTypes.damageIndicators.hasRuntimeId, isTrue);
     expect(DocumentTypes.damageIndicators.transferable, isTrue);
     expect(DocumentTypes.damageIndicators.undoable, isTrue);
-    expect(DocumentTypes.damageIndicators.sourcePreserving, isFalse);
     expect(DocumentTypes.tablist.hasRuntimeId, isTrue);
     expect(DocumentTypes.tablist.transferable, isTrue);
     expect(DocumentTypes.tablist.undoable, isTrue);
-    expect(DocumentTypes.tablist.sourcePreserving, isFalse);
   });
 }

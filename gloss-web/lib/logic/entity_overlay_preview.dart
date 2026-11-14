@@ -206,40 +206,46 @@ EntityOverlayPreview resolveEntityOverlayPreview(
               '&7Toughness &f0 &8| &7Knockback resistance &f0 &8| &7Detection range &f35',
             ]
       : const <String>[];
-  final List<GlossLineRender> rows = <GlossLineRender>[];
+  // `EntityOverlayText.prepare` joins every shown row into one display, so a
+  // colour or format runs on into the next row like the client draws it.
+  final List<String> templates = <String>[];
+  final Map<String, String> literals = <String, String>{};
+  final Map<String, String> markers = <String, String>{};
   for (final GlossEntityOverlayLine line in doc.lines) {
     if (!_shown(line.show, scope, errors)) continue;
     if (line.type == 'spacer') {
-      rows.add(renderGlossLine(' '));
+      templates.add(' ');
       continue;
     }
     final List<String> values = line.type == 'insight'
         ? details
         : const <String>[''];
     for (final String detail in values) {
-      final Map<String, String> literals = <String, String>{};
-      final Map<String, String> markers = <String, String>{};
-      final String template = _format(line.text, <String, String>{
-        ...tokens,
-        'name': _protectLiteral(sample.name, literals, markers),
-        'insight': _protectLiteral(detail, literals, markers),
-      });
-      final GlossLineRender pipeline = renderGlossLine(
-        template,
-        animations: animations,
-        emoji: emoji,
-        nowMs: nowMs,
-        expressionSamples: samples,
-        expressionLiteralEncoder: (String value) =>
-            _protectLiteral(value, literals, markers),
+      templates.add(
+        _format(line.text, <String, String>{
+          ...tokens,
+          'name': _protectLiteral(sample.name, literals, markers),
+          'insight': _protectLiteral(detail, literals, markers),
+        }),
       );
-      errors.addAll(pipeline.expressionErrors);
-      if (pipeline.particleSpanError != null) {
-        errors.add(pipeline.particleSpanError!);
-      }
-      final GlossLineRender result = _richLine(pipeline, literals);
-      rows.add(result);
     }
+  }
+  final List<GlossLineRender> rows = <GlossLineRender>[];
+  if (templates.isNotEmpty) {
+    final GlossLineRender pipeline = renderGlossLine(
+      templates.join('\n'),
+      animations: animations,
+      emoji: emoji,
+      nowMs: nowMs,
+      expressionSamples: samples,
+      expressionLiteralEncoder: (String value) =>
+          _protectLiteral(value, literals, markers),
+    );
+    errors.addAll(pipeline.expressionErrors);
+    if (pipeline.particleSpanError != null) {
+      errors.add(pipeline.particleSpanError!);
+    }
+    rows.addAll(glossDisplayLines(_richLine(pipeline, literals)));
   }
   if (rows.isEmpty ||
       rows.every((GlossLineRender row) => row.plainText.trim().isEmpty)) {
@@ -316,7 +322,7 @@ GlossLineRender _richLine(
   GlossLineRender pipeline,
   Map<String, String> literals,
 ) {
-  final McTextResult parsed = parseMcText(pipeline.renderedText);
+  final McTextResult parsed = parseMcDisplayText(pipeline.renderedText);
   final List<GlossTextPiece> pieces = <GlossTextPiece>[];
   for (int row = 0; row < parsed.lines.length; row++) {
     if (row > 0) pieces.add(const GlossTextRun(McSpan(text: '\n')));
@@ -350,7 +356,7 @@ GlossLineRender _richLine(
       0,
       end.clamp(0, pipeline.renderedText.length),
     );
-    final String plain = parseMcText(source).plainText;
+    final String plain = parseMcDisplayText(source).plainText;
     return literals.entries.fold(
       plain,
       (String value, MapEntry<String, String> literal) => value.replaceAll(

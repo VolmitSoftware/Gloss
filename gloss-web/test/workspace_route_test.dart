@@ -85,10 +85,40 @@ void main() {
     );
   });
 
+  test('should read the start page, pairing links and server workspaces', () {
+    expect(parseWorkspaceRoute('').route, isA<WorkspaceStartRoute>());
+    expect(parseWorkspaceRoute('#/').route, isA<WorkspaceStartRoute>());
+    expect(
+      parseWorkspaceRoute('#/workspace').route,
+      isA<WorkspaceLocalRoute>(),
+    );
+    final WorkspaceRoute? pair = parseWorkspaceRoute('#/pair/GLS1.abc').route;
+    expect(pair, isA<WorkspacePairRoute>());
+    expect((pair! as WorkspacePairRoute).code, 'GLS1.abc');
+    expect(
+      (parseWorkspaceRoute('#/pair').route! as WorkspacePairRoute).code,
+      isEmpty,
+    );
+    const String doc = '01234567-89ab-4cde-8f01-23456789abcd';
+    final WorkspaceRoute? server = parseWorkspaceRoute(
+      serverWorkspaceHash('0123456789abcdef', doc),
+    ).route;
+    expect(server, isA<WorkspaceServerRoute>());
+    expect((server! as WorkspaceServerRoute).serverId, '0123456789abcdef');
+    expect((server as WorkspaceServerRoute).documentId, doc);
+    expect(
+      (parseWorkspaceRoute('#/server/0123456789abcdef').route!
+              as WorkspaceServerRoute)
+          .documentId,
+      isNull,
+    );
+    expect(parseWorkspaceRoute('#/server/XYZ').error, isNotNull);
+  });
+
   test('unsupported and malformed hashes fail without throwing', () {
     expect(parseWorkspaceRoute('#/future/route').error, isNotNull);
     expect(parseWorkspaceRoute('#/import/menu/not-gzip').error, isNotNull);
-    expect(parseWorkspaceRoute('').route, isNull);
+    expect(parseWorkspaceRoute('').route, isA<WorkspaceStartRoute>());
   });
 
   test('gzip advertised size is rejected before envelope inflation', () {
@@ -201,8 +231,11 @@ void main() {
     reloaded.mutate('turn follow on', (HuiMenu menu) {
       menu.followPlayer = true;
     });
-    expect(reloaded.exportJson(), isNot(source));
-    expect(jsonDecode(reloaded.exportJson()), contains('closeOnDeath'));
+    // The edit writes its own key; the defaults the file leaves out stay out.
+    expect(jsonDecode(reloaded.exportJson()), <String, Object?>{
+      ...(jsonDecode(source) as Map<String, Object?>),
+      'followPlayer': true,
+    });
 
     reloaded.dispose();
     reloadedWorkspace.dispose();

@@ -73,7 +73,7 @@ public final class EntityOverlayText {
         if (lines.isEmpty()) {
             return Prepared.hidden();
         }
-        String marked = ParticleText.parse(TextUtils.joinLegacyLines(lines)).marked();
+        String marked = ParticleText.parse(String.join("\n", lines)).marked();
         UnaryOperator<String> render = source -> pipeline.renderScoped(viewer, source, scope, literals::add);
         AnimationTemplate animation = animator == null ? null
             : animator.compileTemplate(List.of(marked), render, false);
@@ -98,7 +98,7 @@ public final class EntityOverlayText {
         for (String text : texts) {
             lines.add(authored(text, tokens, "", literals));
         }
-        String marked = ParticleText.parse(TextUtils.joinLegacyLines(lines)).marked();
+        String marked = ParticleText.parse(String.join("\n", lines)).marked();
         UnaryOperator<String> render = source -> plugin.text().renderScoped(viewer, source, scope, literals::add);
         AnimationTemplate animation = plugin.animator() == null ? null
             : plugin.animator().compileTemplate(List.of(marked), render, false);
@@ -268,9 +268,18 @@ public final class EntityOverlayText {
             this.literals = literals;
             TagResolver.Builder builder = TagResolver.builder();
             for (Map.Entry<String, String> literal : literals.entrySet()) {
-                builder.resolver(Placeholder.component(tag(literal.getKey()), TextUtils.parseLegacy(literal.getValue())));
+                builder.resolver(Placeholder.component(tag(literal.getKey()),
+                    TextUtils.parseLegacyOverFormats(resetToDisplayDefault(literal.getValue()))));
             }
             this.resolver = builder.build();
+        }
+
+        /**
+         * A value sits inside the template's style, so a plain reset would fall back to that style;
+         * the display's own default is plain white.
+         */
+        private static String resetToDisplayDefault(String value) {
+            return value.replace("§r", "§f").replace("§R", "§f");
         }
 
         private static Prepared hidden() {
@@ -313,7 +322,7 @@ public final class EntityOverlayText {
         private String add(String value) {
             String marker = "\uE000" + values.size() + "\uE001";
             String sanitized = value.replace("\u0007", "").replace("\uE000", "").replace("\uE001", "");
-            values.put(marker, TextUtils.scopeLegacyLines(ColorFormatter.translateColors(sanitized)));
+            values.put(marker, ColorFormatter.translateColors(sanitized));
             return marker;
         }
 

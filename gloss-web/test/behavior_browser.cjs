@@ -1,36 +1,33 @@
 const assert = require('node:assert/strict');
-const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const shell = require('./support/shell.cjs');
 
 async function main() {
-  const browser = await chromium.launch({headless: true,
-    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {})});
+  const browser = await shell.launch();
   try {
-    const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
-    const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    await page.goto(process.env.EDITOR_URL || 'http://127.0.0.1:8107');
-    await page.waitForSelector('#hui-library-new-document', {timeout: 60000});
-    if (await page.getByText('Skip', {exact: true}).isVisible()) await page.getByText('Skip', {exact: true}).click();
+    const {page, errors} = await shell.openEditor(browser);
     const source = {schemaVersion: 2, revision: 19, matching: {maxInputCharacters: 4096},
       on: [{trigger: 'chat', pattern: '^hello$', permission: 'example.greeting',
-        do: [{type: 'sequence', actions: [{type: 'message', message: 'Welcome'}]}]}],
+        do: [{type: 'sequence', steps: [{type: 'message', message: 'Welcome'}]}]}],
       state: {visits: {scope: 'player', type: 'number', default: 0}}, custom: {retained: true}};
-    await page.getByRole('button', {name: 'Import JSON', exact: true}).click();
-    await page.locator('textarea:visible').last().fill(JSON.stringify(source));
-    await page.getByRole('button', {name: /Replace document$/}).click();
-    await page.getByLabel('maxInputCharacters', {exact: true}).fill('2048');
+    // The matching limits are expert tuning: Advanced only.
+    if (!(await shell.setMode(page, 'advanced'))) {
+      await page.evaluate(() => window.localStorage.setItem('gloss.mode', 'advanced'));
+      await page.reload();
+      await shell.ready(page);
+    }
+    await shell.importJson(page, source);
+    await page.getByLabel('Maximum input characters', {exact: true}).fill('2048');
     await page.getByLabel('Chat pattern 1', {exact: true}).fill('(?=a)a');
-    await page.locator('.hui-status-chip.is-error').waitFor();
+    const problems = page.locator('.hui-status-problems button');
+    await problems.filter({hasText: /\berrors?\b/}).waitFor();
     await page.getByLabel('Chat pattern 1', {exact: true}).fill('^welcome$');
     await page.getByLabel('Chat pattern 1', {exact: true}).press('Tab');
-    await page.getByRole('button', {name: 'No validation issues', exact: true}).waitFor();
+    await problems.filter({hasText: /No issues/}).waitFor();
     await page.setViewportSize({width: 390, height: 1000});
-    await page.getByRole('button', {name: 'Open inspector', exact: true}).click();
-    await page.getByLabel('maxWorkUnits', {exact: true}).fill('75000');
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.getByLabel('Maximum search work units', {exact: true}).fill('75000');
+    assert.equal(await shell.noHorizontalScroll(page), true);
     await page.setViewportSize({width: 1440, height: 1000});
-    await page.getByRole('button', {name: /^Export .* JSON$/}).click();
-    const output = JSON.parse(await page.locator('pre.hui-codeblock:visible').last().innerText());
+    const output = await shell.exportJson(page);
     assert.equal(output.revision, source.revision);
     assert.equal(output.matching.maxInputCharacters, 2048);
     assert.equal(output.matching.maxWorkUnits, 75000);

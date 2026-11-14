@@ -26,8 +26,6 @@ final class MotdDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('MOTD');
 
-  @override
-  String get createLabel => huiText('New MOTD');
 
   @override
   String get pluralLabel => huiText('MOTDs');

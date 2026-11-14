@@ -229,6 +229,12 @@ final class PersistentHologram implements AnchoredHologram {
         return snapshot == null ? null : snapshot.location().clone();
     }
 
+    /** The world the document names, loaded or not; {@link #location} is null while it is not loaded. */
+    String worldName() {
+        AnchorState snapshot = anchorState;
+        return snapshot == null ? "" : snapshot.worldName();
+    }
+
     @Override
     public void teleport(Location location) {
         Objects.requireNonNull(location, "Hologram teleport requires a location.");
@@ -1332,7 +1338,7 @@ final class PersistentHologram implements AnchoredHologram {
             rendered.add(cached != null ? cached : text.render(player, values.get(index)));
         }
 
-        return TextUtils.joinLegacyLines(rendered);
+        return String.join("\n", rendered);
     }
 
     private String[] staticSegments(LineSet snapshot) {

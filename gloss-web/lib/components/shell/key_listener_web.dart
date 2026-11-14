@@ -24,6 +24,7 @@ void Function() installShellKeyListener(ShellKeyHandler handler) {
       alt: typed.altKey,
       editable: _isEditable(event.target),
       overlayOpen: huiArcaneOverlayOpen(),
+      menuOpen: huiArcaneMenuOpen(),
     );
     if (handler(key)) {
       event.preventDefault();
@@ -83,9 +84,27 @@ bool huiArcaneOverlayOpen() {
   }
 }
 
+/// True while a dropdown or context menu is open.
+bool huiArcaneMenuOpen() {
+  try {
+    return web.document.querySelector(
+          '[data-arcane-surface="menu"][data-arcane-state="open"], '
+          '[data-arcane-surface="context-menu"][data-arcane-state="open"]',
+        ) !=
+        null;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// True while the library or inspector drawer is open.
 bool huiMobilePaneOpen() {
   try {
-    return web.document.querySelector('.hui-pane.is-mobile-open') != null;
+    return web.document.querySelector(
+          '#hui-library-drawer [data-arcane-state="open"], '
+          '#hui-inspector-drawer [data-arcane-state="open"]',
+        ) !=
+        null;
   } catch (_) {
     return false;
   }

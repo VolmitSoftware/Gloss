@@ -2,7 +2,9 @@ package art.arcane.gloss.persistence;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DataFileFence;
 import art.arcane.gloss.doc.DocumentHashes;
+import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -41,8 +43,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -53,6 +57,7 @@ public final class GlossProjectTransaction {
   private static final int UUID_CHARACTERS = 36;
   private static final String IMAGES_COLLECTION = "images";
   private static final long MAX_JOURNAL_BYTES = 1024L * 1024L;
+  static final String QUARANTINE = "editor-sync-quarantine";
   private static final Pattern TRANSACTION_DIRECTORY = Pattern.compile(
       "[0-9]{10,}-[A-Za-z0-9_-]{1,64}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
   private static final Gson GSON = new GsonBuilder()
@@ -63,7 +68,9 @@ public final class GlossProjectTransaction {
   private final Path dataDirectory;
   private final Path transactionsDirectory;
   private final Path backupsDirectory;
+  private final Path quarantineDirectory;
   private final DirectoryForceProbe directoryForceProbe;
+  private final Consumer<String> reports;
   private final Set<String> uncertainCommits;
   private volatile RetentionSettings retentionSettings;
   private volatile RetentionSettings completedRetention;
@@ -75,11 +82,17 @@ public final class GlossProjectTransaction {
   }
 
   GlossProjectTransaction(Path dataDirectory, DirectoryForceProbe directoryForceProbe) {
+    this(dataDirectory, directoryForceProbe, (String line) -> Gloss.warn("%s", line));
+  }
+
+  GlossProjectTransaction(Path dataDirectory, DirectoryForceProbe directoryForceProbe, Consumer<String> reports) {
     this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory")
         .toAbsolutePath().normalize();
     this.transactionsDirectory = this.dataDirectory.resolve("editor-sync-transactions");
     this.backupsDirectory = this.dataDirectory.resolve("editor-sync-backups");
+    this.quarantineDirectory = this.dataDirectory.resolve(QUARANTINE);
     this.directoryForceProbe = Objects.requireNonNull(directoryForceProbe, "directoryForceProbe");
+    this.reports = Objects.requireNonNull(reports, "reports");
     this.uncertainCommits = new HashSet<>();
   }
 
@@ -88,27 +101,88 @@ public final class GlossProjectTransaction {
    * never run an editor sync has nothing to recover, and creating the pair on every boot left two
    * permanently empty folders in the data directory. {@link #apply} still creates them, because it
    * is about to write into them.
+   *
+   * <p>A transaction that cannot be rolled back (a target changed since, a damaged journal) is moved
+   * whole, journal and backup copies included, to {@value #QUARANTINE} with one warning, and its
+   * targets are left as found; it never stops the next one or startup. A deleted file that came back
+   * as the copy Gloss ships is not a change of anyone's: the delete is undone over it, and the
+   * transaction goes to quarantine too, with a warning naming the file.
+   *
+   * @return the transactions that could not be rolled back
    */
-  public void recover() throws IOException {
+  public List<String> recover() throws IOException {
     if (!Files.exists(transactionsDirectory, LinkOption.NOFOLLOW_LINKS)
         && !Files.exists(backupsDirectory, LinkOption.NOFOLLOW_LINKS)) {
+      return List.of();
+    }
+    List<String> stranded = new ArrayList<>();
+    for (Path transaction : childDirectories(transactionsDirectory)) {
+      try {
+        recover(transaction);
+      } catch (IOException | RuntimeException failure) {
+        String name = transaction.getFileName().toString();
+        String moved = quarantine(transaction, failure);
+        reports.accept("Editor sync transaction " + name + " could not be rolled back (" + reasons(failure)
+            + "). It was moved with its journal and backup copies to " + moved
+            + "; the data files were left as they are.");
+        stranded.add(name);
+      }
+    }
+    return List.copyOf(stranded);
+  }
+
+  private void recover(Path transaction) throws IOException {
+    if (!Files.exists(transaction.resolve("journal.json"), LinkOption.NOFOLLOW_LINKS)) {
+      cleanupUnjournaled(transaction);
       return;
     }
-    List<Path> transactions = childDirectories(transactionsDirectory);
-    for (Path transaction : transactions) {
-      if (!Files.exists(transaction.resolve("journal.json"), LinkOption.NOFOLLOW_LINKS)) {
-        cleanupUnjournaled(transaction);
-        continue;
-      }
-      Journal journal = readJournal(transaction);
-      if (journal.state().equals("committed")) {
-        archive(transaction, journal.id());
-      } else {
-        rollback(transaction, journal);
-        writeJournal(transaction, journal.withState("rolledback"));
-        archive(transaction, journal.id());
-      }
+    Journal journal = readJournal(transaction);
+    if (journal.state().equals("committed")) {
+      archive(transaction, journal.id());
+      return;
     }
+    List<String> overShipped = rollback(transaction, journal);
+    writeJournal(transaction, journal.withState("rolledback"));
+    if (overShipped.isEmpty()) {
+      archive(transaction, journal.id());
+      return;
+    }
+    String moved = quarantine(transaction, null);
+    reports.accept("Editor sync transaction " + journal.id() + " deleted " + String.join(", ", overShipped)
+        + " and Gloss put the shipped copy back before the delete was undone; the copy from before the delete was"
+        + " restored and the transaction was moved to " + moved + ".");
+  }
+
+  /** Moves the transaction folder to quarantine; returns where it went, relative to the data folder. */
+  private String quarantine(Path transaction, Exception failure) throws IOException {
+    String name = transaction.getFileName().toString();
+    ensureChildDirectory(dataDirectory, quarantineDirectory);
+    Path destination = quarantineDirectory.resolve(name).normalize();
+    requireChild(quarantineDirectory, destination);
+    if (Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) {
+      destination = quarantineDirectory.resolve(name + "-" + UUID.randomUUID()).normalize();
+    }
+    try {
+      Files.move(transaction, destination, StandardCopyOption.ATOMIC_MOVE);
+    } catch (IOException moveFailure) {
+      if (failure != null) {
+        moveFailure.addSuppressed(failure);
+      }
+      throw moveFailure;
+    }
+    forceDirectory(transactionsDirectory);
+    forceDirectory(quarantineDirectory);
+    return QUARANTINE + "/" + destination.getFileName();
+  }
+
+  /** The failure and the per-file failures recorded under it, on one line. */
+  private static String reasons(Throwable failure) {
+    List<String> reasons = new ArrayList<>();
+    reasons.add(String.valueOf(failure.getMessage()));
+    for (Throwable entry : failure.getSuppressed()) {
+      reasons.add(String.valueOf(entry.getMessage()));
+    }
+    return String.join("; ", reasons).replace('\n', ' ').replace('\r', ' ');
   }
 
   public void configureRetention(RetentionPolicy policy) {
@@ -209,6 +283,14 @@ public final class GlossProjectTransaction {
 
     Journal prepared = new Journal(JOURNAL_VERSION, id, "prepared", List.copyOf(entries));
     writeJournal(transaction, prepared);
+    return DataFileFence.hold(() -> replace(transaction, id, prepared, stage, expectedExisting, preparation,
+        List.copyOf(mutations.keySet())));
+  }
+
+  /** Checks every target still holds what the publish was based on, then moves the staged files into place. */
+  private Pending replace(Path transaction, String id, Journal prepared, Path stage,
+                          Map<Path, byte[]> expectedExisting, TransactionPreparation preparation,
+                          List<Path> targets) throws IOException {
     try {
       verifyExpected(expectedExisting, preparation);
       preparation.check();
@@ -225,7 +307,7 @@ public final class GlossProjectTransaction {
     Journal publishing = prepared.withState("publishing");
     writeJournal(transaction, publishing);
     try {
-      for (Entry entry : entries) {
+      for (Entry entry : prepared.entries()) {
         Path target = target(entry);
         if (entry.operation() == Operation.WRITE) {
           Path staged = stage.resolve(entry.relativePath()).normalize();
@@ -240,7 +322,7 @@ public final class GlossProjectTransaction {
       }
       Journal published = prepared.withState("published");
       writeJournal(transaction, published);
-      return new Pending(transaction, id, List.copyOf(mutations.keySet()));
+      return new Pending(transaction, id, targets);
     } catch (IOException | RuntimeException failure) {
       try {
         rollback(transaction, publishing);
@@ -324,7 +406,9 @@ public final class GlossProjectTransaction {
     }
   }
 
-  private void rollback(Path transaction, Journal journal) throws IOException {
+  /** Undoes every entry; returns the deleted files it restored over the shipped copy Gloss had put back. */
+  private List<String> rollback(Path transaction, Journal journal) throws IOException {
+    List<String> overShipped = new ArrayList<>();
     Path backup = transaction.resolve("backup").normalize();
     Path stage = transaction.resolve("stage").normalize();
     requireChild(transaction, backup);
@@ -367,6 +451,11 @@ public final class GlossProjectTransaction {
           if (targetHash.equals(entry.originalHash())) {
             continue;
           }
+          if (entry.operation() == Operation.DELETE && isShippedCopy(target, entry.relativePath())) {
+            restoreDurably(target, backupFile, entry.originalHash());
+            overShipped.add(entry.relativePath());
+            continue;
+          }
           if (entry.operation() == Operation.DELETE || !targetHash.equals(entry.stagedHash())) {
             throw new IOException("editor sync target changed independently during recovery: "
                 + entry.relativePath());
@@ -397,6 +486,14 @@ public final class GlossProjectTransaction {
     if (failure != null) {
       throw failure;
     }
+    return List.copyOf(overShipped);
+  }
+
+  /** True when {@code target} holds exactly the copy Gloss ships for that data-folder path. */
+  private static boolean isShippedCopy(Path target, String relativePath) throws IOException {
+    Optional<byte[]> shipped = ShippedDefaults.shippedCopy(relativePath);
+    return shipped.isPresent() && Files.size(target) == shipped.get().length
+        && Arrays.equals(Files.readAllBytes(target), shipped.get());
   }
 
   private void archive(Path transaction, String id) throws IOException {

@@ -15,12 +15,12 @@ final class InventoryItemText {
 
     static ItemStack apply(ItemStack item, String name, List<String> lore) {
         if (name != null) {
-            item.setComponent(ComponentTypes.CUSTOM_NAME, TextUtils.parse(name));
+            item.setComponent(ComponentTypes.CUSTOM_NAME, TextUtils.parseOverFormats(name));
         }
         if (!lore.isEmpty()) {
             List<Component> lines = new ArrayList<>(lore.size());
             for (String line : lore) {
-                lines.add(TextUtils.parse(line));
+                lines.add(TextUtils.parseOverFormats(line));
             }
             item.setComponent(ComponentTypes.LORE, new ItemLore(lines));
         }

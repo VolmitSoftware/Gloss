@@ -1,7 +1,12 @@
+/// Links a flow map to a world panel: create one from a root menu and the
+/// target world, or import a world-panel JSON file. Shown while the flow map
+/// has no world panel; the world ids make it an Advanced section.
 library;
 
 import 'dart:convert';
+
 import 'package:arcane_jaspr/arcane_jaspr.dart';
+
 import '../../doctype/doctype.dart';
 import '../../l10n/hui_localizations.dart';
 import '../../model/runtime_panel_definition.dart';
@@ -10,8 +15,12 @@ import '../../services/file_transfer.dart';
 import '../../state/editor_store.dart';
 import '../../state/workspace.dart';
 import '../../state/workspace_panel.dart';
-import '../common/common.dart';
-import 'inspector_widgets.dart';
+import '../../ui/action_row.dart';
+import '../../ui/alert.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/section.dart';
+import '../../ui/technical_input.dart';
 
 class PanelAuthoring extends StatefulWidget {
   const PanelAuthoring({required this.store, super.key});
@@ -36,68 +45,73 @@ class _PanelAuthoringState extends State<PanelAuthoring> {
 
   @override
   Widget build(BuildContext context) {
-    final WorkspacePanelData panel = component.store.activePanel!.data;
-    final Map<String, dynamic>? definition = panel.runtimeBoard;
-    return HuiPanel(
+    final List<String> menus = _menus;
+    final ComponentSize size = controlSize(Density.dense);
+    return AppSection(
       title: huiText('World panel'),
+      memoryKey: 'panel.world',
+      tip: huiText(
+        'Use the world key and UUID from the target server. Placement can be edited after creation.',
+      ),
       children: <Widget>[
-        if (definition != null)
-          Button(
-            variant: ButtonVariant.outline,
-            onPressed: () => downloadText(
-              '${panel.runtimeBoardId}.json',
-              const JsonEncoder.withIndent('  ').convert(definition),
-            ),
-            label: huiText('Export world panel'),
-          )
-        else ...<Widget>[
-          _field('Panel id', _id, (String value) => _id = value),
-          _field('World key', _worldKey, (String value) => _worldKey = value),
-          _field(
-            'World UUID',
-            _worldUuid,
-            (String value) => _worldUuid = value,
+        Field(
+          label: huiText('Root menu'),
+          docKey: 'panel.rootMenuId',
+          child: ArcaneSelect(
+            value: _rootMenu ?? (menus.isEmpty ? null : menus.first),
+            size: size,
+            fullWidth: true,
+            options: <ArcaneSelectOption>[
+              for (final String id in menus)
+                ArcaneSelectOption(value: id, label: id),
+            ],
+            onChanged: (String value) => setState(() => _rootMenu = value),
           ),
-          HuiField(
-            label: huiText('Root menu'),
-            control: ArcaneSelect(
-              value: _rootMenu ?? (_menus.isEmpty ? null : _menus.first),
-              options: <ArcaneSelectOption>[
-                for (final String id in _menus)
-                  ArcaneSelectOption(value: id, label: id),
-              ],
-              onChanged: (String value) => setState(() => _rootMenu = value),
-            ),
-          ),
-          HuiNote(
-            huiText(
-              'Use the world key and UUID from the target server. Placement can be edited after creation.',
-            ),
-          ),
-          Button(
-            variant: ButtonVariant.outline,
-            onPressed: _create,
-            label: huiText('Create world panel'),
-          ),
-          Button(
-            variant: ButtonVariant.outline,
-            onPressed: _import,
-            label: huiText('Import world panel'),
-          ),
-        ],
-        if (_error != null) HuiNote(_error!, tone: HuiNoteTone.danger),
+        ),
+        _field('hui-panel-new-id', huiText('Panel id'), _id, (String value) {
+          _id = value;
+        }),
+        _field('hui-panel-new-world', huiText('World key'), _worldKey, (
+          String value,
+        ) {
+          _worldKey = value;
+        }),
+        _field('hui-panel-new-world-uuid', huiText('World UUID'), _worldUuid, (
+          String value,
+        ) {
+          _worldUuid = value;
+        }),
+        if (_error != null)
+          AppAlert(tone: AlertTone.error, message: _error!, live: true),
+        FormFooter(
+          dense: true,
+          secondary: <RowAction>[
+            RowAction(huiText('Import'), _import),
+          ],
+          primary: RowAction(huiText('Create world panel'), _create),
+        ),
       ],
     );
   }
 
-  Widget _field(String label, String value, void Function(String) changed) =>
-      HuiField(
-        label: huiText(label),
-        control: TextInput(
-          value: value,
-          onChanged: (String value) => setState(() => changed(value)),
-        ),
-      );
+  Widget _field(
+    String id,
+    String label,
+    String value,
+    void Function(String) changed,
+  ) => Field(
+    label: label,
+    forId: id,
+    child: TextInput(
+      id: id,
+      value: value,
+      size: controlSize(Density.dense),
+      fullWidth: true,
+      styles: technicalInputStyles,
+      attributes: technicalInputAttributes,
+      onChanged: (String value) => setState(() => changed(value)),
+    ),
+  );
 
   void _create() {
     if (_menus.isEmpty) {

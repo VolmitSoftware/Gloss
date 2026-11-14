@@ -421,4 +421,39 @@ void main() {
     expect(workspace.requiresReload, isTrue);
     expect(workspace.lastError, contains('reset in another browser tab'));
   });
+
+  test(
+    'a tab waiting for another to let go takes its writes quietly',
+    () async {
+      final _RecoverableRepository repository = _RecoverableRepository(
+        current: jsonEncode(_workspacePayload()),
+      );
+      final Workspace workspace = await Workspace.open(repository: repository);
+      const WorkspaceRepositoryNotice changed = WorkspaceRepositoryNotice(
+        kind: WorkspaceRepositoryNoticeKind.changed,
+        key: Workspace.storageKey,
+        revision: 2,
+      );
+
+      repository.emit(changed);
+      workspace.pauseWrites();
+
+      expect(
+        workspace.requiresReload,
+        isFalse,
+        reason: 'heard before the tab knew it waits',
+      );
+      expect(workspace.lastError, isNull);
+
+      repository.emit(changed);
+
+      expect(workspace.requiresReload, isFalse);
+      expect(workspace.lastError, isNull);
+      expect(
+        workspace.canWrite,
+        isFalse,
+        reason: 'still read only until it takes over',
+      );
+    },
+  );
 }

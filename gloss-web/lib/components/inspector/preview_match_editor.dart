@@ -1,34 +1,43 @@
 /// Document-level inspector for a container-preview document: shown whenever
 /// no element is selected, the way [MenuInspector] shows the menu root.
 ///
-/// `match`/`variants` are kept deliberately simple, per the task brief:
-/// blocks/entities are plain chip lists (globs are just a chip with a `*` in
-/// it — the same string either way), `special` is a small fixed choice, and
-/// `vars` is key/value rows with a colour swatch affordance for anything
-/// starting with `#`. There is no dedicated glob builder or drag-reorder for
-/// variants beyond the same up/down tools every other list in this editor
-/// already has.
+/// `match`/`variants` stay simple: blocks and entities are comma lists (a
+/// glob is a name with a `*` in it), `special` is a small fixed choice, and
+/// `vars` are key/value rows with a colour swatch for anything starting with
+/// `#`.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../config/links.dart';
+import '../../logic/preview_field_text.dart';
 import '../../logic/validation.dart';
-import '../../model/preview_doc.dart';
-import '../../model/json_codec.dart';
-import '../../model/particle_layer.dart';
-import '../../state/editor_store.dart';
-import '../common/common.dart';
-import 'extras_editor.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
-import 'display_style_editor.dart';
 import '../../model/hui_icons.dart';
+import '../../model/particle_layer.dart';
+import '../../model/preview_doc.dart';
+import '../../state/editor_store.dart';
+import '../../ui/color_field.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/field_tip.dart';
+import '../../ui/field_group.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/menu.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/technical_input.dart';
+import 'display_style_editor.dart';
+import 'extras_editor.dart';
+import 'particle_layers_editor.dart';
 import 'preview_color_swatch.dart';
 import 'preview_expr_field.dart';
-import 'particle_layers_editor.dart';
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+import '../../ui/toast.dart';
 
 const List<String> _specialValues = <String>[
   'enderChest',
@@ -45,6 +54,20 @@ String _specialValueLabel(String value) => switch (value) {
 
 final RegExp _identifierPattern = RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$');
 
+/// Whether [issue] sits at [path] or under it (`path.key`, `path[0]`).
+bool _under(HuiIssue issue, String path) =>
+    issue.path == path ||
+    issue.path.startsWith('$path.') ||
+    issue.path.startsWith('$path[');
+
+bool _sameNames(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (int index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
+}
+
 class PreviewMatchEditor extends StatelessWidget {
   const PreviewMatchEditor({required this.store, super.key});
 
@@ -52,174 +75,121 @@ class PreviewMatchEditor extends StatelessWidget {
 
   HuiPreviewDoc get _doc => store.previewDoc!;
 
-  /// Document-level issues only: no `elements[...]` prefix.
-  List<HuiIssue> _issuesFor(String path) => store.issues
-      .where(
-        (HuiIssue issue) =>
-            issue.path == path || issue.path.startsWith('$path.'),
-      )
-      .toList();
+  /// Document-level issues at [path] or under it.
+  List<HuiIssue> _issuesFor(String path) =>
+      store.issues.where((HuiIssue issue) => _under(issue, path)).toList();
+
+  List<HuiIssue> _issuesAt(String path) =>
+      store.issues.where((HuiIssue issue) => issue.path == path).toList();
 
   void _mutate(String label, void Function(HuiPreviewDoc doc) fn) =>
       store.mutatePreview(label, fn);
 
-  Widget _refreshField(
-    String label,
-    int value,
-    void Function(HuiPreviewDoc doc, int value) update,
-  ) => HuiField(
-    label: huiText(label),
-    control: TextInput(
-      value: '$value',
-      attributes: <String, String>{'aria-label': label, 'inputmode': 'numeric'},
-      onChanged: (String text) {
-        final int? parsed = int.tryParse(text);
-        if (parsed != null) {
-          _mutate(label, (HuiPreviewDoc doc) => update(doc, parsed));
-        }
+  void _undoToast(String name) => toastInfo(
+    huiText('Deleted {id}.', <String, Object?>{'id': name}),
+    action: ToastAction(
+      label: huiText('Undo'),
+      onPressed: () {
+        store.performUndo();
       },
     ),
   );
 
   @override
-  Widget build(
-    BuildContext context,
-  ) => dom.div(classes: 'hui-inspector-body is-menu', <Widget>[
-    _header(),
-    ExtrasEditor(
-      title: huiText('Settings'),
-      extensionKeys: false,
-      extras: <String, Object?>{
-        'scale': _doc.scale,
-        'viewDistance': _doc.viewDistance,
-      },
-      onChanged: (String label, Map<String, dynamic> next) => _mutate(label, (
-        HuiPreviewDoc edited,
-      ) {
-        edited.scale = huiReadDouble(next, 'scale', fallback: 0.65);
-        edited.viewDistance = huiReadDouble(next, 'viewDistance', fallback: 10);
-      }),
-    ),
-    InspectorSection(
-      title: huiText('Refresh'),
+  Widget build(BuildContext context) {
+    final ComponentSize size = controlSize(DensityScope.of(context));
+    return DenseBox(
+      classes: 'hui-inspector-body is-container-preview',
       children: <Widget>[
-        _refreshField(
-          'Content refresh ticks',
-          _doc.contentRefreshTicks ?? 4,
-          (HuiPreviewDoc doc, int value) => doc.contentRefreshTicks = value,
-        ),
-        _refreshField(
-          'Access check ticks',
-          _doc.accessCheckTicks ?? 10,
-          (HuiPreviewDoc doc, int value) => doc.accessCheckTicks = value,
-        ),
-        HuiNote(
-          huiText(
-            'Use 1–1200 ticks. Access checks also refresh content; lower values detect protection changes sooner.',
+        PaneHeader(
+          kind: huiText('Container preview'),
+          title: store.menuId,
+          tip: huiText(
+            'Nothing is selected, so these are the document-wide '
+            'settings: which blocks and entities draw this card, its '
+            'variants, and the chrome around it. Pick an element in the '
+            'list to edit it.',
           ),
         ),
-      ],
-    ),
-    _matchSection(),
-    _variantsSection(),
-    _cardSection(),
-    DisplayStyleEditor(
-      title: 'Text style',
-      sectionKey: 'preview.textStyle',
-      style: _doc.textStyle,
-      issues: _issuesFor('textStyle'),
-      onChanged: (String label, HuiIconStyle? style) =>
-          _mutate(label, (HuiPreviewDoc doc) => doc.textStyle = style),
-    ),
-    DisplayStyleEditor(
-      title: 'Item style',
-      sectionKey: 'preview.itemStyle',
-      style: _doc.itemStyle,
-      defaults: HuiIconStyle(blockLight: 15, skyLight: 15),
-      issues: _issuesFor('itemStyle'),
-      onChanged: (String label, HuiIconStyle? style) =>
-          _mutate(label, (HuiPreviewDoc doc) => doc.itemStyle = style),
-    ),
-    ParticleLayersEditor(
-      layers: _doc.particleLayers,
-      sectionKey: 'preview.particleLayers',
-      mutate: (String label, void Function(List<GlossParticleLayer>) edit) =>
-          _mutate(label, (HuiPreviewDoc doc) => edit(doc.particleLayers)),
-    ),
-    _install(),
-    _extras(),
-  ]);
-
-  Widget _header() => dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-    dom.div(classes: 'hui-inspector-header is-menu', <Widget>[
-      HuiEyebrow(huiText('Container preview')),
-      dom.h2(classes: 'hui-inspector-title hui-ltr', <Widget>[
-        Text(store.menuId),
-      ]),
-    ]),
-    dom.p(classes: 'hui-inspector-lede', <Widget>[
-      Text(
-        huiText(
-          'Nothing is selected, so these are the document-wide '
-          'settings: which blocks and entities draw this card, its '
-          'variants, and the chrome around it. Pick an element in the '
-          'list to edit it.',
+        _matchSection(size),
+        _varsSection(),
+        _variantsSection(size),
+        _cardSection(),
+        DisplayStyleEditor(
+          title: 'Text style',
+          sectionKey: 'preview.textStyle',
+          style: _doc.textStyle,
+          issues: _issuesFor('textStyle'),
+          onChanged: (String label, HuiIconStyle? style) =>
+              _mutate(label, (HuiPreviewDoc doc) => doc.textStyle = style),
         ),
-      ),
-    ]),
-  ]);
+        DisplayStyleEditor(
+          title: 'Item style',
+          sectionKey: 'preview.itemStyle',
+          style: _doc.itemStyle,
+          defaults: HuiIconStyle(blockLight: 15, skyLight: 15),
+          issues: _issuesFor('itemStyle'),
+          onChanged: (String label, HuiIconStyle? style) =>
+              _mutate(label, (HuiPreviewDoc doc) => doc.itemStyle = style),
+        ),
+        ParticleLayersEditor(
+          layers: _doc.particleLayers,
+          sectionKey: 'preview.particleLayers',
+          mutate: (String label, void Function(List<GlossParticleLayer>) edit) =>
+              _mutate(label, (HuiPreviewDoc doc) => edit(doc.particleLayers)),
+        ),
+        _settingsSection(),
+        _install(),
+        AdvancedOnly(child: _extras()),
+      ],
+    );
+  }
 
-  Widget _matchSection() => InspectorSection(
+  // --- match ----------------------------------------------------------------
+
+  Widget _matchSection(ComponentSize size) => AppSection(
     title: huiText('Match'),
-    sectionKey: 'preview.match',
-    trailing: const HuiFieldHelp('preview.match'),
-    description: huiText(
-      'Which blocks, entities or special targets this '
-      'document draws over. The highest-priority document naming a '
-      'target wins.',
-    ),
+    memoryKey: 'preview.match',
+    docKey: 'preview.match',
     children: <Widget>[
-      PreviewExprField(
-        label: huiText('Visibility expression'),
-        raw: _doc.show,
-        showCondition: true,
-        kind: PreviewExprKind.boolean,
-        placeholder: huiText('true'),
-        trailing: const HuiFieldHelp('preview.show'),
-        issues: _issuesFor('show'),
-        onChanged: (Object? value) =>
-            _mutate('show', (HuiPreviewDoc doc) => doc.show = value),
-      ),
-      _PreviewNameChips(
+      _NameListField(
+        id: 'hui-preview-match-blocks',
         label: huiText('Blocks'),
         docKey: 'preview.match.blocks',
+        placeholder: huiText('CHEST or OAK_*'),
         values: _doc.match.blocks,
-        help: huiText(
-          '"*" is the only wildcard, e.g. "OAK_*" or "*_SHULKER_BOX".',
-        ),
+        // The "matches nothing at all" note sits here: a block is its fix.
+        problems: <HuiIssue>[
+          ..._issuesFor('match.blocks'),
+          ..._issuesAt('match'),
+        ],
         onChanged: (List<String> next) =>
             _mutate('match blocks', (HuiPreviewDoc d) => d.match.blocks = next),
       ),
-      HuiInlineIssues(_issuesFor('match.blocks')),
-      _PreviewNameChips(
+      _NameListField(
+        id: 'hui-preview-match-entities',
         label: huiText('Entities'),
         docKey: 'preview.match.entities',
         values: _doc.match.entities,
-        help: huiText('Same glob rule as blocks.'),
+        problems: _issuesFor('match.entities'),
         onChanged: (List<String> next) => _mutate(
           'match entities',
           (HuiPreviewDoc d) => d.match.entities = next,
         ),
       ),
-      HuiInlineIssues(_issuesFor('match.entities')),
-      _specialField(),
-      HuiField(
+      _specialField(
+        id: 'hui-preview-match-special',
+        value: _doc.match.special,
+        docKey: 'preview.match.special',
+        problems: _issuesFor('match.special'),
+        size: size,
+        onChanged: (String? value) =>
+            _mutate('match special', (HuiPreviewDoc d) => d.match.special = value),
+      ),
+      Field(
         label: huiText('Priority'),
-        trailing: const HuiFieldHelp('preview.match.priority'),
-        help: huiText(
-          'Highest priority wins. Shipped documents use 10, so a user '
-          'document at 20 overrides one.',
-        ),
+        forId: 'hui-preview-match-priority',
+        docKey: 'preview.match.priority',
         defaultValue: '0',
         onReset: (_doc.match.priority ?? 0) == 0
             ? null
@@ -227,7 +197,9 @@ class PreviewMatchEditor extends StatelessWidget {
                 'match priority',
                 (HuiPreviewDoc d) => d.match.priority = 0,
               ),
-        control: HuiNumberField(
+        problems: _issuesFor('match.priority'),
+        child: NumberField(
+          id: 'hui-preview-match-priority',
           value: (_doc.match.priority ?? 0).toDouble(),
           integer: true,
           min: -1000000,
@@ -238,227 +210,256 @@ class PreviewMatchEditor extends StatelessWidget {
           ),
         ),
       ),
-      const HuiDivider(),
+      AdvancedOnly(
+        child: PreviewExprField(
+          label: huiText('Visibility expression'),
+          raw: _doc.show,
+          showCondition: true,
+          kind: PreviewExprKind.boolean,
+          placeholder: huiText('true'),
+          docKey: 'preview.show',
+          issues: _issuesFor('show'),
+          onChanged: (Object? value) =>
+              _mutate('show', (HuiPreviewDoc doc) => doc.show = value),
+        ),
+      ),
+      AdvancedOnly(
+        child: ExtrasEditor(
+          title: huiText('Match'),
+          extras: _doc.match.extras,
+          onChanged: (String label, Map<String, dynamic> next) =>
+              _mutate(label, (HuiPreviewDoc d) => d.match.extras = next),
+        ),
+      ),
+    ],
+  );
+
+  Widget _specialField({
+    required String id,
+    required String? value,
+    required List<HuiIssue> problems,
+    required ComponentSize size,
+    required void Function(String? value) onChanged,
+    String? docKey,
+    String? tip,
+  }) => Field(
+    label: huiText('Special'),
+    forId: id,
+    docKey: docKey,
+    tip: tip,
+    problems: problems,
+    child: ArcaneSelect(
+      id: id,
+      value: value ?? 'none',
+      size: size,
+      fullWidth: true,
+      options: <ArcaneSelectOption>[
+        ArcaneSelectOption(label: huiText('None'), value: 'none'),
+        for (final String special in _specialValues)
+          ArcaneSelectOption(
+            label: _specialValueLabel(special),
+            value: special,
+          ),
+      ],
+      onChanged: (String picked) => onChanged(picked == 'none' ? null : picked),
+    ),
+  );
+
+  // --- vars -----------------------------------------------------------------
+
+  Widget _varsSection() => AppSection(
+    title: huiText('Variables'),
+    memoryKey: 'preview.vars',
+    docKey: 'preview.vars',
+    count: _doc.match.vars.length,
+    children: <Widget>[
       _PreviewVarsRows(
-        title: huiText('vars'),
-        docKey: 'preview.vars',
+        idPrefix: 'hui-preview-var',
+        pathPrefix: 'match.vars',
         vars: _doc.match.vars,
+        issues: _issuesFor('match.vars'),
         onChanged: (Map<String, dynamic> next) =>
             _mutate('match vars', (HuiPreviewDoc d) => d.match.vars = next),
       ),
-      HuiInlineIssues(_issuesFor('match.vars')),
-      ExtrasEditor(
-        title: huiText('Match'),
-        extras: _doc.match.extras,
-        onChanged: (String label, Map<String, dynamic> next) =>
-            _mutate(label, (HuiPreviewDoc d) => d.match.extras = next),
-      ),
-      HuiInlineIssues(_issuesFor('match')),
     ],
   );
 
-  Widget _specialField() {
-    final String? special = _doc.match.special;
-    return HuiField(
-      label: huiText('Special'),
-      trailing: const HuiFieldHelp('preview.match.special'),
-      help: huiText(
-        'enderChest draws from the viewer\'s own ender chest, locked is '
-        'the access-denied card, anyInventoryHolder is the entity fallback.',
-      ),
-      control: dom.div(<Widget>[
-        HuiSegmented(
-          value: special ?? 'none',
-          segments: <HuiSegment>[
-            HuiSegment(value: 'none', label: huiText('None')),
-            for (final String value in _specialValues)
-              HuiSegment(value: value, label: _specialValueLabel(value)),
-          ],
-          onChanged: (String value) => _mutate(
-            'match special',
-            (HuiPreviewDoc d) =>
-                d.match.special = value == 'none' ? null : value,
+  // --- variants -------------------------------------------------------------
+
+  Widget _variantsSection(ComponentSize size) {
+    final int count = _doc.variants.length;
+    return AppSection(
+      title: huiText('Variants'),
+      memoryKey: 'preview.variants',
+      docKey: 'preview.variants',
+      count: count,
+      description: count == 0
+          ? huiText("No variants. Every target uses the document's own vars.")
+          : null,
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.plus(),
+          label: huiText('Add variant'),
+          tipAtEnd: true,
+          onPressed: () => _mutate(
+            'add variant',
+            (HuiPreviewDoc d) => d.variants.add(HuiPreviewVariant()),
           ),
         ),
-        HuiInlineIssues(_issuesFor('match.special')),
-      ]),
+      ],
+      children: <Widget>[
+        for (int index = 0; index < count; index++) _variant(index, size),
+      ],
     );
   }
 
-  Widget _variantsSection() => InspectorSection(
-    title: huiText('Variants'),
-    sectionKey: 'preview.variants',
-    description: huiText(
-      'Extra vars (and optionally extra blocks/entities) for a '
-      'subset of targets, tried in order — the first one whose blocks '
-      'or entities match wins.',
-    ),
-    trailing: Button(
-      variant: ButtonVariant.outline,
-      size: ButtonSize.sm,
-      icon: ArcaneIcon.plus(size: IconSize.sm),
-      onPressed: () => _mutate(
-        'add variant',
-        (HuiPreviewDoc d) => d.variants.add(HuiPreviewVariant()),
-      ),
-      label: huiText('Add'),
-    ),
-    children: <Widget>[
-      if (_doc.variants.isEmpty)
-        HuiNote(
-          huiText('No variants. Every target uses the document\'s own vars.'),
-        )
-      else
-        for (int i = 0; i < _doc.variants.length; i++) _variantCard(i),
-    ],
-  );
+  void _moveVariant(int from, int to) =>
+      _mutate('move variant', (HuiPreviewDoc d) {
+        final HuiPreviewVariant moved = d.variants.removeAt(from);
+        d.variants.insert(to, moved);
+      });
 
-  Widget _variantCard(int index) {
+  /// One variant under its own heading. Only the last one starts open, so a
+  /// new variant opens and the one before it closes.
+  Widget _variant(int index, ComponentSize size) {
     final HuiPreviewVariant variant = _doc.variants[index];
     final String path = 'variants[$index]';
-    return dom.div(
-      classes: 'hui-inspector-section',
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'border': '1px solid var(--hui-border-soft)',
-          'border-radius': 'var(--hui-radius)',
-          'padding': '10px',
-        },
-      ),
-      <Widget>[
-        dom.div(
-          styles: const dom.Styles(
-            raw: <String, String>{
-              'display': 'flex',
-              'align-items': 'center',
-              'justify-content': 'space-between',
-              'margin-bottom': '8px',
-            },
-          ),
-          <Widget>[
-            HuiEyebrow(
-              huiText("Variant {value}", <String, Object?>{'value': index + 1}),
+    final String name = huiText('Variant {value}', <String, Object?>{
+      'value': index + 1,
+    });
+    final int count = _doc.variants.length;
+    return AppSection(
+      title: name,
+      open: index == count - 1,
+      actions: <Widget>[
+        AppMenu(
+          icon: ArcaneIcon.ellipsis(),
+          iconLabel: huiText('Actions for {label}', <String, Object?>{
+            'label': name,
+          }),
+          alignEnd: true,
+          entries: <AppMenuEntry>[
+            AppMenuEntry(
+              huiText('Move up'),
+              index == 0 ? null : () => _moveVariant(index, index - 1),
+              icon: ArcaneIcon.arrowUp(),
             ),
-            HuiRowTools(
-              onMoveUp: index == 0
-                  ? null
-                  : () => _mutate('move variant', (HuiPreviewDoc d) {
-                      final HuiPreviewVariant v = d.variants.removeAt(index);
-                      d.variants.insert(index - 1, v);
-                    }),
-              onMoveDown: index >= _doc.variants.length - 1
-                  ? null
-                  : () => _mutate('move variant', (HuiPreviewDoc d) {
-                      final HuiPreviewVariant v = d.variants.removeAt(index);
-                      d.variants.insert(index + 1, v);
-                    }),
-              onRemove: () => _mutate(
-                'remove variant',
-                (HuiPreviewDoc d) => d.variants.removeAt(index),
-              ),
-              removeLabel: huiText('Delete variant {number}', <String, Object?>{
+            AppMenuEntry(
+              huiText('Move down'),
+              index >= count - 1 ? null : () => _moveVariant(index, index + 1),
+              icon: ArcaneIcon.arrowDown(),
+            ),
+            const AppMenuEntry.separator(),
+            AppMenuEntry(
+              huiText('Delete variant {number}', <String, Object?>{
                 'number': index + 1,
               }),
+              () {
+                _mutate(
+                  'remove variant',
+                  (HuiPreviewDoc d) => d.variants.removeAt(index),
+                );
+                _undoToast(name);
+              },
+              icon: ArcaneIcon.trash2(),
+              destructive: true,
             ),
           ],
         ),
-        _PreviewNameChips(
+      ],
+      children: <Widget>[
+        _NameListField(
+          id: 'hui-preview-$path-blocks',
           label: huiText('Blocks'),
           docKey: 'preview.variant.blocks',
           values: variant.blocks,
+          problems: _issuesFor('$path.blocks'),
           onChanged: (List<String> next) => _mutate(
             'variant blocks',
             (HuiPreviewDoc d) => d.variants[index].blocks = next,
           ),
         ),
-        HuiInlineIssues(_issuesFor('$path.blocks')),
-        _PreviewNameChips(
+        _NameListField(
+          id: 'hui-preview-$path-entities',
           label: huiText('Entities'),
           docKey: 'preview.variant.entities',
           values: variant.entities,
+          problems: _issuesFor('$path.entities'),
           onChanged: (List<String> next) => _mutate(
             'variant entities',
             (HuiPreviewDoc d) => d.variants[index].entities = next,
           ),
         ),
-        HuiInlineIssues(_issuesFor('$path.entities')),
-        _variantSpecialField(index, variant, path),
-        HuiField(
-          label: huiText('Priority'),
-          help: huiText(
-            'Overrides the document priority when this variant matches.',
+        _specialField(
+          id: 'hui-preview-$path-special',
+          value: variant.special,
+          tip: huiText(
+            'Optionally limits this variant to an ender chest, locked target or '
+            'inventory-holder fallback.',
           ),
-          control: HuiNumberField(
-            value: (variant.priority ?? 0).toDouble(),
-            integer: true,
-            min: -1000000,
-            max: 1000000,
-            onChanged: (double value) => _mutate(
-              'variant priority',
-              (HuiPreviewDoc d) => d.variants[index].priority = value.round(),
+          problems: _issuesFor('$path.special'),
+          size: size,
+          onChanged: (String? value) => _mutate(
+            'variant special',
+            (HuiPreviewDoc d) => d.variants[index].special = value,
+          ),
+        ),
+        AdvancedOnly(
+          child: Field(
+            label: huiText('Priority'),
+            forId: 'hui-preview-$path-priority',
+            tip: huiText(
+              'Overrides the document priority when this variant matches.',
+            ),
+            problems: _issuesFor('$path.priority'),
+            child: NumberField(
+              id: 'hui-preview-$path-priority',
+              value: (variant.priority ?? 0).toDouble(),
+              integer: true,
+              min: -1000000,
+              max: 1000000,
+              onChanged: (double value) => _mutate(
+                'variant priority',
+                (HuiPreviewDoc d) => d.variants[index].priority = value.round(),
+              ),
             ),
           ),
         ),
         _PreviewVarsRows(
-          title: huiText('vars'),
+          idPrefix: 'hui-preview-$path-var',
+          pathPrefix: '$path.vars',
           docKey: 'preview.variant.vars',
           vars: variant.vars,
+          issues: _issuesFor('$path.vars'),
           onChanged: (Map<String, dynamic> next) => _mutate(
             'variant vars',
             (HuiPreviewDoc d) => d.variants[index].vars = next,
           ),
         ),
-        HuiInlineIssues(_issuesFor('$path.vars')),
-        ExtrasEditor(
-          title: huiText('Variant'),
-          extras: variant.extras,
-          onChanged: (String label, Map<String, dynamic> next) => _mutate(
-            label,
-            (HuiPreviewDoc d) => d.variants[index].extras = next,
+        AdvancedOnly(
+          child: ExtrasEditor(
+            title: huiText('Variant'),
+            extras: variant.extras,
+            onChanged: (String label, Map<String, dynamic> next) => _mutate(
+              label,
+              (HuiPreviewDoc d) => d.variants[index].extras = next,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _variantSpecialField(
-    int index,
-    HuiPreviewVariant variant,
-    String path,
-  ) => HuiField(
-    label: huiText('Special'),
-    help: huiText(
-      'Optionally limits this variant to an ender chest, locked target or '
-      'inventory-holder fallback.',
-    ),
-    control: HuiSegmented(
-      value: variant.special ?? 'none',
-      segments: <HuiSegment>[
-        HuiSegment(value: 'none', label: huiText('None')),
-        for (final String value in _specialValues)
-          HuiSegment(value: value, label: _specialValueLabel(value)),
-      ],
-      onChanged: (String value) => _mutate(
-        'variant special',
-        (HuiPreviewDoc d) =>
-            d.variants[index].special = value == 'none' ? null : value,
-      ),
-    ),
-    trailing: HuiInlineIssues(_issuesFor('$path.special')),
-  );
+  // --- card -----------------------------------------------------------------
 
   Widget _cardSection() {
     final HuiPreviewCard? card = _doc.card;
-    return InspectorSection(
+    return AppSection(
       title: huiText('Card'),
-      sectionKey: 'preview.card',
-      trailing: const HuiFieldHelp('preview.card'),
-      description: huiText(
-        'The chrome drawn around the elements. Omit it entirely '
-        'for bare content with no frame.',
-      ),
+      memoryKey: 'preview.card',
+      docKey: 'preview.card',
       children: <Widget>[
-        HuiSwitchRow(
+        SwitchField(
           label: huiText('Draw card chrome'),
           value: card != null,
           onChanged: (bool value) => _mutate(
@@ -473,23 +474,25 @@ class PreviewMatchEditor extends StatelessWidget {
   }
 
   List<Widget> _cardFields(HuiPreviewCard card) => <Widget>[
-    PreviewExprField(
-      label: huiText('Visibility expression'),
-      raw: card.show,
-      showCondition: true,
-      kind: PreviewExprKind.boolean,
-      placeholder: huiText('true'),
-      trailing: const HuiFieldHelp('preview.card.show'),
-      issues: _issuesFor('card.show'),
-      onChanged: (Object? value) =>
-          _mutate('card show', (HuiPreviewDoc doc) => doc.card?.show = value),
+    AdvancedOnly(
+      child: PreviewExprField(
+        label: huiText('Visibility expression'),
+        raw: card.show,
+        showCondition: true,
+        kind: PreviewExprKind.boolean,
+        placeholder: huiText('true'),
+        docKey: 'preview.card.show',
+        issues: _issuesFor('card.show'),
+        onChanged: (Object? value) =>
+            _mutate('card show', (HuiPreviewDoc doc) => doc.card?.show = value),
+      ),
     ),
     PreviewExprField(
       label: huiText('Framed'),
       raw: card.framed,
       kind: PreviewExprKind.boolean,
       placeholder: huiText('true'),
-      trailing: const HuiFieldHelp('preview.card.framed'),
+      docKey: 'preview.card.framed',
       issues: _issuesFor('card.framed'),
       onChanged: (Object? v) =>
           _mutate('card framed', (HuiPreviewDoc d) => d.card?.framed = v),
@@ -499,7 +502,7 @@ class PreviewMatchEditor extends StatelessWidget {
       raw: card.title,
       kind: PreviewExprKind.string,
       placeholder: huiText("'Furnace'"),
-      trailing: const HuiFieldHelp('preview.card.title'),
+      docKey: 'preview.card.title',
       issues: _issuesFor('card.title'),
       onChanged: (Object? v) => _mutate(
         'card title',
@@ -511,224 +514,291 @@ class PreviewMatchEditor extends StatelessWidget {
       raw: card.accent,
       kind: PreviewExprKind.string,
       placeholder: huiText('#FF808080'),
-      trailing: dom.div(classes: 'hui-field-tools', <Widget>[
-        ?previewColorPicker(
-          card.accent,
-          label: huiText('card accent'),
-          onPicked: (String hex) =>
-              _mutate('card accent', (HuiPreviewDoc d) => d.card?.accent = hex),
-        ),
-        const HuiFieldHelp('preview.card.accent'),
-      ]),
+      docKey: 'preview.card.accent',
+      trailing: previewColorPicker(
+        card.accent,
+        label: huiText('card accent'),
+        onPicked: (String hex) =>
+            _mutate('card accent', (HuiPreviewDoc d) => d.card?.accent = hex),
+      ),
       issues: _issuesFor('card.accent'),
       onChanged: (Object? v) => _mutate(
         'card accent',
         (HuiPreviewDoc d) => d.card?.accent = v as String?,
       ),
     ),
-    HuiField(
-      label: huiText('Min half width'),
-      trailing: const HuiFieldHelp('preview.card.minHalfWidth'),
-      help: huiText(
-        'Minimum panel half-width in pixels, so a narrow card does not '
-        'collapse around a short title.',
-      ),
-      defaultValue: '82',
-      onReset: (card.minHalfWidth ?? 82) == 82
-          ? null
-          : () => _mutate(
-              'card minHalfWidth',
-              (HuiPreviewDoc d) => d.card?.minHalfWidth = 82,
-            ),
-      control: HuiNumberField(
-        value: (card.minHalfWidth ?? 82).toDouble(),
-        integer: true,
-        min: 0,
-        max: 2000,
-        onChanged: (double value) => _mutate(
-          'card minHalfWidth',
-          (HuiPreviewDoc d) => d.card?.minHalfWidth = value.round(),
-        ),
-      ),
-    ),
-    HuiField(
-      label: huiText('Padding'),
-      help: huiText('Font pixels. 0..256.'),
-      defaultValue: '7',
-      onReset: () => _mutate(
-        'card padding',
-        (HuiPreviewDoc doc) => doc.card?.padding = null,
-      ),
-      control: HuiNumberField(
-        value: (card.padding ?? 7).toDouble(),
-        min: 0,
-        max: 256,
-        integer: true,
-        onChanged: (double value) => _mutate(
-          'card padding',
-          (HuiPreviewDoc doc) => doc.card?.padding = value.round(),
-        ),
-      ),
-    ),
-    HuiField(
-      label: huiText('Border width'),
-      help: huiText('Font pixels. 0..256.'),
-      defaultValue: '3',
-      onReset: () => _mutate(
-        'card borderWidth',
-        (HuiPreviewDoc doc) => doc.card?.borderWidth = null,
-      ),
-      control: HuiNumberField(
-        value: (card.borderWidth ?? 3).toDouble(),
-        min: 0,
-        max: 256,
-        integer: true,
-        onChanged: (double value) => _mutate(
-          'card borderWidth',
-          (HuiPreviewDoc doc) => doc.card?.borderWidth = value.round(),
-        ),
-      ),
-    ),
-    HuiField(
-      label: huiText('Tray padding'),
-      help: huiText('Font pixels. 0..256.'),
-      defaultValue: '4',
-      onReset: () => _mutate(
-        'card trayPadding',
-        (HuiPreviewDoc doc) => doc.card?.trayPadding = null,
-      ),
-      control: HuiNumberField(
-        value: (card.trayPadding ?? 4).toDouble(),
-        min: 0,
-        max: 256,
-        integer: true,
-        onChanged: (double value) => _mutate(
-          'card trayPadding',
-          (HuiPreviewDoc doc) => doc.card?.trayPadding = value.round(),
-        ),
-      ),
-    ),
-    HuiField(
-      label: huiText('Title height'),
-      help: huiText('Font pixels. 0..256.'),
-      defaultValue: '17',
-      onReset: () => _mutate(
-        'card titleHeight',
-        (HuiPreviewDoc doc) => doc.card?.titleHeight = null,
-      ),
-      control: HuiNumberField(
-        value: (card.titleHeight ?? 17).toDouble(),
-        min: 0,
-        max: 256,
-        integer: true,
-        onChanged: (double value) => _mutate(
-          'card titleHeight',
-          (HuiPreviewDoc doc) => doc.card?.titleHeight = value.round(),
-        ),
-      ),
-    ),
-    HuiField(
-      label: huiText('Title gap'),
-      help: huiText('Font pixels. 0..256.'),
-      defaultValue: '6',
-      onReset: () => _mutate(
-        'card titleGap',
-        (HuiPreviewDoc doc) => doc.card?.titleGap = null,
-      ),
-      control: HuiNumberField(
-        value: (card.titleGap ?? 6).toDouble(),
-        min: 0,
-        max: 256,
-        integer: true,
-        onChanged: (double value) => _mutate(
-          'card titleGap',
-          (HuiPreviewDoc doc) => doc.card?.titleGap = value.round(),
-        ),
-      ),
-    ),
-    HuiField(
+    _cardColor(
+      key: 'backgroundArgb',
       label: huiText('Background'),
-      onReset: () => _mutate(
-        'card backgroundArgb',
-        (HuiPreviewDoc doc) => doc.card?.backgroundArgb = null,
-      ),
-      control: HuiColorField(
-        value: card.backgroundArgb ?? '#F21B1B22',
-        label: huiText('Background'),
-        onChanged: (String value) => _mutate(
-          'card backgroundArgb',
-          (HuiPreviewDoc doc) => doc.card?.backgroundArgb = value,
-        ),
-      ),
+      value: card.backgroundArgb,
+      fallback: '#F21B1B22',
+      hasDefault: true,
+      write: (HuiPreviewCard c, String? v) => c.backgroundArgb = v,
     ),
-    HuiField(
+    _cardColor(
+      key: 'trayArgb',
       label: huiText('Tray color'),
-      onReset: () => _mutate(
-        'card trayArgb',
-        (HuiPreviewDoc doc) => doc.card?.trayArgb = null,
-      ),
-      control: HuiColorField(
-        value: card.trayArgb ?? '#FF33333E',
-        label: huiText('Tray color'),
-        onChanged: (String value) => _mutate(
-          'card trayArgb',
-          (HuiPreviewDoc doc) => doc.card?.trayArgb = value,
-        ),
-      ),
+      value: card.trayArgb,
+      fallback: '#FF33333E',
+      hasDefault: true,
+      write: (HuiPreviewCard c, String? v) => c.trayArgb = v,
     ),
-    HuiField(
+    // Null border and title colours follow the accent, so there is no one
+    // default value to show or reset to.
+    _cardColor(
+      key: 'borderArgb',
       label: huiText('Border color'),
-      onReset: () => _mutate(
-        'card borderArgb',
-        (HuiPreviewDoc doc) => doc.card?.borderArgb = null,
-      ),
-      control: HuiColorField(
-        value: card.borderArgb ?? '#CCCBD0D9',
-        label: huiText('Border color'),
-        onChanged: (String value) => _mutate(
-          'card borderArgb',
-          (HuiPreviewDoc doc) => doc.card?.borderArgb = value,
-        ),
-      ),
+      value: card.borderArgb,
+      fallback: '#CCCBD0D9',
+      write: (HuiPreviewCard c, String? v) => c.borderArgb = v,
     ),
-    HuiField(
+    _cardColor(
+      key: 'titleArgb',
       label: huiText('Title background'),
-      onReset: () => _mutate(
-        'card titleArgb',
-        (HuiPreviewDoc doc) => doc.card?.titleArgb = null,
-      ),
-      control: HuiColorField(
-        value: card.titleArgb ?? '#E6CBD0D9',
-        label: huiText('Title background'),
-        onChanged: (String value) => _mutate(
-          'card titleArgb',
-          (HuiPreviewDoc doc) => doc.card?.titleArgb = value,
-        ),
-      ),
+      value: card.titleArgb,
+      fallback: '#E6CBD0D9',
+      write: (HuiPreviewCard c, String? v) => c.titleArgb = v,
     ),
-    ExtrasEditor(
-      title: huiText('Card'),
-      extras: card.extras,
-      onChanged: (String label, Map<String, dynamic> next) =>
-          _mutate(label, (HuiPreviewDoc d) => d.card?.extras = next),
+    MoreFields(
+      memoryKey: 'preview.card.more',
+      children: <Widget>[
+        _cardPixels(
+          key: 'minHalfWidth',
+          label: huiText('Min half width'),
+          value: card.minHalfWidth,
+          fallback: 82,
+          max: 2000,
+          write: (HuiPreviewCard c, int? v) => c.minHalfWidth = v,
+        ),
+        _cardPixels(
+          key: 'padding',
+          label: huiText('Padding'),
+          value: card.padding,
+          fallback: 7,
+          write: (HuiPreviewCard c, int? v) => c.padding = v,
+        ),
+        _cardPixels(
+          key: 'borderWidth',
+          label: huiText('Border width'),
+          value: card.borderWidth,
+          fallback: 3,
+          write: (HuiPreviewCard c, int? v) => c.borderWidth = v,
+        ),
+        _cardPixels(
+          key: 'trayPadding',
+          label: huiText('Tray padding'),
+          value: card.trayPadding,
+          fallback: 4,
+          write: (HuiPreviewCard c, int? v) => c.trayPadding = v,
+        ),
+        _cardPixels(
+          key: 'titleHeight',
+          label: huiText('Title height'),
+          value: card.titleHeight,
+          fallback: 17,
+          write: (HuiPreviewCard c, int? v) => c.titleHeight = v,
+        ),
+        _cardPixels(
+          key: 'titleGap',
+          label: huiText('Title gap'),
+          value: card.titleGap,
+          fallback: 6,
+          write: (HuiPreviewCard c, int? v) => c.titleGap = v,
+        ),
+      ],
+    ),
+    AdvancedOnly(
+      child: ExtrasEditor(
+        title: huiText('Card'),
+        extras: card.extras,
+        onChanged: (String label, Map<String, dynamic> next) =>
+            _mutate(label, (HuiPreviewDoc d) => d.card?.extras = next),
+      ),
     ),
   ];
 
-  Widget _install() => InspectorSection(
-    title: huiText('Install on the server'),
-    children: <Widget>[
-      HuiDetailRow(
-        huiText('Preview file'),
-        '$huiPreviewFolder${store.menuId}.json',
+  /// A card length in font pixels; null keeps Gloss's own default.
+  Widget _cardPixels({
+    required String key,
+    required String label,
+    required int? value,
+    required int fallback,
+    required void Function(HuiPreviewCard card, int? value) write,
+    double max = 256,
+  }) {
+    final String id = 'hui-preview-card-$key';
+    void set(int? next) => _mutate('card $key', (HuiPreviewDoc d) {
+      final HuiPreviewCard? card = d.card;
+      if (card != null) write(card, next);
+    });
+    return Field(
+      label: label,
+      forId: id,
+      docKey: 'preview.card.$key',
+      defaultValue: '$fallback',
+      onReset: value == null ? null : () => set(null),
+      problems: _issuesFor('card.$key'),
+      child: NumberField(
+        id: id,
+        value: (value ?? fallback).toDouble(),
+        min: 0,
+        max: max,
+        integer: true,
+        onChanged: (double next) => set(next.round()),
       ),
-      HuiDetailRow(huiText('Permission'), 'gloss.preview'),
+    );
+  }
+
+  /// A full `#AARRGGBB` card colour. [hasDefault] shows [fallback] as the
+  /// value Gloss uses when the key is omitted.
+  Widget _cardColor({
+    required String key,
+    required String label,
+    required String? value,
+    required String fallback,
+    required void Function(HuiPreviewCard card, String? value) write,
+    bool hasDefault = false,
+  }) {
+    final String id = 'hui-preview-card-$key';
+    void set(String? next) => _mutate('card $key', (HuiPreviewDoc d) {
+      final HuiPreviewCard? card = d.card;
+      if (card != null) write(card, next);
+    });
+    return Field(
+      label: label,
+      forId: id,
+      docKey: 'preview.card.$key',
+      defaultValue: hasDefault ? fallback : null,
+      onReset: value == null ? null : () => set(null),
+      problems: _issuesFor('card.$key'),
+      child: ColorField(
+        id: id,
+        label: label,
+        value: value ?? fallback,
+        onChanged: set,
+      ),
+    );
+  }
+
+  // --- settings, install, extras -------------------------------------------
+
+  Widget _settingsSection() => AppSection(
+    title: huiText('Settings'),
+    memoryKey: 'preview.settings',
+    children: <Widget>[
+      Field(
+        label: huiText('Scale'),
+        forId: 'hui-preview-scale',
+        docKey: 'preview.scale',
+        defaultValue: '0.65',
+        onReset: _doc.scale == 0.65
+            ? null
+            : () => _mutate('scale', (HuiPreviewDoc d) => d.scale = 0.65),
+        problems: _issuesFor('scale'),
+        child: NumberField(
+          id: 'hui-preview-scale',
+          value: _doc.scale,
+          min: 0.25,
+          max: 4,
+          decimals: 2,
+          onChanged: (double value) =>
+              _mutate('scale', (HuiPreviewDoc d) => d.scale = value),
+        ),
+      ),
+      Field(
+        label: huiText('View distance'),
+        forId: 'hui-preview-view-distance',
+        docKey: 'preview.viewDistance',
+        defaultValue: '10',
+        onReset: _doc.viewDistance == 10
+            ? null
+            : () => _mutate(
+                'viewDistance',
+                (HuiPreviewDoc d) => d.viewDistance = 10,
+              ),
+        problems: _issuesFor('viewDistance'),
+        child: NumberField(
+          id: 'hui-preview-view-distance',
+          value: _doc.viewDistance,
+          min: 1,
+          max: 24,
+          step: 0.5,
+          decimals: 2,
+          onChanged: (double value) => _mutate(
+            'viewDistance',
+            (HuiPreviewDoc d) => d.viewDistance = value,
+          ),
+        ),
+      ),
+      _ticksField(
+        id: 'hui-preview-content-refresh',
+        label: huiText('Content refresh ticks'),
+        docKey: 'preview.contentRefreshTicks',
+        path: 'contentRefreshTicks',
+        value: _doc.contentRefreshTicks,
+        fallback: 4,
+        write: (HuiPreviewDoc d, int? value) => d.contentRefreshTicks = value,
+      ),
+      _ticksField(
+        id: 'hui-preview-access-check',
+        label: huiText('Access check ticks'),
+        docKey: 'preview.accessCheckTicks',
+        path: 'accessCheckTicks',
+        value: _doc.accessCheckTicks,
+        fallback: 10,
+        write: (HuiPreviewDoc d, int? value) => d.accessCheckTicks = value,
+      ),
     ],
   );
 
-  Widget _extras() => InspectorSection(
+  Widget _ticksField({
+    required String id,
+    required String label,
+    required String docKey,
+    required String path,
+    required int? value,
+    required int fallback,
+    required void Function(HuiPreviewDoc doc, int? value) write,
+  }) => Field(
+    label: label,
+    forId: id,
+    docKey: docKey,
+    defaultValue: '$fallback',
+    onReset: value == null
+        ? null
+        : () => _mutate(path, (HuiPreviewDoc d) => write(d, null)),
+    problems: _issuesFor(path),
+    child: NumberField(
+      id: id,
+      value: (value ?? fallback).toDouble(),
+      min: 1,
+      max: 1200,
+      integer: true,
+      onChanged: (double next) =>
+          _mutate(path, (HuiPreviewDoc d) => write(d, next.round())),
+    ),
+  );
+
+  Widget _install() => FieldGroup(
+    title: huiText('Install on the server'),
+    children: <Widget>[
+      Field(
+        label: huiText('Preview file'),
+        child: _code('$huiPreviewFolder${store.menuId}.json'),
+      ),
+      Field(label: huiText('Permission'), child: _code('gloss.preview')),
+    ],
+  );
+
+  static Widget _code(String text) => dom.code(
+    attributes: const <String, String>{'dir': 'ltr'},
+    <Widget>[Component.text(text)],
+  );
+
+  Widget _extras() => AppSection(
     title: huiText('Extra keys'),
-    sectionKey: 'previewDoc.extras',
-    initiallyOpen: false,
+    memoryKey: 'previewDoc.extras',
+    open: false,
     children: <Widget>[
       ExtrasEditor(
         title: huiText('Document'),
@@ -740,151 +810,102 @@ class PreviewMatchEditor extends StatelessWidget {
   );
 }
 
-/// Editable chip list for `match.blocks`/`match.entities` (and their variant
-/// equivalents): plain uppercase names, `*` is the only wildcard.
-class _PreviewNameChips extends StatefulWidget {
-  const _PreviewNameChips({
+/// `match.blocks`/`match.entities` (and their variant twins) as one comma
+/// list. What is being typed stays as typed; the committed list is the
+/// parsed, upper-cased names, and the text tidies to it on blur.
+class _NameListField extends StatefulWidget {
+  const _NameListField({
+    required this.id,
     required this.label,
     required this.values,
     required this.onChanged,
-    this.help,
     this.docKey,
+    this.placeholder,
+    this.problems = const <HuiIssue>[],
   });
 
+  final String id;
   final String label;
   final List<String> values;
   final void Function(List<String> next) onChanged;
-
-  /// Field-doc key mounted beside the label; null renders no help affordance.
   final String? docKey;
-  final String? help;
+  final String? placeholder;
+  final List<HuiIssue> problems;
 
   @override
-  State<_PreviewNameChips> createState() => _PreviewNameChipsState();
+  State<_NameListField> createState() => _NameListFieldState();
 }
 
-class _PreviewNameChipsState extends State<_PreviewNameChips> {
-  String _draft = '';
+class _NameListFieldState extends State<_NameListField> {
+  /// The text being typed; null shows the committed names.
+  String? _draft;
 
-  void _add() {
-    final String value = _draft.trim().toUpperCase();
-    if (value.isEmpty) return;
-    setState(() => _draft = '');
-    if (component.values.contains(value)) return;
-    component.onChanged(<String>[...component.values, value]);
+  @override
+  void didUpdateWidget(_NameListField oldComponent) {
+    super.didUpdateWidget(oldComponent);
+    // Undo, redo and a code-view commit rewrite the list behind the field.
+    final String? draft = _draft;
+    if (draft != null &&
+        !_sameNames(parsePreviewNameList(draft), component.values)) {
+      _draft = null;
+    }
   }
 
-  void _remove(String value) => component.onChanged(
-    component.values.where((String v) => v != value).toList(),
-  );
+  void _input(String text) {
+    setState(() => _draft = text);
+    final List<String> next = parsePreviewNameList(text);
+    if (!_sameNames(next, component.values)) component.onChanged(next);
+  }
 
   @override
-  Widget build(BuildContext context) => HuiField(
+  Widget build(BuildContext context) => Field(
     label: component.label,
-    help: component.help,
-    trailing: component.docKey == null ? null : HuiFieldHelp(component.docKey!),
-    control: dom.div(
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'flex',
-          'flex-direction': 'column',
-          'gap': '6px',
-          'min-width': '0',
-        },
-      ),
-      <Widget>[
-        if (component.values.isNotEmpty)
-          dom.div(classes: 'hui-chips', <Widget>[
-            for (final String value in component.values) _chip(value),
-          ]),
-        dom.div(
-          styles: const dom.Styles(
-            raw: <String, String>{
-              'display': 'grid',
-              'grid-template-columns': 'minmax(0, 1fr) auto',
-              'gap': '8px',
-              'min-width': '0',
-            },
-          ),
-          <Widget>[
-            TextInput(
-              value: _draft,
-              size: ComponentSize.sm,
-              fullWidth: true,
-              placeholder: huiText('CHEST or OAK_*'),
-              onChanged: (String value) => setState(() => _draft = value),
-              styles: huiTechnicalInputStyles,
-              attributes: huiTechnicalInputAttributes,
-            ),
-            Button(
-              variant: ButtonVariant.outline,
-              size: ButtonSize.sm,
-              icon: ArcaneIcon.plus(size: IconSize.sm),
-              onPressed: _add,
-              label: huiText('Add'),
-            ),
-          ],
-        ),
-      ],
+    forId: component.id,
+    tip: tipWithDoc(
+      huiText('Separate names with commas; "*" is the only wildcard.'),
+      component.docKey,
     ),
-  );
-
-  Widget _chip(String value) => dom.span(
-    classes: 'hui-chip',
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'display': 'inline-flex',
-        'align-items': 'center',
-        'gap': '4px',
+    problems: component.problems,
+    child: TextInput(
+      id: component.id,
+      value: _draft ?? formatPreviewNameList(component.values),
+      size: controlSize(DensityScope.of(context)),
+      fullWidth: true,
+      placeholder: component.placeholder,
+      onChanged: _input,
+      onBlur: () {
+        if (_draft != null) setState(() => _draft = null);
       },
+      styles: technicalInputStyles,
+      attributes: technicalInputAttributes,
     ),
-    <Widget>[
-      Text(value),
-      dom.button(
-        styles: const dom.Styles(
-          raw: <String, String>{
-            'display': 'inline-flex',
-            'border': '0',
-            'padding': '0',
-            'background': 'transparent',
-            'color': 'inherit',
-            'cursor': 'pointer',
-            'opacity': '0.7',
-          },
-        ),
-        attributes: <String, String>{
-          'type': 'button',
-          'aria-label': huiText("Remove {value}", <String, Object?>{
-            'value': value,
-          }),
-        },
-        events: <String, void Function(Object)>{
-          'click': (Object _) => _remove(value),
-        },
-        <Widget>[ArcaneIcon.x(size: IconSize.sm)],
-      ),
-    ],
   );
 }
 
-/// Key/value rows for `vars`: value text with a colour swatch affordance for
-/// anything starting with `#`. A value commits as `true`/`false`/a number
-/// when the text is exactly that; anything else (including a `#RRGGBB`
-/// literal, left exactly as typed) is a plain string, matching
+/// Key/value rows for `vars`: value text with a colour swatch for anything
+/// starting with `#`. A value commits as `true`/`false`/a number when the
+/// text is exactly that; anything else (including a `#RRGGBB` literal, left
+/// exactly as typed) is a plain string, matching
 /// `PreviewDocumentParser.compileVars`.
 class _PreviewVarsRows extends StatefulWidget {
   const _PreviewVarsRows({
-    required this.title,
+    required this.idPrefix,
+    required this.pathPrefix,
     required this.vars,
     required this.onChanged,
+    this.issues = const <HuiIssue>[],
     this.docKey,
   });
 
-  final String title;
+  final String idPrefix;
+
+  /// The issue path of the map (`match.vars`, `variants[0].vars`).
+  final String pathPrefix;
   final Map<String, dynamic> vars;
   final void Function(Map<String, dynamic> next) onChanged;
+  final List<HuiIssue> issues;
 
-  /// Field-doc key mounted beside the group's eyebrow.
+  /// Field-doc key on the add row.
   final String? docKey;
 
   @override
@@ -899,11 +920,9 @@ class _PreviewVarsRowsState extends State<_PreviewVarsRows> {
   @override
   void didUpdateWidget(_PreviewVarsRows oldComponent) {
     super.didUpdateWidget(oldComponent);
-    // Undo, redo and a code-view commit all rewrite `vars` behind this
-    // widget's back (mirrors `ExtrasEditor`'s own resync). Without this, a
-    // key whose committed value moved kept showing its stale draft, and the
-    // next keystroke on that row committed starting from that stale text -
-    // silently re-reverting whatever the user just undid.
+    // Undo, redo and a code-view commit rewrite `vars` behind this widget.
+    // A key whose committed value moved drops its stale draft, so the next
+    // keystroke does not re-revert what was just undone.
     final Map<String, dynamic> next = component.vars;
     _drafts.removeWhere((String key, String draft) {
       if (!next.containsKey(key)) return true;
@@ -983,36 +1002,18 @@ class _PreviewVarsRowsState extends State<_PreviewVarsRows> {
   }
 
   @override
-  Widget build(BuildContext context) => dom.div(
-    styles: const dom.Styles(
-      raw: <String, String>{
-        'display': 'flex',
-        'flex-direction': 'column',
-        'gap': '8px',
-        'min-width': '0',
-      },
-    ),
-    <Widget>[
-      dom.div(
-        styles: const dom.Styles(
-          raw: <String, String>{
-            'display': 'flex',
-            'align-items': 'center',
-            'gap': '2px',
-          },
-        ),
-        <Widget>[
-          HuiEyebrow(component.title),
-          if (component.docKey != null) HuiFieldHelp(component.docKey!),
-        ],
-      ),
-      for (final String key in component.vars.keys.toList()) _row(key),
-      _addRow(),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final ComponentSize size = controlSize(DensityScope.of(context));
+    return Component.fragment(<Widget>[
+      for (final String key in component.vars.keys.toList()) _row(key, size),
+      _addRow(size),
+    ]);
+  }
 
-  Widget _row(String key) {
+  Widget _row(String key, ComponentSize size) {
     final Object? value = component.vars[key];
+    final String id = '${component.idPrefix}-$key';
+    final String path = '${component.pathPrefix}.$key';
     final Widget? swatch = value is String && value.startsWith('#')
         ? previewColorPicker(
             value,
@@ -1020,90 +1021,63 @@ class _PreviewVarsRowsState extends State<_PreviewVarsRows> {
             onPicked: (String hex) => _editValue(key, hex),
           )
         : null;
-    return HuiField(
+    return Field(
       label: key,
-      trailing: Button(
-        variant: ButtonVariant.ghost,
-        size: ButtonSize.iconSm,
-        onPressed: () => _remove(key),
-        attributes: <String, String>{
-          'aria-label': huiText("Remove {key}", <String, Object?>{'key': key}),
-        },
-        icon: ArcaneIcon.trash2(size: IconSize.sm),
-      ),
-      help: huiText(
-        'A leading "#" is read as a colour literal (#RGB, #RRGGBB or '
-        '#AARRGGBB); anything else is a plain string, never parsed as an '
-        'expression.',
-      ),
-      control: dom.div(
-        styles: const dom.Styles(
-          raw: <String, String>{
-            'display': 'flex',
-            'align-items': 'center',
-            'gap': '8px',
-            'min-width': '0',
-          },
+      forId: id,
+      problems: component.issues
+          .where((HuiIssue issue) => issue.path == path)
+          .toList(),
+      trailing: Component.fragment(<Widget>[
+        ?swatch,
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
+          label: huiText("Remove {key}", <String, Object?>{'key': key}),
+          tipAtEnd: true,
+          onPressed: () => _remove(key),
         ),
-        <Widget>[
-          ?swatch,
-          dom.div(
-            styles: const dom.Styles(
-              raw: <String, String>{'flex': '1 1 auto', 'min-width': '0'},
-            ),
-            <Widget>[
-              TextInput(
-                value: _valueText(key),
-                size: ComponentSize.sm,
-                fullWidth: true,
-                placeholder: huiText('value or #RRGGBB'),
-                onChanged: (String value) => _editValue(key, value),
-                attributes: const <String, String>{
-                  'autocomplete': 'off',
-                  'spellcheck': 'false',
-                },
-              ),
-            ],
-          ),
-        ],
+      ]),
+      child: TextInput(
+        id: id,
+        value: _valueText(key),
+        size: size,
+        fullWidth: true,
+        placeholder: huiText('value or #RRGGBB'),
+        onChanged: (String text) => _editValue(key, text),
+        attributes: const <String, String>{
+          'autocomplete': 'off',
+          'spellcheck': 'false',
+        },
       ),
     );
   }
 
-  Widget _addRow() => HuiField(
-    label: huiText('Add a var'),
-    error: _newKeyError?.call(),
-    control: dom.div(
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'grid',
-          'grid-template-columns': 'minmax(0, 1fr) auto',
-          'align-items': 'center',
-          'gap': '8px',
-          'min-width': '0',
-        },
+  Widget _addRow(ComponentSize size) {
+    final String id = '${component.idPrefix}-new';
+    return Field(
+      label: huiText('Add a var'),
+      forId: id,
+      docKey: component.docKey,
+      error: _newKeyError?.call(),
+      trailing: AppIconButton(
+        icon: ArcaneIcon.plus(),
+        label: huiText('Add'),
+        tipAtEnd: true,
+        onPressed: _add,
       ),
-      <Widget>[
-        TextInput(
-          value: _newKey,
-          size: ComponentSize.sm,
-          fullWidth: true,
-          placeholder: huiText('accent'),
-          onChanged: (String value) {
-            _newKey = value;
-            if (_newKeyError != null) setState(() => _newKeyError = null);
-          },
-          styles: huiTechnicalInputStyles,
-          attributes: huiTechnicalInputAttributes,
-        ),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          icon: ArcaneIcon.plus(size: IconSize.sm),
-          onPressed: _add,
-          label: huiText('Add'),
-        ),
-      ],
-    ),
-  );
+      child: TextInput(
+        id: id,
+        value: _newKey,
+        size: size,
+        fullWidth: true,
+        placeholder: huiText('accent'),
+        onChanged: (String text) => setState(() {
+          _newKey = text;
+          _newKeyError = null;
+        }),
+        onSubmitted: (String _) => _add(),
+        styles: technicalInputStyles,
+        attributes: technicalInputAttributes,
+      ),
+    );
+  }
 }

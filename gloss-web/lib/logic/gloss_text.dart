@@ -25,11 +25,11 @@
 ///     the plugin substitutes AFTER placeholders expand, but the editor
 ///     keeps placeholder tokens literal, so a trigger inside an expanded
 ///     placeholder value cannot be seen here.
-///  5. Colours: `[RRGGBB]` bracket hex (exactly six hex digits then `]`,
-///     `TextPipeline.translateBracketHex`), then legacy `&` codes via
-///     `ChatColor.translateAlternateColorCodes` and the client's `§` state
+///  5. Colours: `ColorFormatter.translateColors` ([glossTranslateColors]):
+///     `&` codes and the `&#RRGGBB`, `&xRRGGBB` and `&x&R&R&G&G&B&B` hex
+///     forms, then `[RRGGBB]` bracket hex, read by the client's `§` state
 ///     machine — a colour code resets the decorations, `&r` resets
-///     everything, and Bungee's `§x§R§R§G§G§B§B` hex form is honoured.
+///     everything, and the style runs on across the newlines of one display.
 ///
 /// Menu text icons use this same pipeline. [glossRenderMenuText] returns its
 /// string form for `TextUtils.parse`; unresolved PAPI stays literal because
@@ -40,6 +40,8 @@
 /// deterministic under an injected clock.
 library;
 
+import 'dart:math' as math;
+
 import '../model/gloss_names.dart';
 
 import 'gloss_show.dart';
@@ -48,7 +50,12 @@ import '../model/gloss_animation.dart';
 import 'gloss_animation_playback.dart';
 import 'gloss_particle_text.dart';
 import 'mc_text.dart'
-    show McSpan, McTextResult, parseMcText, mcDefaultTextColor, mcLegacyColors;
+    show
+        McSpan,
+        McTextResult,
+        parseMcDisplayText,
+        mcDefaultTextColor,
+        mcLegacyColors;
 import 'preview_expr.dart';
 import 'preview_expr_functions.dart';
 
@@ -344,6 +351,90 @@ final class GlossLineRender {
   ].join();
 }
 
+/// One display's rendered text broken into its lines. [whole] was rendered as
+/// one string, so each line starts with the style the previous one ended in,
+/// as the client draws a text display. Every line keeps the whole render's
+/// animation, placeholder and expression lists; particle spans move to the
+/// line they sit on.
+List<GlossLineRender> glossDisplayLines(GlossLineRender whole) {
+  final List<List<GlossTextPiece>> lines = <List<GlossTextPiece>>[
+    <GlossTextPiece>[],
+  ];
+  for (final GlossTextPiece piece in whole.pieces) {
+    if (piece is! GlossTextRun || !piece.span.text.contains('\n')) {
+      lines.last.add(piece);
+      continue;
+    }
+    final List<String> parts = piece.span.text.split('\n');
+    for (int index = 0; index < parts.length; index++) {
+      if (index > 0) lines.add(<GlossTextPiece>[]);
+      if (parts[index].isNotEmpty) {
+        lines.last.add(GlossTextRun(piece.span.withText(parts[index])));
+      }
+    }
+  }
+  final List<String> texts = whole.renderedText.split('\n');
+  final List<GlossLineRender> out = <GlossLineRender>[];
+  int start = 0;
+  for (int index = 0; index < lines.length; index++) {
+    final String text = index < texts.length ? texts[index] : '';
+    final int end = start + text.length;
+    out.add(
+      GlossLineRender(
+        pieces: List<GlossTextPiece>.unmodifiable(lines[index]),
+        usedAnimations: whole.usedAnimations,
+        missingAnimations: whole.missingAnimations,
+        placeholders: whole.placeholders,
+        metrics: whole.metrics,
+        expressions: whole.expressions,
+        expressionErrors: whole.expressionErrors,
+        renderedText: text,
+        particleSpans: <GlossParticleTextSpan>[
+          for (final GlossParticleTextSpan span in whole.particleSpans)
+            if (span.start < end && span.end > start)
+              GlossParticleTextSpan(
+                name: span.name,
+                start: math.max(span.start, start) - start,
+                end: math.min(span.end, end) - start,
+              ),
+        ],
+        particleSpanError: whole.particleSpanError,
+      ),
+    );
+    start = end + 1;
+  }
+  return out;
+}
+
+/// The last [count] rows of [whole]'s display as one render, with `\n` runs
+/// between them: how an authored line reads below the lines it shares a
+/// display with.
+GlossLineRender glossDisplayTail(GlossLineRender whole, int count) {
+  final List<GlossLineRender> rows = glossDisplayLines(whole);
+  final List<GlossLineRender> tail = rows.sublist(
+    math.max(0, rows.length - math.max(1, count)),
+  );
+  return GlossLineRender(
+    pieces: List<GlossTextPiece>.unmodifiable(<GlossTextPiece>[
+      for (int row = 0; row < tail.length; row++) ...<GlossTextPiece>[
+        if (row > 0) const GlossTextRun(McSpan(text: '\n')),
+        ...tail[row].pieces,
+      ],
+    ]),
+    usedAnimations: whole.usedAnimations,
+    missingAnimations: whole.missingAnimations,
+    placeholders: whole.placeholders,
+    metrics: whole.metrics,
+    expressions: whole.expressions,
+    expressionErrors: whole.expressionErrors,
+    renderedText: <String>[
+      for (final GlossLineRender row in tail) row.renderedText,
+    ].join('\n'),
+    particleSpans: const <GlossParticleTextSpan>[],
+    particleSpanError: whole.particleSpanError,
+  );
+}
+
 /// Renders [raw] at [nowMs] against the workspace's animations and emoji.
 GlossLineRender renderGlossLine(
   String raw, {
@@ -352,6 +443,7 @@ GlossLineRender renderGlossLine(
   int nowMs = 0,
   bool viewerAware = true,
   bool richText = false,
+  int defaultColor = mcDefaultTextColor,
   String Function(String)? expressionLiteralEncoder,
   GlossTextExpressionSamples expressionSamples =
       const GlossTextExpressionSamples(),
@@ -362,6 +454,7 @@ GlossLineRender renderGlossLine(
   nowMs: nowMs,
   viewerAware: viewerAware,
   richText: richText,
+  defaultColor: defaultColor,
   expressionSamples: expressionSamples,
   expressionLiteralEncoder: expressionLiteralEncoder,
 );
@@ -401,6 +494,7 @@ GlossLineRender renderGlossScoreboardTitle(
   emoji: emoji,
   nowMs: nowMs,
   expressionSamples: expressionSamples,
+  richText: true,
   runtimeTransform: _limitScoreboardTitle,
 );
 
@@ -417,6 +511,7 @@ GlossLineRender renderGlossScoreboardLine(
   emoji: emoji,
   nowMs: nowMs,
   expressionSamples: expressionSamples,
+  richText: true,
   runtimeTransform: _limitScoreboardLine,
 );
 
@@ -444,7 +539,7 @@ GlossScoreboardLineMeasure measureGlossScoreboardLine(
     emoji,
   );
   final String translated = _normalizeScoreboardCharacters(
-    _translateRuntimeColors(substituted),
+    glossTranslateColors(substituted),
   );
   final _ScoreboardLineFit fit = _fitScoreboardLine(translated);
   return GlossScoreboardLineMeasure(
@@ -476,6 +571,7 @@ GlossLineRender _renderGlossLine(
   required int nowMs,
   bool viewerAware = true,
   bool richText = false,
+  int defaultColor = mcDefaultTextColor,
   required GlossTextExpressionSamples expressionSamples,
   String Function(String value)? runtimeTransform,
   String Function(String)? expressionLiteralEncoder,
@@ -522,7 +618,7 @@ GlossLineRender _renderGlossLine(
     if (runtimeTransform != null) {
       substituted = runtimeTransform(substituted);
     }
-    return _translateRuntimeColors(substituted);
+    return glossTranslateColors(substituted);
   }
 
   GlossParticleTextRendered rendered;
@@ -537,9 +633,16 @@ GlossLineRender _renderGlossLine(
     );
   }
   final List<String> placeholders = <String>[];
+  // The text is translated already, so the legacy pass reads only section
+  // signs: an escaped `\&c` stays the literal `&c` the client shows.
   final List<GlossTextPiece> pieces = richText
-      ? _renderRichText(rendered.text, placeholders)
-      : _renderColors(rendered.text, placeholders);
+      ? _renderRichText(rendered.text, placeholders, defaultColor)
+      : _renderColors(
+          rendered.text,
+          placeholders,
+          defaultColor: defaultColor,
+          alternateColors: false,
+        );
   return GlossLineRender(
     pieces: List<GlossTextPiece>.unmodifiable(pieces),
     usedAnimations: List<String>.unmodifiable(used),
@@ -555,11 +658,11 @@ GlossLineRender _renderGlossLine(
 }
 
 String _limitScoreboardTitle(String value) {
-  return _normalizeScoreboardCharacters(_translateRuntimeColors(value));
+  return _normalizeScoreboardCharacters(glossTranslateColors(value));
 }
 
 String _limitScoreboardLine(String value) =>
-    _fitScoreboardLine(_translateRuntimeColors(value)).text;
+    _fitScoreboardLine(glossTranslateColors(value)).text;
 
 _ScoreboardLineFit _fitScoreboardLine(String input) {
   final String normalized = _normalizeScoreboardCharacters(input);
@@ -613,7 +716,7 @@ String _longestRuntimeFrame(List<String> frames) {
   int longestLength = 0;
   for (final String frame in frames) {
     final int length = _normalizeScoreboardCharacters(
-      _translateRuntimeColors(frame),
+      glossTranslateColors(frame),
     ).length;
     if (length > longestLength) {
       longest = frame;
@@ -623,28 +726,100 @@ String _longestRuntimeFrame(List<String> frames) {
   return longest;
 }
 
-String _translateRuntimeColors(String input) {
-  final String bracketHex = _translateBracketHex(input);
-  if (!bracketHex.contains('&')) return bracketHex;
+/// `ColorFormatter.translateColors` (VolmLib), the pipeline's colour stage.
+///
+/// First the `&` pass (`translateAlternateColorCodes('&', ...)`): `\&` keeps a
+/// literal `&`, `&` plus a legacy code becomes `§` plus the lowercased code,
+/// and the hex spellings `&#RRGGBB`, `&x&R&R&G&G&B&B` and `&xRRGGBB` become
+/// `§x§r§r§g§g§b§b`. Then, for a result of 8 or more characters, the bracket
+/// pass: `\[` keeps a literal `[`, and `[RRGGBB]` becomes the same hex form.
+String glossTranslateColors(String input) {
+  if (!input.contains('&') && !input.contains('[')) return input;
+  final String translated = _translateAmpersandCodes(input);
+  if (translated.length < 8 || !translated.contains('[')) return translated;
   final StringBuffer out = StringBuffer();
   int index = 0;
-  while (index < bracketHex.length) {
-    final String char = bracketHex[index];
-    if (char == '&' && index + 1 < bracketHex.length) {
-      final String code = bracketHex[index + 1].toLowerCase();
-      if (mcLegacyColors.containsKey(code) ||
-          _legacyDecorations.contains(code) ||
-          code == 'r' ||
-          code == 'x') {
-        out.write('§$code');
-        index += 2;
-        continue;
-      }
+  while (index < translated.length) {
+    final String char = translated[index];
+    if (char == '\\' &&
+        index + 1 < translated.length &&
+        translated[index + 1] == '[') {
+      out.write('[');
+      index += 2;
+      continue;
+    }
+    if (char == '[' &&
+        index + 7 < translated.length &&
+        translated[index + 7] == ']' &&
+        _isBracketHex(translated, index + 1)) {
+      out.write(_bungeeHex(translated.substring(index + 1, index + 7)));
+      index += 8;
+      continue;
     }
     out.write(char);
     index++;
   }
   return out.toString();
+}
+
+String _translateAmpersandCodes(String input) {
+  if (!input.contains('&')) return input;
+  final StringBuffer out = StringBuffer();
+  final int length = input.length;
+  int i = 0;
+  while (i < length) {
+    final String char = input[i];
+    if (char == '\\' && i + 1 < length && input[i + 1] == '&') {
+      out.write('&');
+      i += 2;
+      continue;
+    }
+    if (char == '&' && i + 1 < length) {
+      final String next = input[i + 1];
+      final String code = next.toLowerCase();
+      if (mcLegacyColors.containsKey(code) ||
+          _legacyDecorations.contains(code) ||
+          code == 'r') {
+        out.write('§$code');
+        i += 2;
+        continue;
+      }
+      if (next == '#' && i + 7 < length && _isBracketHex(input, i + 2)) {
+        out.write(_bungeeHex(input.substring(i + 2, i + 8)));
+        i += 8;
+        continue;
+      }
+      if (code == 'x') {
+        if (i + 13 < length && _isExpandedHex(input, i)) {
+          final StringBuffer hex = StringBuffer();
+          for (int pair = 0; pair < 6; pair++) {
+            hex.write(input[i + 3 + pair * 2]);
+          }
+          out.write(_bungeeHex(hex.toString()));
+          i += 14;
+          continue;
+        }
+        if (i + 7 < length && _isBracketHex(input, i + 2)) {
+          out.write(_bungeeHex(input.substring(i + 2, i + 8)));
+          i += 8;
+          continue;
+        }
+      }
+    }
+    out.write(char);
+    i++;
+  }
+  return out.toString();
+}
+
+/// `ColorFormatter.isExpandedHex`: six `&<hex digit>` pairs after `&x`.
+bool _isExpandedHex(String input, int offset) {
+  for (int pair = 0; pair < 6; pair++) {
+    final int marker = offset + 2 + pair * 2;
+    if (marker + 1 >= input.length) return false;
+    if (input[marker] != '&' || !_isHexDigit(input[marker + 1])) return false;
+  }
+  return true;
 }
 
 final class _ScoreboardLineFit {
@@ -715,7 +890,7 @@ GlossParticleTextRendered glossRenderMenuParticleText(
       <String>[],
       <String>[],
     );
-    return _translateBracketHex(
+    return glossTranslateColors(
       glossApplyEmoji(
         expressions,
         emoji,
@@ -832,9 +1007,8 @@ int glossTranslatedLength(
     ),
     emoji,
   );
-  return _normalizeScoreboardCharacters(
-    _translateRuntimeColors(substituted),
-  ).length;
+  return _normalizeScoreboardCharacters(glossTranslateColors(substituted))
+      .length;
 }
 
 final class GlossTextExpressionSamples {
@@ -1219,7 +1393,11 @@ final RegExp _metricPattern = RegExp(r'\|metric\.([^|]+)\|');
 const Set<String> _legacyDecorations = <String>{'k', 'l', 'm', 'n', 'o'};
 
 class _ColorState {
-  int color = mcDefaultTextColor;
+  _ColorState(this.defaultColor) : color = defaultColor;
+
+  /// The surface's colour for uncoloured text, which `&r` returns to.
+  final int defaultColor;
+  int color;
   bool bold = false;
   bool italic = false;
   bool underlined = false;
@@ -1237,7 +1415,7 @@ class _ColorState {
     obfuscated = false;
   }
 
-  void reset() => setColor(mcDefaultTextColor);
+  void reset() => setColor(defaultColor);
 
   McSpan span(String text) => McSpan(
     text: text,
@@ -1267,8 +1445,17 @@ bool _isBracketHex(String input, int offset) {
   return true;
 }
 
-List<GlossTextPiece> _renderRichText(String input, List<String> placeholders) {
-  final McTextResult parsed = parseMcText(input);
+/// The rich (MiniMessage) form of one component: style and open tags carry
+/// across its newlines, as `TextUtils.parse` builds it and the client draws it.
+List<GlossTextPiece> _renderRichText(
+  String input,
+  List<String> placeholders,
+  int defaultColor,
+) {
+  final McTextResult parsed = parseMcDisplayText(
+    input,
+    defaultColor: defaultColor,
+  );
   final List<GlossTextPiece> pieces = <GlossTextPiece>[];
   for (int line = 0; line < parsed.lines.length; line++) {
     if (line > 0) pieces.add(const GlossTextRun(McSpan(text: '\n')));
@@ -1318,31 +1505,49 @@ List<GlossTextPiece> _renderRichText(String input, List<String> placeholders) {
   return pieces;
 }
 
-String glossRichPrefixLegacy(String prefix) {
-  String marker = '\uF8FF';
-  while (prefix.contains(marker)) {
-    marker += '\uF8FF';
-  }
-  final McTextResult parsed = parseMcText('$prefix$marker');
-  final StringBuffer output = StringBuffer();
-  for (int index = 0; index < parsed.lines.length; index++) {
-    if (index > 0) output.write('\n');
-    for (final McSpan span in parsed.lines[index]) {
-      output.write('§r§x');
-      for (final int rune
-          in span.color.toRadixString(16).padLeft(6, '0').runes) {
-        output.write('§${String.fromCharCode(rune)}');
-      }
-      if (span.bold) output.write('§l');
-      if (span.italic) output.write('§o');
-      if (span.underlined) output.write('§n');
-      if (span.strikethrough) output.write('§m');
-      if (span.obfuscated) output.write('§k');
-      output.write(span.text);
+/// `TextUtils.renderLegacy`: [text] parsed as one component (MiniMessage and
+/// `&` codes) and written back as section-sign codes. A code is written only
+/// where the style changes, colour first, so the string reads the same to the
+/// client's legacy state machine.
+String glossRenderLegacy(String text) {
+  final McTextResult parsed = parseMcDisplayText(text);
+  final StringBuffer out = StringBuffer();
+  McSpan? written;
+  for (int line = 0; line < parsed.lines.length; line++) {
+    if (line > 0) out.write('\n');
+    for (final McSpan span in parsed.lines[line]) {
+      final bool plain = span.color == mcDefaultTextColor && !span.isStyled;
+      final bool same = written == null
+          ? plain
+          : written.withText('') == span.withText('');
+      if (!same) out.write(plain ? '§r' : _legacyCodes(span));
+      written = span;
+      out.write(span.text);
     }
   }
-  final String legacy = output.toString();
-  return legacy.substring(0, legacy.length - marker.length);
+  return out.toString();
+}
+
+String _legacyCodes(McSpan span) {
+  final StringBuffer out = StringBuffer();
+  String? code;
+  for (final MapEntry<String, int> entry in mcLegacyColors.entries) {
+    if (entry.value == span.color) {
+      code = entry.key;
+      break;
+    }
+  }
+  out.write(
+    code == null
+        ? _bungeeHex(span.color.toRadixString(16).padLeft(6, '0'))
+        : '§$code',
+  );
+  if (span.obfuscated) out.write('§k');
+  if (span.bold) out.write('§l');
+  if (span.strikethrough) out.write('§m');
+  if (span.underlined) out.write('§n');
+  if (span.italic) out.write('§o');
+  return out.toString();
 }
 
 GlossLineRender renderGlossLiteralLine(String text) => GlossLineRender(
@@ -1380,11 +1585,12 @@ List<GlossTextPiece> _renderColors(
   String input,
   List<String> placeholders, {
   McSpan? initial,
+  int defaultColor = mcDefaultTextColor,
   bool references = true,
   bool alternateColors = true,
 }) {
   final List<GlossTextPiece> pieces = <GlossTextPiece>[];
-  final _ColorState state = _ColorState();
+  final _ColorState state = _ColorState(defaultColor);
   if (initial != null) {
     state.color = initial.color;
     state.bold = initial.bold;
@@ -1464,8 +1670,19 @@ List<GlossTextPiece> _renderColors(
           continue;
         }
       }
-      // An unknown code stays literal, exactly like the plugin's translate
-      // step leaving `&z` alone.
+      // An unknown `&` code stays literal, exactly like the plugin's
+      // translate step leaving `&z` alone; the client skips an unknown `§`
+      // code with its character.
+      if (char == '§') {
+        flushRun();
+        i += 2;
+        continue;
+      }
+    }
+    // The client drops a section sign that ends the text.
+    if (char == '§' && i + 1 == input.length) {
+      i++;
+      continue;
     }
 
     // `|metric.<key>|` — the token the function stage wrote back.
@@ -1505,40 +1722,13 @@ List<GlossTextPiece> _renderColors(
   return pieces;
 }
 
-/// `TextPipeline.translateBracketHex`: every `[rrggbb]` (exactly six hex digits
-/// then `]`) becomes Bungee's `§x§r§r§g§g§b§b`, which `parseMcText` then folds
-/// into a `<#rrggbb>` tag the same way `TextUtils.legacyHex` does. A token that
-/// fails the guard stays literal and the scan resumes at the next `[`.
-String _translateBracketHex(String input) {
-  if (!input.contains('[')) return input;
-  StringBuffer? out;
-  int cursor = 0;
-  int open = input.indexOf('[');
-  while (open >= 0) {
-    if (open + 7 >= input.length ||
-        input[open + 7] != ']' ||
-        !_isBracketHex(input, open + 1)) {
-      open = input.indexOf('[', open + 1);
-      continue;
-    }
-    out ??= StringBuffer();
-    out.write(input.substring(cursor, open));
-    out.write(_bungeeHex(input.substring(open + 1, open + 7).toLowerCase()));
-    cursor = open + 8;
-    open = input.indexOf('[', cursor);
-  }
-  if (out == null) return input;
-  out.write(input.substring(cursor));
-  return out.toString();
-}
-
 /// `ChatColor.of("#rrggbb").toString()` — `§x` then one `§` per hex digit.
 String _bungeeHex(String hex) {
   final StringBuffer out = StringBuffer('§x');
   for (int i = 0; i < hex.length; i++) {
     out
       ..write('§')
-      ..write(hex[i]);
+      ..write(hex[i].toLowerCase());
   }
   return out.toString();
 }

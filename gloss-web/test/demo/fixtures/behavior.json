@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 2,
+  "revision": 19,
+  "matching": {
+    "maxInputCharacters": 4096
+  },
+  "on": [
+    {
+      "trigger": "chat",
+      "pattern": "^hello$",
+      "permission": "example.greeting",
+      "do": [
+        {
+          "type": "sequence",
+          "actions": [
+            {
+              "type": "message",
+              "message": "Welcome"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trigger": "join",
+      "do": [
+        {
+          "type": "if",
+          "when": "true",
+          "then": [
+            {
+              "type": "addState",
+              "key": "visits",
+              "value": "1"
+            }
+          ],
+          "else": []
+        }
+      ]
+    }
+  ],
+  "state": {
+    "visits": {
+      "scope": "player",
+      "type": "number",
+      "default": 0
+    }
+  }
+}

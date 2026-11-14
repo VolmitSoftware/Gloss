@@ -39,9 +39,11 @@ void main() {
     final GlossBubblePreviewBubble original = GlossBubblePreviewTimeline(
       _style(),
     ).bubblesAt(0).single;
+    const String message =
+        '<red>Player</red> {{ player.name }} |animation.rainbow| &c[FF0000]literal';
     final GlossBubblePreviewBubble bubble = GlossBubblePreviewBubble(
-      text:
-          '<red>Player</red> {{ player.name }} |animation.rainbow| &c[FF0000]literal',
+      message: message,
+      text: message,
       lineCount: 1,
       stackY: original.stackY,
       remainingMs: original.remainingMs,
@@ -49,7 +51,7 @@ void main() {
       shimmerBandIndex: null,
     );
     final GlossLineRender rendered = renderGlossBubblePreviewText(
-      _style(prefix: '<bold>Prefix</bold> &7'),
+      _style(prefix: '<bold>Prefix</bold> &7', wrap: 128),
       bubble,
       nowMs: 0,
     );

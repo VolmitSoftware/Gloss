@@ -63,9 +63,11 @@ public final class HoloUiDataImporter {
     private static final Set<String> SECRETS = Set.of("editor-sync-sessions.json", "editor-sync-transactions",
         "editor-sync-backups", "custom-items.json");
     private static final Set<String> SETTING_KEYS = Set.of("debugHitbox", "debugPosition", "builderUrl",
-        "editorSyncEnabled", "editorSyncCreateToken", "editorSyncSessionMinutes", "editorSyncPollSeconds",
         "editorSyncMaxProjectMiB", "previewEnabled", "previewLookDistance", "previewScale", "uiScale",
         "customItems", "customItemProviders");
+    /** HoloUi settings with no Gloss equivalent: Gloss long-polls the relay instead of polling on a timer. */
+    private static final Set<String> IGNORED_SETTING_KEYS = Set.of("editorSyncPollSeconds", "editorSyncEnabled",
+        "editorSyncSessionMinutes", "editorSyncCreateToken");
 
     private final Path root;
     private final Services services;
@@ -320,7 +322,7 @@ public final class HoloUiDataImporter {
             boolean alreadyImported = previousReceipt.has("settingsSha256")
                 && Objects.equals(settingsHash, previousReceipt.get("settingsSha256").getAsString());
             for (String key : settings.keySet()) {
-                if (!SETTING_KEYS.contains(key)) {
+                if (!SETTING_KEYS.contains(key) && !IGNORED_SETTING_KEYS.contains(key)) {
                     draft.add("config", "settings.json:" + key, HoloUiImportDisposition.UNSUPPORTED,
                         "no verified conversion for this setting");
                 }
@@ -345,11 +347,8 @@ public final class HoloUiDataImporter {
             JsonObject before = JSON.toJsonTree(candidate).getAsJsonObject();
             overlay(draft, settings, "debugHitbox", value -> candidate.debug.hitbox = bool(value));
             overlay(draft, settings, "debugPosition", value -> candidate.debug.position = bool(value));
-            overlay(draft, settings, "builderUrl", value -> candidate.editor.builderUrl = string(value));
-            overlay(draft, settings, "editorSyncEnabled", value -> candidate.editor.sync.enabled = bool(value));
-            overlay(draft, settings, "editorSyncSessionMinutes", value -> candidate.editor.sync.sessionMinutes = integer(value));
-            overlay(draft, settings, "editorSyncPollSeconds", value -> candidate.editor.sync.pollSeconds = integer(value));
-            overlay(draft, settings, "editorSyncMaxProjectMiB", value -> candidate.editor.sync.maxProjectMiB = integer(value));
+            overlay(draft, settings, "builderUrl", value -> candidate.editor.editorUrl = string(value));
+            overlay(draft, settings, "editorSyncMaxProjectMiB", value -> candidate.editor.maxProjectMiB = integer(value));
             overlay(draft, settings, "previewEnabled", value -> candidate.features.previews = bool(value));
             overlay(draft, settings, "uiScale", value -> candidate.menus.uiScale = finiteNumber(value));
             overlay(draft, settings, "customItems", value -> candidate.items.customItems = bool(value));

@@ -140,15 +140,20 @@ void main() {
       final PreviewBox bounds = previewSceneBounds(scene)!;
       expect(bounds.width, 20);
       final PreviewCardView fitted = view.fittedTo(bounds, paddingPx: 20);
-      // 20 card px into 160 usable px is 8x; the 12x stop would overflow.
-      expect(fitted.zoom, 8);
+      // 20 card px into 160 usable px would take 8x; a fit stops at 2x.
+      expect(fitted.zoom, previewFitMaxZoom);
+      expect(previewFitMaxZoom, 2);
       expect(fitted.toScreenX(bounds.centerX), closeTo(200, 1e-9));
       expect(fitted.toScreenY(bounds.centerY), closeTo(100, 1e-9));
+      final PreviewBox wide = previewSceneBounds(
+        _build(HuiPreviewDoc(elements: <HuiPreviewElement>[_cell(0, 0, 100)])),
+      )!;
+      expect(view.fittedTo(wide, paddingPx: 20).zoom, 1, reason: 'below the cap the fit is unchanged');
     });
 
-    test('a fit with nothing to frame keeps the surface at rest', () {
+    test('a fit with nothing to frame shows the empty card at 100%', () {
       final PreviewCardView fitted = view.fittedTo(null);
-      expect(fitted.zoom, previewDefaultZoom);
+      expect(fitted.zoom, 1);
       expect(fitted.panX, 0);
       expect(fitted.panY, 0);
     });

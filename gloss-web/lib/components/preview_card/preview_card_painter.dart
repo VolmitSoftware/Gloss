@@ -16,6 +16,7 @@ import 'dart:math' as math;
 import 'package:web/web.dart' as web;
 
 import '../../l10n/hui_localizations.dart';
+import '../../logic/canvas_text_wrap.dart';
 import '../../logic/preview_card_edit.dart';
 import '../../logic/preview_card_scene.dart';
 import '../../logic/preview_sim.dart';
@@ -720,13 +721,19 @@ class PreviewCardPainter {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     _fill(ctx, palette.labelMuted);
-    ctx.fillText(
+    // Wrapped to the canvas, so a phone-width preview shows all of it.
+    final List<String> lines = wrapCanvasText(
       huiText(
         'Nothing drawn yet - add an element, or check the simulated state',
       ),
-      view.widthPx / 2,
-      view.heightPx / 2,
+      view.widthPx - 32,
+      (String text) => ctx.measureText(text).width,
     );
+    const double lineHeight = 18;
+    final double top = view.heightPx / 2 - (lines.length - 1) * lineHeight / 2;
+    for (int index = 0; index < lines.length; index++) {
+      ctx.fillText(lines[index], view.widthPx / 2, top + index * lineHeight);
+    }
     ctx.restore();
   }
 

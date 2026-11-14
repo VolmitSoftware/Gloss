@@ -1,3 +1,9 @@
-.dart_tool
-build
-coverage
+.dart_tool/
+.gitignore
+.DS_Store
+build/
+coverage/
+test/
+service-account*.json
+.env
+.env.*

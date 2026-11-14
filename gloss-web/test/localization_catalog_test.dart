@@ -73,9 +73,10 @@ void main() {
     );
     catalog.messages['1 through 100000000.'] = '1 through 100000000.';
     expect(
-      validateLocalizationCatalog(catalog, source).where(
-        (String error) => error.contains('pathological repetition'),
-      ),
+      validateLocalizationCatalog(
+        catalog,
+        source,
+      ).where((String error) => error.contains('pathological repetition')),
       isEmpty,
     );
     catalog.messages['1 through 100000000.'] = 'aaaaaaaa';
@@ -183,9 +184,9 @@ void main() {
     LocalizationCatalog catalog = readLocalizationCatalog(
       File('${root.path}/l10n/en_US.json'),
     );
-    final String placeholder = RegExp(
-      r'\{[a-z][a-zA-Z0-9_]*\}',
-    ).firstMatch(placeholderKey)!.group(0)!;
+    final String placeholder = RegExp(r'\{[a-z][a-zA-Z0-9_]*\}')
+        .firstMatch(placeholderKey)!
+        .group(0)!;
     catalog.messages[placeholderKey] = placeholderKey.replaceFirst(
       placeholder,
       '',
@@ -283,6 +284,12 @@ void main() {
     expect(source.messages, contains('The workspace state is unreadable.'));
     expect(
       source.messages,
+      contains(
+        'This workspace changed in another browser tab. Export this tab before reloading to choose which version to keep.',
+      ),
+    );
+    expect(
+      source.messages,
       contains('The stored image library was unreadable and was ignored.'),
     );
     expect(
@@ -296,12 +303,10 @@ void main() {
       source.messages,
       contains('Panel metadata was unreadable and defaults are being shown.'),
     );
-    expect(source.messages, contains('The relay timed out.'));
+    expect(source.messages, contains('The relay did not answer.'));
     expect(source.messages, contains('delete line'));
-    expect(
-      source.messages,
-      contains('Menu format reference, commands and permissions.'),
-    );
+    // A link label, read from lib/config/links.dart.
+    expect(source.messages, contains('Documentation'));
     expect(
       source.messages,
       contains('namespace:id, or a bare id searched across namespaces'),
@@ -327,12 +332,6 @@ void main() {
         '{name} references provider namespace "{prefix}", which nothing '
         'currently cataloged publishes. It may be supplied by another plugin '
         'at runtime, or it may be a typo.',
-      ),
-    );
-    expect(
-      source.messages,
-      contains(
-        'No background: a menu has no panel, colour or image behind its components.',
       ),
     );
     expect(source.plurals, contains('workspace.repaired_entries.count'));
@@ -590,8 +589,8 @@ void main() {
       File('${root.path}/l10n/de_DE.json'),
     );
     const String fullKey =
-        'A menu needs at least one component to render. Start with a text '
-        'decoration or a button.';
+        'Drag empty space to marquee · Shift-click adds · Alt-drag copies · '
+        'right-click creates';
     catalog.messages[fullKey] = fullKey;
     expect(
       validateLocalizationCatalog(catalog, source),

@@ -8,7 +8,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,35 +20,23 @@ class EditorSyncPresetTest {
     Path root;
 
     @Test
-    void individualSessionPreservesSourceAndCarriesImmutablePresetContext() throws Exception {
+    void workspacePreservesTheBoardSourceAndResolvesItsPreset() throws Exception {
         prepare("First");
-        EditorSyncProject project = builder().open(EditorSyncKind.SCOREBOARD, "test", 1024 * 1024);
-        assertEquals(BOARD, EditorSyncDocuments.parse(project.json()).getFirst().json());
-        assertTrue(project.json().getAsJsonObject("constraints").has("presets"));
+        EditorSyncProject project = builder().open(1024 * 1024);
+        assertEquals(BOARD, EditorSyncDocuments.parse(project.json()).stream()
+            .filter(entry -> entry.kind().equals("scoreboard")).findFirst().orElseThrow().json());
         EditorSyncPublicationValidator.ValidatedProject validated = new EditorSyncPublicationValidator()
-            .validateBase(session(project), 1024 * 1024);
+            .validate(session(project), new EditorSyncPublication(project.baseRevision(),
+                project.json()), 1024 * 1024, project.json());
         assertEquals("First", board(validated).presentation().title());
         assertEquals(7L, board(validated).revision());
     }
 
     @Test
-    void individualPublicationRefusesAChangedSharedPreset() throws Exception {
-        prepare("First");
-        EditorSyncProject project = builder().open(EditorSyncKind.SCOREBOARD, "test", 1024 * 1024);
-        EditorSyncStoredSession session = session(project);
-        prepare("Second");
-        EditorSyncProject server = builder().open(EditorSyncKind.SCOREBOARD, "test", 1024 * 1024);
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
-            new EditorSyncPublicationValidator().validate(session,
-                new EditorSyncPublication(1L, session.baseRevision(), project.json()), 1024 * 1024, server.json()));
-        assertTrue(failure.getMessage().contains("Preset catalog changed"));
-    }
-
-    @Test
     void workspacePresetEditRecompilesValuesAndOnlyIncrementsCatalogRevision() throws Exception {
         prepare("First");
-        EditorSyncProject project = builder().open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024);
-        EditorSyncStoredSession session = session(project);
+        EditorSyncProject project = builder().open(1024 * 1024);
+        EditorSyncPublicationValidator.Base session = session(project);
         JsonObject changed = project.json().deepCopy();
         for (JsonElement element : changed.getAsJsonArray("documents")) {
             JsonObject entry = element.getAsJsonObject();
@@ -59,7 +46,7 @@ class EditorSyncPresetTest {
         }
         EditorSyncTestProjects.sign(changed);
         EditorSyncPublicationValidator.ValidatedProject validated = new EditorSyncPublicationValidator()
-            .validate(session, new EditorSyncPublication(1L, session.baseRevision(), changed),
+            .validate(session, new EditorSyncPublication(session.baseRevision(), changed),
                 1024 * 1024, project.json());
         assertEquals("Second", board(validated).presentation().title());
         assertEquals(7L, board(validated).revision());
@@ -80,11 +67,8 @@ class EditorSyncPresetTest {
         return new EditorSyncContentSnapshotBuilder(root);
     }
 
-    private EditorSyncStoredSession session(EditorSyncProject project) {
-        return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-            "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
-            new EditorSyncStoredSession.Subject(project.kind(), project.subjectId()),
-            Instant.now().plusSeconds(3600L), 0L, project.json(), null);
+    private EditorSyncPublicationValidator.Base session(EditorSyncProject project) {
+        return EditorSyncPublicationValidator.Base.of(project);
     }
 
     private void prepare(String title) throws Exception {

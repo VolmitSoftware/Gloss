@@ -1,13 +1,23 @@
+/// The events that submit a surface (`on`): join, world and server changes,
+/// and intervals, each with an optional delay and viewer condition. One
+/// section per subscription; the condition is an expression, so it shows in
+/// Advanced only.
+library;
+
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:jaspr/dom.dart' as dom;
 
 import '../../l10n/hui_localizations.dart';
 import '../../logic/validation.dart';
 import '../../model/gloss_surface.dart';
 import '../../model/gloss_surface_subscription.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
-import 'inspector_widgets.dart';
+import '../../ui/affixed.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/section.dart';
+import '../../ui/technical_input.dart';
 
 class SurfaceSubscriptionsEditor extends StatelessWidget {
   const SurfaceSubscriptionsEditor({required this.store, super.key});
@@ -18,36 +28,56 @@ class SurfaceSubscriptionsEditor extends StatelessWidget {
         update(next.on![index]);
       });
 
-  String _label(int index, String field) => huiText(
-    'Subscription {index}: {field}',
-    <String, Object?>{'index': index + 1, 'field': field},
-  );
+  List<HuiIssue> _issuesAt(String path) =>
+      store.issues.where((HuiIssue issue) => issue.path == path).toList();
+
+  List<HuiIssue> _issuesUnder(String path) => store.issues
+      .where((HuiIssue issue) => issue.path.startsWith(path))
+      .toList();
+
+  static String _path(int index) =>
+      r'$.on['
+      '$index]';
 
   Widget _number(
+    BuildContext context,
     int index,
+    String key,
     String label,
+    String tip,
     int? value,
     void Function(GlossSurfaceSubscription entry, int? value) update,
-  ) => HuiField(
-    label: label,
-    control: TextInput(
-      value: value?.toString() ?? '',
-      fullWidth: true,
-      attributes: <String, String>{
-        'aria-label': _label(index, label),
-        'inputmode': 'numeric',
-      },
-      onChanged: (String source) {
-        final int? parsed = int.tryParse(source);
-        if (parsed != null || source.trim().isEmpty) {
-          _edit(
-            index,
-            (GlossSurfaceSubscription entry) => update(entry, parsed),
-          );
-        }
-      },
-    ),
-  );
+  ) {
+    final String id = 'surface-subscription-$index-$key';
+    return Field(
+      label: label,
+      forId: id,
+      tip: tip,
+      problems: _issuesUnder('${_path(index)}.$key'),
+      child: Affixed(
+        suffix: huiText('ticks'),
+        child: TextInput(
+          id: id,
+          value: value?.toString() ?? '',
+          size: controlSize(DensityScope.of(context)),
+          fullWidth: true,
+          attributes: const <String, String>{
+            'inputmode': 'numeric',
+            'autocomplete': 'off',
+          },
+          onChanged: (String source) {
+            final int? parsed = int.tryParse(source);
+            if (parsed != null || source.trim().isEmpty) {
+              _edit(
+                index,
+                (GlossSurfaceSubscription entry) => update(entry, parsed),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
 
   void _move(int from, int to) =>
       store.mutateSurface('move surface subscription', (GlossSurfaceDoc next) {
@@ -55,140 +85,143 @@ class SurfaceSubscriptionsEditor extends StatelessWidget {
         next.on!.insert(to, entry);
       });
 
+  Widget _subscription(
+    BuildContext context,
+    List<GlossSurfaceSubscription> entries,
+    int index,
+  ) {
+    final GlossSurfaceSubscription entry = entries[index];
+    final String path = _path(index);
+    final String eventId = 'surface-subscription-$index-trigger';
+    final String conditionId = 'surface-subscription-$index-when';
+    return FieldOwner(
+      name: huiText('Subscription {index}', <String, Object?>{
+        'index': index + 1,
+      }),
+      child: AppSection(
+        title: huiText('Subscription {index}', <String, Object?>{
+          'index': index + 1,
+        }),
+        memoryKey: 'surface.subscription.$index',
+        attributes: <String, String>{'data-surface-subscription': '$index'},
+        actions: <Widget>[
+          AppIconButton(
+            icon: ArcaneIcon.arrowUp(),
+            label: huiText('Move up'),
+            onPressed: index == 0 ? null : () => _move(index, index - 1),
+          ),
+          AppIconButton(
+            icon: ArcaneIcon.arrowDown(),
+            label: huiText('Move down'),
+            onPressed: index + 1 == entries.length
+                ? null
+                : () => _move(index, index + 1),
+          ),
+          AppIconButton(
+            icon: ArcaneIcon.trash2(),
+            label: huiText('Remove subscription'),
+            onPressed: () => store.mutateSurface(
+              'remove surface subscription',
+              (GlossSurfaceDoc next) => next.on!.removeAt(index),
+            ),
+          ),
+        ],
+        children: <Widget>[
+          ..._problemLines(_issuesAt(path)),
+          Field(
+            label: huiText('Event'),
+            forId: eventId,
+            problems: _issuesUnder('$path.trigger'),
+            child: ArcaneSelect(
+              id: eventId,
+              value: entry.trigger ?? '',
+              size: controlSize(DensityScope.of(context)),
+              fullWidth: true,
+              options: <ArcaneSelectOption>[
+                if (!glossSurfaceSubscriptionTriggers.contains(entry.trigger))
+                  ArcaneSelectOption(
+                    value: entry.trigger ?? '',
+                    label: entry.trigger ?? huiText('Select event'),
+                  ),
+                for (final String trigger in glossSurfaceSubscriptionTriggers)
+                  ArcaneSelectOption(value: trigger, label: trigger),
+              ],
+              onChanged: (String value) => _edit(
+                index,
+                (GlossSurfaceSubscription next) => next.setTrigger(value),
+              ),
+            ),
+          ),
+          if (entry.trigger == 'interval' || entry.everyTicks != null)
+            _number(
+              context,
+              index,
+              'everyTicks',
+              huiText('Interval'),
+              huiText('Required for interval events, 1–1728000 ticks.'),
+              entry.everyTicks,
+              (GlossSurfaceSubscription next, int? value) {
+                next.everyTicks = value;
+                next.extras.remove('everyTicks');
+              },
+            ),
+          _number(
+            context,
+            index,
+            'delayTicks',
+            huiText('Delay'),
+            huiText('Wait 0–72000 ticks after the event before submitting.'),
+            entry.delayTicks,
+            (GlossSurfaceSubscription next, int? value) {
+              next.delayTicks = value;
+              next.extras.remove('delayTicks');
+            },
+          ),
+          AdvancedOnly(
+            child: Field(
+              label: huiText('Condition'),
+              forId: conditionId,
+              tip: huiText('Viewer condition evaluated when this event fires.'),
+              problems: _issuesUnder('$path.when'),
+              child: TextInput(
+                id: conditionId,
+                value: entry.when ?? '',
+                placeholder: 'true',
+                size: controlSize(DensityScope.of(context)),
+                fullWidth: true,
+                styles: technicalInputStyles,
+                attributes: technicalInputAttributes,
+                onChanged: (String value) =>
+                    _edit(index, (GlossSurfaceSubscription next) {
+                      next.when = value.isEmpty ? null : value;
+                      next.extras.remove('when');
+                    }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final GlossSurfaceDoc doc = store.surfaceDoc!;
     final List<GlossSurfaceSubscription> entries =
         doc.on ?? const <GlossSurfaceSubscription>[];
-    return InspectorSection(
+    final bool malformed = doc.hasMalformedSubscriptions;
+    return AppSection(
       title: huiText('Event subscriptions'),
-      sectionKey: 'surface.subscriptions',
-      children: <Widget>[
-        HuiNote(
-          huiText(
-            'World changes run on the backend; server changes run on Velocity. Join and interval events work on both.',
-          ),
-        ),
-        HuiInlineIssues(
-          store.issues
-              .where((HuiIssue issue) => issue.path.startsWith(r'$.on'))
-              .toList(),
-        ),
-        if (doc.hasMalformedSubscriptions)
-          HuiNote(
-            huiText(
-              'Repair event subscriptions in Code view to use these controls.',
-            ),
-          )
-        else ...<Widget>[
-          for (final (int index, GlossSurfaceSubscription entry)
-              in entries.indexed)
-            dom.div(
-              classes: 'hui-inspector-subsection',
-              attributes: <String, String>{
-                'data-surface-subscription': '$index',
-              },
-              <Widget>[
-                HuiEyebrow(
-                  huiText('Subscription {index}', <String, Object?>{
-                    'index': index + 1,
-                  }),
-                ),
-                ArcaneSelect(
-                  label: _label(index, huiText('Event')),
-                  value: entry.trigger ?? '',
-                  options: <ArcaneSelectOption>[
-                    if (!glossSurfaceSubscriptionTriggers.contains(
-                      entry.trigger,
-                    ))
-                      ArcaneSelectOption(
-                        value: entry.trigger ?? '',
-                        label: entry.trigger ?? huiText('Select event'),
-                      ),
-                    for (final String trigger
-                        in glossSurfaceSubscriptionTriggers)
-                      ArcaneSelectOption(value: trigger, label: trigger),
-                  ],
-                  onChanged: (String value) => _edit(
-                    index,
-                    (GlossSurfaceSubscription next) => next.setTrigger(value),
-                  ),
-                ),
-                if (entry.trigger == 'interval' ||
-                    entry.everyTicks != null) ...<Widget>[
-                  _number(index, huiText('Interval'), entry.everyTicks, (
-                    GlossSurfaceSubscription next,
-                    int? value,
-                  ) {
-                    next.everyTicks = value;
-                    next.extras.remove('everyTicks');
-                  }),
-                  HuiNote(
-                    huiText('Required for interval events, 1–1728000 ticks.'),
-                  ),
-                ],
-                _number(index, huiText('Delay'), entry.delayTicks, (
-                  GlossSurfaceSubscription next,
-                  int? value,
-                ) {
-                  next.delayTicks = value;
-                  next.extras.remove('delayTicks');
-                }),
-                HuiNote(
-                  huiText(
-                    'Wait 0–72000 ticks after the event before submitting.',
-                  ),
-                ),
-                HuiField(
-                  label: huiText('Condition'),
-                  control: TextInput(
-                    value: entry.when ?? '',
-                    placeholder: 'true',
-                    fullWidth: true,
-                    attributes: <String, String>{
-                      'aria-label': _label(index, huiText('Condition')),
-                    },
-                    onChanged: (String value) =>
-                        _edit(index, (GlossSurfaceSubscription next) {
-                          next.when = value.isEmpty ? null : value;
-                          next.extras.remove('when');
-                        }),
-                  ),
-                ),
-                HuiNote(
-                  huiText('Viewer condition evaluated when this event fires.'),
-                ),
-                Wrap(
-                  children: <Widget>[
-                    Button(
-                      label: huiText('Move up'),
-                      variant: ButtonVariant.outline,
-                      onPressed: index == 0
-                          ? null
-                          : () => _move(index, index - 1),
-                    ),
-                    Button(
-                      label: huiText('Move down'),
-                      variant: ButtonVariant.outline,
-                      onPressed: index + 1 == entries.length
-                          ? null
-                          : () => _move(index, index + 1),
-                    ),
-                    Button(
-                      label: huiText('Remove subscription'),
-                      variant: ButtonVariant.outline,
-                      onPressed: () => store.mutateSurface(
-                        'remove surface subscription',
-                        (GlossSurfaceDoc next) => next.on!.removeAt(index),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          Button(
+      memoryKey: 'surface.subscriptions',
+      count: malformed ? null : entries.length,
+      tip: huiText(
+        'World changes run on the backend; server changes run on Velocity. Join and interval events work on both.',
+      ),
+      actions: <Widget>[
+        if (!malformed)
+          AppIconButton(
+            icon: ArcaneIcon.plus(),
             label: huiText('Add subscription'),
-            variant: ButtonVariant.outline,
             onPressed: entries.length >= 64
                 ? null
                 : () => store.mutateSurface('add surface subscription', (
@@ -200,8 +233,28 @@ class SurfaceSubscriptionsEditor extends StatelessWidget {
                     next.extras.remove('on');
                   }),
           ),
+      ],
+      children: <Widget>[
+        if (malformed) ...<Widget>[
+          ..._problemLines(_issuesUnder(r'$.on')),
+          ArcaneFieldDescription(
+            huiText(
+              'Repair event subscriptions in Code view to use these controls.',
+            ),
+          ),
+        ] else ...<Widget>[
+          ..._problemLines(_issuesAt(r'$.on')),
+          if (entries.isEmpty)
+            ArcaneFieldDescription(huiText('No event subscriptions.')),
+          for (int index = 0; index < entries.length; index++)
+            _subscription(context, entries, index),
         ],
       ],
     );
   }
 }
+
+/// Problems that belong to the list or a whole subscription.
+List<Widget> _problemLines(List<HuiIssue> issues) => <Widget>[
+  for (final HuiIssue issue in distinctIssues(issues)) issueNote(issue),
+];

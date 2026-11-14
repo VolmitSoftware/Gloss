@@ -1,0 +1,105 @@
+{
+  "description": "Golden editor API 1 messages written by the Gloss plugin's EditorFixturesTest from real answers. The editor API section of gloss-web/sync-relay/README.md describes each one.",
+  "messages": [
+    {
+      "name": "hello-response",
+      "path": "api/hello-response.json"
+    },
+    {
+      "name": "pairing-code",
+      "path": "api/pairing-code.json"
+    },
+    {
+      "name": "pair-request",
+      "path": "api/pair-request.json"
+    },
+    {
+      "name": "pair-response",
+      "path": "api/pair-response.json"
+    },
+    {
+      "name": "token-response",
+      "path": "api/token-response.json"
+    },
+    {
+      "name": "catalog-response",
+      "path": "api/catalog-response.json"
+    },
+    {
+      "name": "documents-page-response",
+      "path": "api/documents-page-response.json"
+    },
+    {
+      "name": "documents-read-request",
+      "path": "api/documents-read-request.json"
+    },
+    {
+      "name": "documents-read-response",
+      "path": "api/documents-read-response.json"
+    },
+    {
+      "name": "document-response",
+      "path": "api/document-response.json"
+    },
+    {
+      "name": "images-read-request",
+      "path": "api/images-read-request.json"
+    },
+    {
+      "name": "images-read-response",
+      "path": "api/images-read-response.json"
+    },
+    {
+      "name": "image-upload-request",
+      "path": "api/image-upload-request.json"
+    },
+    {
+      "name": "image-upload-response",
+      "path": "api/image-upload-response.json"
+    },
+    {
+      "name": "meta-response",
+      "path": "api/meta-response.json"
+    },
+    {
+      "name": "notes-response",
+      "path": "api/notes-response.json"
+    },
+    {
+      "name": "history-response",
+      "path": "api/history-response.json"
+    },
+    {
+      "name": "event-open",
+      "path": "api/event-open.json"
+    },
+    {
+      "name": "event-catalog",
+      "path": "api/event-catalog.json"
+    },
+    {
+      "name": "changes-request",
+      "path": "api/changes-request.json"
+    },
+    {
+      "name": "changes-response",
+      "path": "api/changes-response.json"
+    },
+    {
+      "name": "event-change",
+      "path": "api/event-change.json"
+    },
+    {
+      "name": "error-response",
+      "path": "api/error-response.json"
+    },
+    {
+      "name": "error-rate-limited",
+      "path": "api/error-rate-limited.json"
+    },
+    {
+      "name": "event-closing",
+      "path": "api/event-closing.json"
+    }
+  ]
+}

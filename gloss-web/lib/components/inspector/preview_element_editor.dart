@@ -3,35 +3,42 @@
 /// specific to `panel`/`cell`/`slot`/`label`.
 ///
 /// Every expression-capable field is a [PreviewExprField]; there is no
-/// separate "constant" vs "expression" mode to pick — typing a bare number or
-/// `true`/`false` commits the JSON constant shape, typing anything else
-/// commits an expression string, and both compile identically. Kept this
-/// simple on purpose: the JSON already erases the distinction (`x: 5` and
-/// `x: "5"` behave the same at build time), so a mode toggle would only be
-/// UI ceremony over a difference nobody can observe in game.
+/// separate constant or expression mode to pick. Typing a bare number or
+/// `true`/`false` commits the JSON constant shape, anything else commits an
+/// expression string, and both compile the same: the JSON already erases the
+/// distinction (`x: 5` and `x: "5"` behave the same at build time).
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
+import '../../config/defaults.dart';
 import '../../logic/preview_card_edit.dart' show previewAutoSimCategory;
 import '../../logic/preview_doc_validation.dart';
 import '../../logic/preview_sim.dart' show previewCategoryVariableNames;
 import '../../logic/validation.dart';
+import '../../model/gloss_hologram_box.dart';
+import '../../model/hui_icons.dart';
 import '../../model/preview_doc.dart';
 import '../../state/editor_store.dart';
-import '../../config/defaults.dart';
-import '../common/common.dart';
-import 'extras_editor.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
+import '../../ui/badge.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/menu.dart';
+import '../../ui/mode.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/technical_input.dart';
+import '../../ui/tone.dart';
 import 'display_style_editor.dart';
+import 'extras_editor.dart';
 import 'hologram_box_editor.dart';
-import '../../model/hui_icons.dart';
-import '../../model/gloss_hologram_box.dart';
 import 'preview_color_swatch.dart';
 import 'preview_expr_field.dart';
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+import '../../ui/toast.dart';
 
 class PreviewElementEditor extends StatelessWidget {
   const PreviewElementEditor({
@@ -68,17 +75,13 @@ class PreviewElementEditor extends StatelessWidget {
   }
 
   /// Every variable name the document's own auto-detected simulated category
-  /// publishes — the "current sim category" driving each field's soft
-  /// "not published here" nudge. Empty (which silences the nudge everywhere)
-  /// when no preview document is open, which cannot actually happen here.
+  /// publishes, behind each field's "not published here" note. Empty (which
+  /// silences the note) when no preview document is open.
   ///
   /// [previewCategoryVariableNames] is a pure function of the category
-  /// string, not a `PreviewSim` getter: this pane's `build()` calls [_field]
-  /// up to a dozen times, each reading this, and while a card is animating
-  /// the whole pane rebuilds on every simulation tick, so allocating a whole
-  /// `PreviewSim` (its default sample state, slot items included) here would
-  /// mean dozens of throwaway allocations a second for a list that depends on
-  /// nothing but which category this is.
+  /// string: this pane rebuilds on every simulation tick while a card
+  /// animates and reads this once per field, so building a whole
+  /// `PreviewSim` here would allocate dozens of throwaway states a second.
   List<String> get _categoryVariableNames {
     final HuiPreviewDoc? doc = store.previewDoc;
     if (doc == null) return const <String>[];
@@ -88,6 +91,23 @@ class PreviewElementEditor extends StatelessWidget {
   void _mutate(String label, void Function(HuiPreviewElement e) fn) =>
       store.editPreviewElement(index, label, fn);
 
+  String get _name =>
+      huiText('Element {value}', <String, Object?>{'value': index + 1});
+
+  void _delete() {
+    final String name = _name;
+    store.deletePreviewElement(index);
+    toastInfo(
+      huiText('Deleted {id}.', <String, Object?>{'id': name}),
+      action: ToastAction(
+        label: huiText('Undo'),
+        onPressed: () {
+          store.performUndo();
+        },
+      ),
+    );
+  }
+
   double _defaultZ() => switch (element.type) {
     'panel' => 1,
     'cell' || 'slot' => 4,
@@ -96,95 +116,109 @@ class PreviewElementEditor extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) =>
-      dom.div(classes: 'hui-inspector-body is-preview-element', <Widget>[
-        _header(),
-        _placement(),
-        _repeatSection(),
-        ..._typeSection(),
-        DisplayStyleEditor(
-          style: element.style,
-          defaults: element.type == 'slot'
-              ? (store.previewDoc?.itemStyle ??
-                    HuiIconStyle(blockLight: 15, skyLight: 15))
-              : store.previewDoc?.textStyle,
-          issues: _elementIssues
-              .where((HuiIssue issue) => issue.path.startsWith('$_path.style'))
-              .toList(),
-          onChanged: (String label, HuiIconStyle? style) => _mutate(
-            label,
-            (HuiPreviewElement edited) => edited.style = style,
+  Widget build(BuildContext context) => DenseBox(
+    classes: 'hui-inspector-body is-preview-element',
+    children: <Widget>[
+      PaneHeader(
+        kind: _typeLabel(element.type),
+        title: _name,
+        tip: switch (previewElementTypeDescriptions[element.type]) {
+          final String note => huiText(note),
+          null => null,
+        },
+        status: _status(),
+        menuId: 'hui-inspector-menu',
+        actions: <AppMenuEntry>[
+          AppMenuEntry(
+            huiText('Duplicate'),
+            () => store.duplicatePreviewElement(index),
+            icon: ArcaneIcon.copy(),
+          ),
+          const AppMenuEntry.separator(),
+          AppMenuEntry(
+            huiText('Delete'),
+            _delete,
+            icon: ArcaneIcon.trash2(),
+            destructive: true,
+          ),
+        ],
+      ),
+      if (!previewElementTypeDescriptions.containsKey(element.type))
+        Field(
+          label: huiText('Type'),
+          docKey: 'preview.element.type',
+          problems: _issuesFor('type'),
+          child: dom.code(
+            attributes: const <String, String>{'dir': 'ltr'},
+            <Widget>[
+              Component.text(
+                element.type.isEmpty ? huiText('(no type)') : element.type,
+              ),
+            ],
           ),
         ),
-        if (element.type == 'label')
-          HologramBoxEditor(
-            box: element.box ?? GlossHologramBox(),
-            issues: _issuesFor('box'),
-            mutate: (String label, void Function(GlossHologramBox) edit) =>
-                _mutate(label, (HuiPreviewElement edited) {
-                  edited.box ??= GlossHologramBox();
-                  edit(edited.box!);
-                }),
-          ),
-        _extras(),
-      ]);
+      _placement(),
+      ?_typeSection(),
+      _repeatSection(context),
+      DisplayStyleEditor(
+        style: element.style,
+        defaults: element.type == 'slot'
+            ? (store.previewDoc?.itemStyle ??
+                  HuiIconStyle(blockLight: 15, skyLight: 15))
+            : store.previewDoc?.textStyle,
+        issues: _elementIssues
+            .where((HuiIssue issue) => issue.path.startsWith('$_path.style'))
+            .toList(),
+        onChanged: (String label, HuiIconStyle? style) => _mutate(
+          label,
+          (HuiPreviewElement edited) => edited.style = style,
+        ),
+      ),
+      if (element.type == 'label')
+        HologramBoxEditor(
+          box: element.box ?? GlossHologramBox(),
+          issues: _issuesFor('box'),
+          mutate: (String label, void Function(GlossHologramBox) edit) =>
+              _mutate(label, (HuiPreviewElement edited) {
+                edited.box ??= GlossHologramBox();
+                edit(edited.box!);
+              }),
+        ),
+      AdvancedOnly(child: _extras()),
+    ],
+  );
 
-  Widget _header() {
+  /// Error and warning counts on this element, as badges after the title.
+  Widget? _status() {
     final int errors = _elementIssues
         .where((HuiIssue i) => i.severity == HuiSeverity.error)
         .length;
     final int warnings = _elementIssues
         .where((HuiIssue i) => i.severity == HuiSeverity.warning)
         .length;
-    return dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-      dom.div(classes: 'hui-inspector-header is-component', <Widget>[
-        HuiEyebrow(
-          huiText("Element {value}", <String, Object?>{'value': index + 1}),
+    if (errors == 0 && warnings == 0) return null;
+    return Component.fragment(<Widget>[
+      if (errors > 0)
+        StatusBadge(
+          huiPlural(
+            'element.problem_count',
+            errors,
+            oneEnglish: '{count} problem',
+            otherEnglish: '{count} problems',
+          ),
+          tone: BadgeTone.error,
         ),
-        dom.h2(classes: 'hui-inspector-title', <Widget>[
-          Text(_typeLabel(element.type)),
-        ]),
-      ]),
-      // What this element type is, in the same words the "add element" menu
-      // uses. The map existed and nothing read it, so the pane never said what
-      // a cell was once you had added one.
-      if (previewElementTypeDescriptions[element.type] case final String note)
-        dom.p(classes: 'hui-inspector-lede', <Widget>[Text(huiText(note))]),
-      if (errors > 0 || warnings > 0)
-        dom.p(classes: 'hui-inspector-lede is-issue', <Widget>[
-          Text(_issueSummary(errors, warnings)),
-        ]),
-    ]);
-  }
-
-  String _issueSummary(int errors, int warnings) {
-    final String warningText = warnings == 0
-        ? ''
-        : huiPlural(
+      if (warnings > 0)
+        StatusBadge(
+          huiPlural(
             'element.warning_count',
             warnings,
             oneEnglish: '{count} warning',
             otherEnglish: '{count} warnings',
-          );
-    if (errors == 0) {
-      return huiText('{warnings} on this element.', <String, Object?>{
-        'warnings': warningText,
-      });
-    }
-    final String problemText = huiPlural(
-      'element.problem_count',
-      errors,
-      oneEnglish: '{count} problem',
-      otherEnglish: '{count} problems',
-    );
-    return warnings == 0
-        ? huiText('{problems} on this element.', <String, Object?>{
-            'problems': problemText,
-          })
-        : huiText('{problems} on this element, {warnings}.', <String, Object?>{
-            'problems': problemText,
-            'warnings': warningText,
-          });
+          ),
+          tone: BadgeTone.warning,
+        ),
+    ]);
   }
 
   static String _typeLabel(String type) => switch (type) {
@@ -195,9 +229,9 @@ class PreviewElementEditor extends StatelessWidget {
     _ => type.isEmpty ? huiText('(no type)') : type,
   };
 
-  Widget _placement() => InspectorSection(
+  Widget _placement() => AppSection(
     title: huiText('Placement'),
-    sectionKey: 'preview.placement',
+    memoryKey: 'preview.placement',
     children: <Widget>[
       _field(
         'X',
@@ -222,23 +256,6 @@ class PreviewElementEditor extends StatelessWidget {
         field: 'z',
         docKey: 'preview.element.z',
         placeholder: _formatDefault(_defaultZ()),
-        help: huiText(
-          "Higher z draws in front. Left blank, this type defaults to {formatDefault}.",
-          <String, Object?>{'formatDefault': _formatDefault(_defaultZ())},
-        ),
-      ),
-      _field(
-        huiText('Visibility expression'),
-        element.show,
-        (Object? value) => _mutate(
-          'show',
-          (HuiPreviewElement element) => element.show = value,
-        ),
-        field: 'show',
-        showCondition: true,
-        docKey: 'preview.element.show',
-        kind: PreviewExprKind.boolean,
-        placeholder: huiText('true'),
       ),
       _field(
         huiText('Visible'),
@@ -249,9 +266,20 @@ class PreviewElementEditor extends StatelessWidget {
         docKey: 'preview.element.visible',
         kind: PreviewExprKind.boolean,
         placeholder: huiText('true'),
-        help: huiText(
-          'Evaluated once when the preview opens - hiding an element '
-          'at build time keeps it hidden for the life of that preview.',
+      ),
+      AdvancedOnly(
+        child: _field(
+          huiText('Visibility expression'),
+          element.show,
+          (Object? value) => _mutate(
+            'show',
+            (HuiPreviewElement element) => element.show = value,
+          ),
+          field: 'show',
+          showCondition: true,
+          docKey: 'preview.element.show',
+          kind: PreviewExprKind.boolean,
+          placeholder: huiText('true'),
         ),
       ),
     ],
@@ -261,17 +289,15 @@ class PreviewElementEditor extends StatelessWidget {
       ? value.toInt().toString()
       : value.toString();
 
-  Widget _repeatSection() {
+  Widget _repeatSection(BuildContext context) {
     final HuiPreviewRepeat? repeat = element.repeat;
-    return InspectorSection(
+    const String varId = 'hui-preview-repeat-var';
+    return AppSection(
       title: huiText('Repeat'),
-      sectionKey: 'preview.repeat',
-      description: huiText(
-        'Emits this element several times with an index bound to '
-        'a loop variable, instead of drawing it once.',
-      ),
+      memoryKey: 'preview.repeat',
+      docKey: 'preview.element.repeat',
       children: <Widget>[
-        HuiSwitchRow(
+        SwitchField(
           label: huiText('Repeat this element'),
           value: repeat != null,
           onChanged: (bool value) => _mutate(
@@ -287,13 +313,7 @@ class PreviewElementEditor extends StatelessWidget {
             raw: repeat.count,
             required: true,
             placeholder: '2',
-            trailing: const HuiFieldHelp('preview.repeat.count'),
-            help: huiText(
-              'Evaluated once, with no variable scope of its own - it '
-              'cannot read the loop variable it defines. A constant above '
-              '1024, or a total above 4096 across every element, is '
-              'rejected by the plugin.',
-            ),
+            docKey: 'preview.repeat.count',
             issues: _issuesFor('repeat.count'),
             declaredVars: _declaredVars,
             onChanged: (Object? v) => _mutate(
@@ -301,9 +321,10 @@ class PreviewElementEditor extends StatelessWidget {
               (HuiPreviewElement e) => e.repeat?.count = v,
             ),
           ),
-          HuiField(
+          Field(
             label: huiText('Loop variable'),
-            trailing: const HuiFieldHelp('preview.repeat.var'),
+            forId: varId,
+            docKey: 'preview.repeat.var',
             defaultValue: 'i',
             onReset: (repeat.varName ?? 'i') == 'i'
                 ? null
@@ -311,67 +332,30 @@ class PreviewElementEditor extends StatelessWidget {
                     'repeat var',
                     (HuiPreviewElement e) => e.repeat?.varName = 'i',
                   ),
-            help: huiText(
-              'Defaults to "i". Must be a plain identifier and cannot '
-              'reuse a catalog or "vars" name.',
-            ),
-            // The issues belong under the control, not in the header slot the
-            // help and the default chip now share.
-            control: dom.div(<Widget>[
-              TextInput(
-                value: repeat.varName ?? 'i',
-                size: ComponentSize.sm,
-                fullWidth: true,
-                placeholder: huiText('i'),
-                onChanged: (String value) => _mutate(
-                  'repeat var',
-                  (HuiPreviewElement e) => e.repeat?.varName = value,
-                ),
-                attributes: const <String, String>{
-                  'autocomplete': 'off',
-                  'spellcheck': 'false',
-                  'dir': 'ltr',
-                },
+            problems: _issuesFor('repeat.var'),
+            child: TextInput(
+              id: varId,
+              value: repeat.varName ?? 'i',
+              size: controlSize(DensityScope.of(context)),
+              fullWidth: true,
+              placeholder: huiText('i'),
+              onChanged: (String value) => _mutate(
+                'repeat var',
+                (HuiPreviewElement e) => e.repeat?.varName = value,
               ),
-              HuiInlineIssues(_issuesFor('repeat.var')),
-            ]),
+              styles: technicalInputStyles,
+              attributes: technicalInputAttributes,
+            ),
           ),
         ],
       ],
     );
   }
 
-  List<Widget> _typeSection() => switch (element.type) {
-    'panel' => <Widget>[_panelSection()],
-    'cell' => <Widget>[_cellSection()],
-    'slot' => <Widget>[_slotSection()],
-    'label' => <Widget>[_labelSection()],
-    _ => <Widget>[
-      InspectorSection(
-        title: huiText('Unknown type'),
-        children: <Widget>[
-          HuiNote(
-            element.type.isEmpty
-                ? huiText(
-                    'This element has no "type" key. The plugin refuses '
-                    'to build the document until one of panel, cell, '
-                    'slot or label is set.',
-                  )
-                : huiText(
-                    '"{type}" is not a type the plugin knows. Delete this '
-                    'element and add a fresh one of the right type.',
-                    <String, Object?>{'type': element.type},
-                  ),
-            tone: HuiNoteTone.danger,
-          ),
-        ],
-      ),
-    ],
-  };
-
-  Widget _panelSection() => InspectorSection(
-    title: huiText('Panel'),
-    children: <Widget>[
+  /// The fields only this element type has; null for an unknown type (the
+  /// Type field under the header says what is wrong).
+  Widget? _typeSection() => switch (element.type) {
+    'panel' => _typeFields(<Widget>[
       _field(
         huiText('Width'),
         element.width,
@@ -400,12 +384,8 @@ class PreviewElementEditor extends StatelessWidget {
         placeholder: huiText('#FF15151B'),
         colorLabel: huiText('panel colour'),
       ),
-    ],
-  );
-
-  Widget _cellSection() => InspectorSection(
-    title: huiText('Cell'),
-    children: <Widget>[
+    ]),
+    'cell' => _typeFields(<Widget>[
       _field(
         huiText('Size'),
         element.size,
@@ -424,17 +404,9 @@ class PreviewElementEditor extends StatelessWidget {
         required: true,
         placeholder: huiText('#FF15151B'),
         colorLabel: huiText('cell colour'),
-        help: huiText(
-          'The one field that is re-evaluated live, every 4 ticks - '
-          'this is where an animated cell reads its own colour.',
-        ),
       ),
-    ],
-  );
-
-  Widget _slotSection() => InspectorSection(
-    title: huiText('Slot'),
-    children: <Widget>[
+    ]),
+    'slot' => _typeFields(<Widget>[
       _field(
         huiText('Size'),
         element.size,
@@ -452,10 +424,6 @@ class PreviewElementEditor extends StatelessWidget {
         docKey: 'preview.element.index',
         required: true,
         placeholder: '0',
-        help: huiText(
-          'Which inventory slot to draw. Nothing clamps this - '
-          'guard it against inventory.size yourself.',
-        ),
       ),
       _field(
         huiText('Well color'),
@@ -467,12 +435,8 @@ class PreviewElementEditor extends StatelessWidget {
         placeholder: huiText('#FF15151B (default)'),
         colorLabel: huiText('well colour'),
       ),
-    ],
-  );
-
-  Widget _labelSection() => InspectorSection(
-    title: huiText('Label'),
-    children: <Widget>[
+    ]),
+    'label' => _typeFields(<Widget>[
       _field(
         huiText('Text'),
         element.text,
@@ -483,10 +447,6 @@ class PreviewElementEditor extends StatelessWidget {
         required: true,
         kind: PreviewExprKind.string,
         placeholder: huiText("'Label text'"),
-        help: huiText(
-          'The other field that is re-evaluated live, every 4 ticks. '
-          'A string literal needs its own quotes: \'like this\'.',
-        ),
       ),
       _field(
         huiText('Background'),
@@ -498,12 +458,21 @@ class PreviewElementEditor extends StatelessWidget {
         placeholder: huiText('0 (transparent)'),
         colorLabel: huiText('label background'),
       ),
-    ],
+    ]),
+    _ => null,
+  };
+
+  Widget _typeFields(List<Widget> fields) => AppSection(
+    title: _typeLabel(element.type),
+    memoryKey: 'preview.type.${element.type}',
+    children: fields,
   );
 
   /// One [PreviewExprField], wired to this element's issues, declared vars,
-  /// repeat scope and simulated-category hint set. [field] is the raw JSON
-  /// key (`x`, `width`, ...), used only to filter [_issuesFor].
+  /// repeat scope and simulated-category names. [field] is the raw JSON key
+  /// (`x`, `width`, ...), used only to filter [_issuesFor]. A colour field
+  /// gets a swatch while its value is a constant colour: a live expression
+  /// has no one colour to pick, and picking would overwrite it.
   Widget _field(
     String label,
     Object? raw,
@@ -513,7 +482,6 @@ class PreviewElementEditor extends StatelessWidget {
     bool showCondition = false,
     PreviewExprKind kind = PreviewExprKind.numeric,
     String? placeholder,
-    String? help,
     String? docKey,
     String? colorLabel,
   }) => PreviewExprField(
@@ -523,8 +491,14 @@ class PreviewElementEditor extends StatelessWidget {
     showCondition: showCondition,
     kind: kind,
     placeholder: placeholder,
-    help: help,
-    trailing: _trailing(raw, onChanged, docKey, colorLabel),
+    docKey: docKey,
+    trailing: colorLabel == null
+        ? null
+        : previewColorPicker(
+            raw,
+            label: colorLabel,
+            onPicked: (String hex) => onChanged(hex),
+          ),
     issues: _issuesFor(field),
     declaredVars: _declaredVars,
     scope: _scope,
@@ -532,34 +506,10 @@ class PreviewElementEditor extends StatelessWidget {
     onChanged: onChanged,
   );
 
-  /// The colour picker, the help button, or both. A colour field whose value
-  /// is a live expression gets the help alone: there is no one colour to open
-  /// a picker on, and picking would overwrite the expression.
-  Widget? _trailing(
-    Object? raw,
-    void Function(Object? value) onChanged,
-    String? docKey,
-    String? colorLabel,
-  ) {
-    final Widget? picker = colorLabel == null
-        ? null
-        : previewColorPicker(
-            raw,
-            label: colorLabel,
-            onPicked: (String hex) => onChanged(hex),
-          );
-    if (picker == null) return docKey == null ? null : HuiFieldHelp(docKey);
-    if (docKey == null) return picker;
-    return dom.div(classes: 'hui-field-tools', <Widget>[
-      picker,
-      HuiFieldHelp(docKey),
-    ]);
-  }
-
-  Widget _extras() => InspectorSection(
+  Widget _extras() => AppSection(
     title: huiText('Extra keys'),
-    sectionKey: 'preview.extras',
-    initiallyOpen: false,
+    memoryKey: 'preview.extras',
+    open: false,
     children: <Widget>[
       ExtrasEditor(
         title: huiText('Element'),

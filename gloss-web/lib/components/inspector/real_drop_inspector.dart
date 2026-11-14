@@ -2,24 +2,36 @@ library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../logic/validation.dart';
 import '../../model/model.dart';
 import '../../model/gloss_hologram_box.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
+import '../../ui/action_row.dart';
+import '../../ui/badge.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/info_tip.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/toggle_choice.dart';
+import '../../ui/technical_input.dart';
 import 'extras_editor.dart';
 import 'real_drop_expr_field.dart';
 import 'real_drop_label_names_editor.dart';
 import 'real_drop_animation_inspector.dart';
-import 'reorder_list.dart';
 import 'particle_layers_editor.dart';
 import 'display_style_editor.dart';
 import 'display_refresh_editor.dart';
 import 'hologram_box_editor.dart';
 import 'gloss_visibility_editor.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class RealDropInspector extends StatefulWidget {
@@ -32,11 +44,16 @@ class RealDropInspector extends StatefulWidget {
 }
 
 class _RealDropInspectorState extends State<RealDropInspector> {
+  static final RegExp _idSeparators = RegExp(r'[^A-Za-z0-9]+');
+
   int? _selectedVariant;
 
   EditorStore get _store => component.store;
 
   GlossRealDropSettingsDoc? get _doc => _store.realDropSettingsDoc;
+
+  /// The inspector pane is dense; its text inputs match the kit fields.
+  ComponentSize get _size => controlSize(Density.dense);
 
   String _selectedPath(String path) => _selectedVariant == null
       ? path
@@ -45,101 +62,150 @@ class _RealDropInspectorState extends State<RealDropInspector> {
           '\$.variants[$_selectedVariant].presentation',
         );
 
+  /// An element id for the control at [path], so its label names it.
+  String _idFor(String path) =>
+      'real-drops${path.replaceAll(_idSeparators, '-')}';
+
   List<HuiIssue> _issuesFor(String path) => _store.issues
       .where((HuiIssue issue) => issue.path.startsWith(_selectedPath(path)))
       .toList();
+
+  /// Issues on exactly this path of the selected presentation. The prefix
+  /// match [_issuesFor] does is wrong for an expression field:
+  /// `$.presentation.script.scale` would swallow all three axes.
+  List<HuiIssue> _exact(String path) => _at(_selectedPath(path));
+
+  List<HuiIssue> _at(String path) =>
+      _store.issues.where((HuiIssue issue) => issue.path == path).toList();
 
   @override
   Widget build(BuildContext context) {
     final GlossRealDropSettingsDoc? doc = _doc;
     if (doc == null) return const dom.div(<Widget>[]);
     final GlossRealDropPresentation presentation = _presentation(doc);
-    return dom.div(classes: 'hui-inspector-body is-real-drops', <Widget>[
-      _header(doc),
-      GlossVisibilityEditor(
-        raw: doc.show ?? true,
-        issues: _issuesFor(r'$.show'),
-        sectionKey: 'realDrops.show',
-        onChanged: (Object? value) => _mutate(
-          'show condition',
-          (GlossRealDropSettingsDoc edited) => edited.show = value,
-        ),
-      ),
-      _conditionalVariants(doc),
-      _audience(doc),
-      HuiField(
-        label: huiText('Presentation'),
-        control: ArcaneSelect(
-          value: _selectedVariant?.toString() ?? 'default',
-          options: <ArcaneSelectOption>[
-            ArcaneSelectOption(
-              value: 'default',
-              label: huiText('Default presentation'),
-            ),
-            for (int index = 0; index < doc.variants.length; index++)
-              ArcaneSelectOption(
-                value: '$index',
-                label: doc.variants[index].id,
-              ),
-          ],
-          onChanged: (String value) =>
-              setState(() => _selectedVariant = int.tryParse(value)),
-        ),
-      ),
-      ParticleLayersEditor(
-        layers: presentation.particleLayers,
-        sectionKey: 'real-drops.particleLayers',
-        mutate: (String label, void Function(List<GlossParticleLayer>) edit) =>
-            _mutatePresentation(
-              label,
-              (GlossRealDropPresentation edited) => edit(edited.particleLayers),
-            ),
-      ),
-      _limits(presentation),
-      _scales(presentation),
-      _motion(presentation),
-      _landing(presentation),
-      _labels(presentation),
-      _filters(presentation),
-      _physics(presentation),
-      _script(presentation),
-      RealDropAnimationInspector(store: _store, variantIndex: _selectedVariant),
-    ]);
-  }
-
-  Widget _header(GlossRealDropSettingsDoc doc) =>
-      dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-        dom.div(classes: 'hui-inspector-header is-real-drops', <Widget>[
-          HuiEyebrow(huiText('Real drops')),
-          dom.h2(classes: 'hui-inspector-title hui-ltr', <Widget>[
-            Text(_store.menuId),
-          ]),
-        ]),
-        dom.p(classes: 'hui-inspector-lede', <Widget>[
-          Text(
-            huiText(
-              'Native item models, motion, landing, labels, and render limits.',
+    return DenseBox(
+      classes: 'hui-inspector-body is-real-drops',
+      children: <Widget>[
+        PaneHeader(
+          kind: huiText('Real drops'),
+          title: _store.menuId,
+          status: AdvancedOnly(
+            child: StatusBadge(
+              huiText('revision {revision}', <String, Object?>{
+                'revision': doc.revision,
+              }),
             ),
           ),
-        ]),
-        HuiRevisionRow(revision: doc.revision),
-      ]);
-
-  Widget _conditionalVariants(GlossRealDropSettingsDoc doc) => InspectorSection(
-    title: huiText('Conditional variants'),
-    children: <Widget>[
-      HuiNote(
-        huiText(
-          'The highest-priority matching variant replaces the entire default '
-          'presentation; equal priorities use the smaller id.',
         ),
+        AdvancedOnly(
+          child: GlossVisibilityEditor(
+            raw: doc.show ?? true,
+            issues: _issuesFor(r'$.show'),
+            sectionKey: 'realDrops.show',
+            onChanged: (Object? value) => _mutate(
+              'show condition',
+              (GlossRealDropSettingsDoc edited) => edited.show = value,
+            ),
+          ),
+        ),
+        AdvancedOnly(child: _conditionalVariants(doc)),
+        AdvancedOnly(child: _audience(doc)),
+        if (doc.variants.isNotEmpty) _presentationPicker(doc),
+        ParticleLayersEditor(
+          layers: presentation.particleLayers,
+          sectionKey: 'real-drops.particleLayers',
+          mutate:
+              (String label, void Function(List<GlossParticleLayer>) edit) =>
+                  _mutatePresentation(
+                    label,
+                    (GlossRealDropPresentation edited) =>
+                        edit(edited.particleLayers),
+                  ),
+        ),
+        _limits(presentation),
+        _scales(presentation),
+        _motion(presentation),
+        _landing(presentation),
+        _labels(presentation),
+        DisplayStyleEditor(
+          style: presentation.labels.style,
+          defaults: defaultRealDropLabelStyle(),
+          issues: _issuesFor(r'$.presentation.labels.style'),
+          onChanged: (String label, HuiIconStyle? style) => _mutatePresentation(
+            label,
+            (GlossRealDropPresentation edited) =>
+                edited.labels.style = style ?? defaultRealDropLabelStyle(),
+          ),
+        ),
+        HologramBoxEditor(
+          box: presentation.labels.box,
+          sectionKey: 'realDrops.labels.box',
+          issues: _issuesFor(r'$.presentation.labels.box'),
+          mutate: (String label, void Function(GlossHologramBox) change) =>
+              _mutatePresentation(
+                label,
+                (GlossRealDropPresentation edited) => change(edited.labels.box),
+              ),
+        ),
+        AdvancedOnly(
+          child: DisplayRefreshEditor(
+            refresh: presentation.labels.refresh,
+            onChanged: (String label, GlossDisplayRefresh next) =>
+                _mutatePresentation(
+                  label,
+                  (GlossRealDropPresentation edited) =>
+                      edited.labels.refresh = next,
+                ),
+          ),
+        ),
+        _filters(presentation),
+        AdvancedOnly(child: _physics(presentation)),
+        AdvancedOnly(child: _script(presentation)),
+        RealDropAnimationInspector(
+          store: _store,
+          variantIndex: _selectedVariant,
+        ),
+      ],
+    );
+  }
+
+  /// Picks the presentation every section below edits: the default one or a
+  /// variant's complete copy.
+  Widget _presentationPicker(GlossRealDropSettingsDoc doc) {
+    const String id = 'real-drops-presentation';
+    return Field(
+      label: huiText('Presentation'),
+      forId: id,
+      docKey: 'realDrops.presentation',
+      child: ArcaneSelect(
+        id: id,
+        value: _selectedVariant?.toString() ?? 'default',
+        size: _size,
+        fullWidth: true,
+        options: <ArcaneSelectOption>[
+          ArcaneSelectOption(
+            value: 'default',
+            label: huiText('Default presentation'),
+          ),
+          for (int index = 0; index < doc.variants.length; index++)
+            ArcaneSelectOption(value: '$index', label: doc.variants[index].id),
+        ],
+        onChanged: (String value) =>
+            setState(() => _selectedVariant = int.tryParse(value)),
       ),
-      for (int index = 0; index < doc.variants.length; index++)
-        _variant(doc, index),
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        icon: ArcaneIcon.plus(size: IconSize.sm),
+    );
+  }
+
+  Widget _conditionalVariants(GlossRealDropSettingsDoc doc) => AppSection(
+    title: huiText('Conditional variants'),
+    memoryKey: 'realDrops.variants',
+    docKey: 'realDrops.variants',
+    count: doc.variants.length,
+    actions: <Widget>[
+      AppIconButton(
+        icon: ArcaneIcon.plus(),
+        label: huiText('Add variant'),
+        tipAtEnd: true,
         onPressed: () => _mutate(
           'add real-drop variant',
           (GlossRealDropSettingsDoc edited) => edited.variants.add(
@@ -150,107 +216,142 @@ class _RealDropInspectorState extends State<RealDropInspector> {
             ),
           ),
         ),
-        label: huiText('Add variant'),
       ),
-      HuiInlineIssues(_issuesFor(r'$.variants')),
+    ],
+    children: <Widget>[
+      for (int index = 0; index < doc.variants.length; index++)
+        ..._variant(doc, index),
     ],
   );
 
-  Widget _variant(GlossRealDropSettingsDoc doc, int index) {
+  List<Widget> _variant(GlossRealDropSettingsDoc doc, int index) {
     final GlossRealDropVariant variant = doc.variants[index];
     final String path = '\$.variants[$index]';
-    return dom.div(classes: 'hui-drop-subgroup', <Widget>[
-      TextInput(
-        value: variant.id,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: huiText('variant-id'),
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
-        onChanged: (String value) => _mutate(
-          'rename real-drop variant',
-          (GlossRealDropSettingsDoc edited) =>
-              edited.variants[index].id = value,
-        ),
+    final String id = _idFor(path);
+    final bool editing = _selectedVariant == index;
+    return <Widget>[
+      ActionRow(
+        dense: true,
+        leading: <Widget>[
+          dom.h3(classes: 'ui-section-title', <Widget>[Text(variant.id)]),
+        ],
+        secondary: <RowAction>[
+          RowAction(
+            huiText('Edit complete presentation'),
+            () => setState(() => _selectedVariant = editing ? null : index),
+            icon: ArcaneIcon.pencil(),
+            iconOnly: true,
+            pressed: editing,
+          ),
+          RowAction(
+            huiText('Remove variant'),
+            () => _removeVariant(index),
+            icon: ArcaneIcon.trash2(),
+            iconOnly: true,
+            destructive: true,
+          ),
+        ],
       ),
-      HuiNumberField(
-        value: variant.priority.toDouble(),
-        step: 1,
-        decimals: 0,
-        integer: true,
-        onChanged: (double value) => _mutate(
-          'real-drop variant priority',
-          (GlossRealDropSettingsDoc edited) =>
-              edited.variants[index].priority = value.round(),
-        ),
-      ),
-      TextInput(
-        value: variant.when,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: huiText("drop.material == 'DIAMOND'"),
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
-        onChanged: (String value) => _mutate(
-          'real-drop variant condition',
-          (GlossRealDropSettingsDoc edited) =>
-              edited.variants[index].when = value,
-        ),
-      ),
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        onPressed: () => setState(() => _selectedVariant = index),
-        label: huiText('Edit complete presentation'),
-      ),
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        icon: ArcaneIcon.trash2(size: IconSize.sm),
-        onPressed: () {
-          _mutate(
-            'remove real-drop variant',
+      Field(
+        label: huiText('Variant id'),
+        forId: '$id-id',
+        problems: _at('$path.id'),
+        child: TextInput(
+          id: '$id-id',
+          value: variant.id,
+          size: _size,
+          fullWidth: true,
+          placeholder: huiText('variant-id'),
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+          onChanged: (String value) => _mutate(
+            'rename real-drop variant',
             (GlossRealDropSettingsDoc edited) =>
-                edited.variants.removeAt(index),
-          );
-          setState(() {
-            if (_selectedVariant == index) {
-              _selectedVariant = null;
-            } else if (_selectedVariant != null && _selectedVariant! > index) {
-              _selectedVariant = _selectedVariant! - 1;
-            }
-          });
-        },
-        label: huiText('Remove variant'),
+                edited.variants[index].id = value,
+          ),
+        ),
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]);
+      Field(
+        label: huiText('Priority'),
+        forId: '$id-priority',
+        problems: _at('$path.priority'),
+        child: NumberField(
+          id: '$id-priority',
+          value: variant.priority.toDouble(),
+          step: 1,
+          decimals: 0,
+          integer: true,
+          onChanged: (double value) => _mutate(
+            'real-drop variant priority',
+            (GlossRealDropSettingsDoc edited) =>
+                edited.variants[index].priority = value.round(),
+          ),
+        ),
+      ),
+      Field(
+        label: huiText('Condition'),
+        forId: '$id-when',
+        problems: _at('$path.when'),
+        child: TextInput(
+          id: '$id-when',
+          value: variant.when,
+          size: _size,
+          fullWidth: true,
+          placeholder: huiText("drop.material == 'DIAMOND'"),
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+          onChanged: (String value) => _mutate(
+            'real-drop variant condition',
+            (GlossRealDropSettingsDoc edited) =>
+                edited.variants[index].when = value,
+          ),
+        ),
+      ),
+    ];
   }
 
-  Widget _audience(GlossRealDropSettingsDoc doc) => InspectorSection(
-    title: huiText('Audience'),
-    children: <Widget>[
-      HuiNote(
-        huiText(
-          'This condition is evaluated separately for every viewer. A false '
-          'result leaves that viewer on the vanilla dropped item.',
+  void _removeVariant(int index) {
+    _mutate(
+      'remove real-drop variant',
+      (GlossRealDropSettingsDoc edited) => edited.variants.removeAt(index),
+    );
+    setState(() {
+      if (_selectedVariant == index) {
+        _selectedVariant = null;
+      } else if (_selectedVariant != null && _selectedVariant! > index) {
+        _selectedVariant = _selectedVariant! - 1;
+      }
+    });
+  }
+
+  Widget _audience(GlossRealDropSettingsDoc doc) {
+    const String id = 'real-drops-audience';
+    return AppSection(
+      title: huiText('Audience'),
+      memoryKey: 'realDrops.audience',
+      docKey: 'realDrops.audience',
+      children: <Widget>[
+        Field(
+          label: huiText('Viewer condition'),
+          forId: id,
+          problems: _issuesFor(r'$.audience.when'),
+          child: TextInput(
+            id: id,
+            value: doc.audience.when,
+            size: _size,
+            fullWidth: true,
+            placeholder: huiText("hasPermission('viewer', 'gloss.drops')"),
+            styles: technicalInputStyles,
+            attributes: technicalInputAttributes,
+            onChanged: (String value) => _mutate(
+              'real-drop audience condition',
+              (GlossRealDropSettingsDoc edited) => edited.audience.when = value,
+            ),
+          ),
         ),
-      ),
-      TextInput(
-        value: doc.audience.when,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: huiText("hasPermission('viewer', 'gloss.drops')"),
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
-        onChanged: (String value) => _mutate(
-          'real-drop audience condition',
-          (GlossRealDropSettingsDoc edited) => edited.audience.when = value,
-        ),
-      ),
-      HuiInlineIssues(_issuesFor(r'$.audience.when')),
-    ],
-  );
+      ],
+    );
+  }
 
   String _nextVariantId(GlossRealDropSettingsDoc doc) {
     int suffix = doc.variants.length + 1;
@@ -262,40 +363,39 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     return id;
   }
 
-  Widget _limits(GlossRealDropPresentation doc) => InspectorSection(
+  Widget _limits(GlossRealDropPresentation doc) => AppSection(
     title: huiText('Performance and density'),
+    memoryKey: 'realDrops.limits',
     children: <Widget>[
-      _integer(
-        label: huiText('Moving update interval'),
-        help: huiText(
-          'Ticks between interpolated targets while an item is moving. 1..20.',
-        ),
-        path: r'$.presentation.limits.updateIntervalTicks',
-        value: doc.limits.updateIntervalTicks,
-        onChanged: (int value) => _mutatePresentation(
-          'drop update interval',
-          (GlossRealDropPresentation edited) =>
-              edited.limits.updateIntervalTicks = value,
+      AdvancedOnly(
+        child: _integer(
+          label: huiText('Moving update interval'),
+          docKey: 'realDrops.limits.updateIntervalTicks',
+          path: r'$.presentation.limits.updateIntervalTicks',
+          value: doc.limits.updateIntervalTicks,
+          onChanged: (int value) => _mutatePresentation(
+            'drop update interval',
+            (GlossRealDropPresentation edited) =>
+                edited.limits.updateIntervalTicks = value,
+          ),
         ),
       ),
-      _integer(
-        label: huiText('Settled poll interval'),
-        help: huiText(
-          'Ticks between checks after the item is stable; landing slides retain the moving cadence. 2..200.',
-        ),
-        path: r'$.presentation.limits.settledPollIntervalTicks',
-        value: doc.limits.settledPollIntervalTicks,
-        onChanged: (int value) => _mutatePresentation(
-          'settled drop interval',
-          (GlossRealDropPresentation edited) =>
-              edited.limits.settledPollIntervalTicks = value,
+      AdvancedOnly(
+        child: _integer(
+          label: huiText('Settled poll interval'),
+          docKey: 'realDrops.limits.settledPollIntervalTicks',
+          path: r'$.presentation.limits.settledPollIntervalTicks',
+          value: doc.limits.settledPollIntervalTicks,
+          onChanged: (int value) => _mutatePresentation(
+            'settled drop interval',
+            (GlossRealDropPresentation edited) =>
+                edited.limits.settledPollIntervalTicks = value,
+          ),
         ),
       ),
       _integer(
         label: huiText('Models per stack'),
-        help: huiText(
-          'Maximum visible item models for one dropped stack. 1..5.',
-        ),
+        docKey: 'realDrops.limits.maxVisualsPerStack',
         path: r'$.presentation.limits.maxVisualsPerStack',
         value: doc.limits.maxVisualsPerStack,
         onChanged: (int value) => _mutatePresentation(
@@ -306,7 +406,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _integer(
         label: huiText('Models per chunk'),
-        help: huiText('Hard chunk budget across all dropped stacks. 8..1024.'),
+        docKey: 'realDrops.limits.maxVisualsPerChunk',
         path: r'$.presentation.limits.maxVisualsPerChunk',
         value: doc.limits.maxVisualsPerChunk,
         onChanged: (int value) => _mutatePresentation(
@@ -317,9 +417,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Model view range'),
-        help: huiText(
-          'Client tracking range for drop models in blocks. 4..128.',
-        ),
+        docKey: 'realDrops.limits.viewRange',
         path: r'$.presentation.limits.viewRange',
         value: doc.limits.viewRange,
         step: 1,
@@ -330,9 +428,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Stack spread'),
-        help: huiText(
-          'Horizontal separation between models in one stack. 0..1.',
-        ),
+        docKey: 'realDrops.limits.spread',
         path: r'$.presentation.limits.spread',
         value: doc.limits.spread,
         onChanged: (double value) => _mutatePresentation(
@@ -343,14 +439,13 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     ],
   );
 
-  Widget _scales(GlossRealDropPresentation doc) => InspectorSection(
+  Widget _scales(GlossRealDropPresentation doc) => AppSection(
     title: huiText('Model scale'),
+    memoryKey: 'realDrops.scale',
     children: <Widget>[
       _decimal(
         label: huiText('Default items'),
-        help: huiText(
-          'Scale for ordinary three-dimensional block models. 0.05..2.',
-        ),
+        docKey: 'realDrops.scale.defaultScale',
         path: r'$.presentation.scale.defaultScale',
         value: doc.scale.defaultScale,
         onChanged: (double value) => _mutatePresentation(
@@ -361,9 +456,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Flat items'),
-        help: huiText(
-          'Scale for non-block items rendered by ItemDisplay. Every block material uses true BlockDisplay geometry. 0.05..2.',
-        ),
+        docKey: 'realDrops.scale.flatItems',
         path: r'$.presentation.scale.flatItems',
         value: doc.scale.flatItems,
         onChanged: (double value) => _mutatePresentation(
@@ -373,9 +466,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Thin blocks'),
-        help: huiText(
-          'Scale for slabs, carpets, pressure plates, and snow layers. 0.05..2.',
-        ),
+        docKey: 'realDrops.scale.thinBlocks',
         path: r'$.presentation.scale.thinBlocks',
         value: doc.scale.thinBlocks,
         onChanged: (double value) => _mutatePresentation(
@@ -386,11 +477,13 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     ],
   );
 
-  Widget _motion(GlossRealDropPresentation doc) => InspectorSection(
+  Widget _motion(GlossRealDropPresentation doc) => AppSection(
     title: huiText('Tumble'),
+    memoryKey: 'realDrops.motion',
     children: <Widget>[
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('Tumble while moving'),
+        docKey: 'realDrops.motion.tumble',
         value: doc.motion.tumble,
         onChanged: (bool value) => _mutatePresentation(
           'drop tumble',
@@ -399,7 +492,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Animation speed'),
-        help: huiText('Multiplier applied to every tumble axis. 0.1..4.'),
+        docKey: 'realDrops.motion.speedMultiplier',
         path: r'$.presentation.motion.speedMultiplier',
         value: doc.motion.speedMultiplier,
         onChanged: (double value) => _mutatePresentation(
@@ -410,7 +503,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('X rotation'),
-        help: huiText('Base X-axis degrees per second. -1440..1440.'),
+        docKey: 'realDrops.motion.degreesPerSecondX',
         path: r'$.presentation.motion.degreesPerSecondX',
         value: doc.motion.degreesPerSecondX,
         step: 5,
@@ -422,7 +515,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Y rotation'),
-        help: huiText('Base Y-axis degrees per second. -1440..1440.'),
+        docKey: 'realDrops.motion.degreesPerSecondY',
         path: r'$.presentation.motion.degreesPerSecondY',
         value: doc.motion.degreesPerSecondY,
         step: 5,
@@ -434,7 +527,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Z rotation'),
-        help: huiText('Base Z-axis degrees per second. -1440..1440.'),
+        docKey: 'realDrops.motion.degreesPerSecondZ',
         path: r'$.presentation.motion.degreesPerSecondZ',
         value: doc.motion.degreesPerSecondZ,
         step: 5,
@@ -446,7 +539,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Per-item variance'),
-        help: huiText('Deterministic variation around the base axes. 0..1.'),
+        docKey: 'realDrops.motion.variance',
         path: r'$.presentation.motion.variance',
         value: doc.motion.variance,
         onChanged: (double value) => _mutatePresentation(
@@ -454,8 +547,9 @@ class _RealDropInspectorState extends State<RealDropInspector> {
           (GlossRealDropPresentation edited) => edited.motion.variance = value,
         ),
       ),
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('Change tumble on bounce'),
+        docKey: 'realDrops.motion.changeOnBounce',
         value: doc.motion.changeOnBounce,
         onChanged: (bool value) => _mutatePresentation(
           'bounce tumble change',
@@ -465,9 +559,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Throw momentum'),
-        help: huiText(
-          'How strongly real movement speed increases tumble speed. 0 ignores throw momentum; higher values tumble harder throws faster. 0..4.',
-        ),
+        docKey: 'realDrops.motion.velocityInfluence',
         path: r'$.presentation.motion.velocityInfluence',
         value: doc.motion.velocityInfluence,
         onChanged: (double value) => _mutatePresentation(
@@ -478,9 +570,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Submerged spin'),
-        help: huiText(
-          'Angular-speed multiplier while the item is in water. 0 stops rotation; 1 preserves airborne spin. 0..1.',
-        ),
+        docKey: 'realDrops.motion.submergedSpinMultiplier',
         path: r'$.presentation.motion.submergedSpinMultiplier',
         value: doc.motion.submergedSpinMultiplier,
         onChanged: (double value) => _mutatePresentation(
@@ -491,9 +581,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Ground roll'),
-        help: huiText(
-          'Rotation produced by real distance travelled on a surface. 0 slides without rolling; 1 uses the model radius. 0..4.',
-        ),
+        docKey: 'realDrops.motion.groundRollMultiplier',
         path: r'$.presentation.motion.groundRollMultiplier',
         value: doc.motion.groundRollMultiplier,
         onChanged: (double value) => _mutatePresentation(
@@ -505,22 +593,21 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     ],
   );
 
-  Widget _landing(GlossRealDropPresentation doc) => InspectorSection(
+  Widget _landing(GlossRealDropPresentation doc) => AppSection(
     title: huiText('Landing'),
+    memoryKey: 'realDrops.landing',
     children: <Widget>[
-      HuiField(
+      Field(
         label: huiText('Landing mode'),
-        help: huiText(
-          'Natural lets block models settle on any of six faces; Flat lays every model down; Upright removes pitch and roll.',
-        ),
-        control: ArcaneSelect(
+        docKey: 'realDrops.landing.mode',
+        problems: _issuesFor(r'$.presentation.landing.mode'),
+        child: ToggleChoice<String>(
+          label: huiText('Landing mode'),
           value: doc.landing.mode,
-          size: ComponentSize.sm,
-          fullWidth: true,
-          options: <ArcaneSelectOption>[
-            ArcaneSelectOption(label: huiText('Natural'), value: 'NATURAL'),
-            ArcaneSelectOption(label: huiText('Flat'), value: 'FLAT'),
-            ArcaneSelectOption(label: huiText('Upright'), value: 'UPRIGHT'),
+          options: <ChoiceOption<String>>[
+            ChoiceOption<String>('NATURAL', huiText('Natural')),
+            ChoiceOption<String>('FLAT', huiText('Flat')),
+            ChoiceOption<String>('UPRIGHT', huiText('Upright')),
           ],
           onChanged: (String value) => _mutatePresentation(
             'drop landing mode',
@@ -530,9 +617,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Natural face rotation'),
-        help: huiText(
-          'Maximum in-face variation for stationary or rebuilt natural blocks; momentum landings preserve their physical heading. 0..45.',
-        ),
+        docKey: 'realDrops.landing.tiltDegrees',
         path: r'$.presentation.landing.tiltDegrees',
         value: doc.landing.tiltDegrees,
         step: 1,
@@ -542,8 +627,9 @@ class _RealDropInspectorState extends State<RealDropInspector> {
               edited.landing.tiltDegrees = value,
         ),
       ),
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('Random landing yaw'),
+        docKey: 'realDrops.landing.randomYaw',
         value: doc.landing.randomYaw,
         onChanged: (bool value) => _mutatePresentation(
           'drop landing yaw',
@@ -553,9 +639,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _integer(
         label: huiText('Landing transition'),
-        help: huiText(
-          'Client interpolation ticks between continuous pose samples. 0..20.',
-        ),
+        docKey: 'realDrops.landing.transitionTicks',
         path: r'$.presentation.landing.transitionTicks',
         value: doc.landing.transitionTicks,
         onChanged: (int value) => _mutatePresentation(
@@ -566,9 +650,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Resting face pull'),
-        help: huiText(
-          'How strongly gravity pulls a nearly still item toward its nearest stable face each sample. 0..1.',
-        ),
+        docKey: 'realDrops.landing.faceAttraction',
         path: r'$.presentation.landing.faceAttraction',
         value: doc.landing.faceAttraction,
         onChanged: (double value) => _mutatePresentation(
@@ -579,9 +661,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Moving face pull'),
-        help: huiText(
-          'Face attraction retained while the item is still rolling. Lower values preserve momentum longer. 0..1.',
-        ),
+        docKey: 'realDrops.landing.movingFaceAttraction',
         path: r'$.presentation.landing.movingFaceAttraction',
         value: doc.landing.movingFaceAttraction,
         onChanged: (double value) => _mutatePresentation(
@@ -592,9 +672,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Face snap tolerance'),
-        help: huiText(
-          'Final subvisual angle where settling may become exactly flush. 0.05..10 degrees.',
-        ),
+        docKey: 'realDrops.landing.alignmentDegrees',
         path: r'$.presentation.landing.alignmentDegrees',
         value: doc.landing.alignmentDegrees,
         onChanged: (double value) => _mutatePresentation(
@@ -605,9 +683,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _integer(
         label: huiText('Stable delay'),
-        help: huiText(
-          'Ticks the item must remain aligned and motionless before sparse settled polling. 0..100.',
-        ),
+        docKey: 'realDrops.landing.settleDelayTicks',
         path: r'$.presentation.landing.settleDelayTicks',
         value: doc.landing.settleDelayTicks,
         onChanged: (int value) => _mutatePresentation(
@@ -619,19 +695,15 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     ],
   );
 
-  Widget _labels(GlossRealDropPresentation doc) => InspectorSection(
+  /// The label's own fields. Its style, box and refresh are sections of
+  /// their own below this one, so no disclosure sits inside another.
+  Widget _labels(GlossRealDropPresentation doc) => AppSection(
     title: huiText('Labels'),
-    sectionKey: 'realDrops.labels',
+    memoryKey: 'realDrops.labels',
     children: <Widget>[
-      ExtrasEditor(title: huiText('Settings'), extensionKeys: false,
-        extras: <String, Object?>{'show': doc.labels.show, 'preserveCustomNames': doc.labels.preserveCustomNames},
-        onChanged: (String label, Map<String, dynamic> next) => _mutatePresentation(label, (GlossRealDropPresentation edited) {
-          edited.labels.show = huiDeepCopy(next['show'] ?? true);
-          edited.labels.preserveCustomNames = next['preserveCustomNames'] == null || huiReadBool(next, 'preserveCustomNames');
-        }),
-      ),
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('Enabled'),
+        docKey: 'realDrops.labels.enabled',
         value: doc.labels.enabled,
         onChanged: (bool value) => _mutatePresentation(
           'label visibility',
@@ -640,7 +712,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _decimal(
         label: huiText('Vertical offset'),
-        help: huiText('Offset above the dropped item in blocks.'),
+        docKey: 'realDrops.labels.yOffset',
         path: r'$.presentation.labels.yOffset',
         value: doc.labels.yOffset,
         onChanged: (double value) => _mutatePresentation(
@@ -659,10 +731,10 @@ class _RealDropInspectorState extends State<RealDropInspector> {
           (GlossRealDropPresentation edited) => edited.labels.format = value,
         ),
       ),
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('Use item display names'),
+        docKey: 'realDrops.labels.useItemDisplayNames',
         value: doc.labels.useItemDisplayNames,
-        trailing: const HuiFieldHelp('realDrops.labels.useItemDisplayNames'),
         onChanged: (bool value) => _mutatePresentation(
           'label item display names',
           (GlossRealDropPresentation edited) =>
@@ -678,115 +750,108 @@ class _RealDropInspectorState extends State<RealDropInspector> {
               (GlossRealDropPresentation edited) => edited.labels.names = next,
             ),
       ),
-      _bundle(doc.labels.bundle),
-      DisplayRefreshEditor(refresh: doc.labels.refresh, onChanged: (String label, GlossDisplayRefresh next) =>
-        _mutatePresentation(label, (GlossRealDropPresentation edited) => edited.labels.refresh = next)),
-      DisplayStyleEditor(
-        style: doc.labels.style,
-        defaults: defaultRealDropLabelStyle(),
-        issues: _issuesFor(r'$.presentation.labels.style'),
-        onChanged: (String label, HuiIconStyle? style) => _mutatePresentation(
-          label,
-          (GlossRealDropPresentation edited) =>
-              edited.labels.style = style ?? defaultRealDropLabelStyle(),
+      ..._bundle(doc.labels.bundle),
+      AdvancedOnly(
+        child: ExtrasEditor(
+          title: huiText('Settings'),
+          extensionKeys: false,
+          extras: <String, Object?>{
+            'show': doc.labels.show,
+            'preserveCustomNames': doc.labels.preserveCustomNames,
+          },
+          onChanged: (String label, Map<String, dynamic> next) =>
+              _mutatePresentation(label, (GlossRealDropPresentation edited) {
+                edited.labels.show = huiDeepCopy(next['show'] ?? true);
+                edited.labels.preserveCustomNames =
+                    next['preserveCustomNames'] == null ||
+                    huiReadBool(next, 'preserveCustomNames');
+              }),
         ),
-      ),
-      HologramBoxEditor(
-        box: doc.labels.box,
-        sectionKey: 'realDrops.labels.box',
-        issues: _issuesFor(r'$.presentation.labels.box'),
-        mutate: (String label, void Function(GlossHologramBox) change) =>
-            _mutatePresentation(
-              label,
-              (GlossRealDropPresentation edited) => change(edited.labels.box),
-            ),
       ),
     ],
   );
 
   /// `labels.bundle`: the label of a dropped bundle that carries stacks.
-  Widget _bundle(GlossRealDropLabelBundle bundle) =>
-      dom.div(classes: 'hui-drop-subgroup', <Widget>[
-        dom.div(classes: 'hui-drop-subhead', <Widget>[
-          Text(huiText('Bundle')),
-          const HuiFieldHelp('realDrops.labels.bundle'),
-        ]),
-        _text(
-          label: huiText('Single-line format'),
-          docKey: 'realDrops.labels.bundle.format',
-          path: r'$.presentation.labels.bundle.format',
-          value: bundle.format,
-          fallback: glossRealDropBundleFormatDefault,
-          onChanged: (String value) => _mutatePresentation(
-            'bundle label format',
-            (GlossRealDropPresentation edited) =>
-                edited.labels.bundle.format = value,
-          ),
-        ),
-        _integer(
-          label: huiText('Entry limit'),
-          docKey: 'realDrops.labels.bundle.entryLimit',
-          path: r'$.presentation.labels.bundle.entryLimit',
-          value: bundle.entryLimit,
-          onChanged: (int value) => _mutatePresentation(
-            'bundle label entry limit',
-            (GlossRealDropPresentation edited) =>
-                edited.labels.bundle.entryLimit = value,
-          ),
-        ),
-        HuiSwitchRow(
-          label: huiText('One line per material'),
-          value: bundle.vertical,
-          trailing: const HuiFieldHelp('realDrops.labels.bundle.vertical'),
-          onChanged: (bool value) => _mutatePresentation(
-            'bundle label lines',
-            (GlossRealDropPresentation edited) =>
-                edited.labels.bundle.vertical = value,
-          ),
-        ),
-        _text(
-          label: huiText('Header format'),
-          docKey: 'realDrops.labels.bundle.headerFormat',
-          path: r'$.presentation.labels.bundle.headerFormat',
-          value: bundle.headerFormat,
-          fallback: glossRealDropBundleHeaderFormatDefault,
-          onChanged: (String value) => _mutatePresentation(
-            'bundle label header format',
-            (GlossRealDropPresentation edited) =>
-                edited.labels.bundle.headerFormat = value,
-          ),
-        ),
-        _text(
-          label: huiText('Entry format'),
-          docKey: 'realDrops.labels.bundle.entryFormat',
-          path: r'$.presentation.labels.bundle.entryFormat',
-          value: bundle.entryFormat,
-          fallback: glossRealDropBundleEntryFormatDefault,
-          onChanged: (String value) => _mutatePresentation(
-            'bundle label entry format',
-            (GlossRealDropPresentation edited) =>
-                edited.labels.bundle.entryFormat = value,
-          ),
-        ),
-        _text(
-          label: huiText('More format'),
-          docKey: 'realDrops.labels.bundle.moreFormat',
-          path: r'$.presentation.labels.bundle.moreFormat',
-          value: bundle.moreFormat,
-          fallback: glossRealDropBundleMoreFormatDefault,
-          onChanged: (String value) => _mutatePresentation(
-            'bundle label more format',
-            (GlossRealDropPresentation edited) =>
-                edited.labels.bundle.moreFormat = value,
-          ),
-        ),
-      ]);
+  List<Widget> _bundle(GlossRealDropLabelBundle bundle) => <Widget>[
+    _subhead(huiText('Bundle'), 'realDrops.labels.bundle'),
+    _text(
+      label: huiText('Single-line format'),
+      docKey: 'realDrops.labels.bundle.format',
+      path: r'$.presentation.labels.bundle.format',
+      value: bundle.format,
+      fallback: glossRealDropBundleFormatDefault,
+      onChanged: (String value) => _mutatePresentation(
+        'bundle label format',
+        (GlossRealDropPresentation edited) =>
+            edited.labels.bundle.format = value,
+      ),
+    ),
+    _integer(
+      label: huiText('Entry limit'),
+      docKey: 'realDrops.labels.bundle.entryLimit',
+      path: r'$.presentation.labels.bundle.entryLimit',
+      value: bundle.entryLimit,
+      onChanged: (int value) => _mutatePresentation(
+        'bundle label entry limit',
+        (GlossRealDropPresentation edited) =>
+            edited.labels.bundle.entryLimit = value,
+      ),
+    ),
+    SwitchField(
+      label: huiText('One line per material'),
+      docKey: 'realDrops.labels.bundle.vertical',
+      value: bundle.vertical,
+      onChanged: (bool value) => _mutatePresentation(
+        'bundle label lines',
+        (GlossRealDropPresentation edited) =>
+            edited.labels.bundle.vertical = value,
+      ),
+    ),
+    _text(
+      label: huiText('Header format'),
+      docKey: 'realDrops.labels.bundle.headerFormat',
+      path: r'$.presentation.labels.bundle.headerFormat',
+      value: bundle.headerFormat,
+      fallback: glossRealDropBundleHeaderFormatDefault,
+      onChanged: (String value) => _mutatePresentation(
+        'bundle label header format',
+        (GlossRealDropPresentation edited) =>
+            edited.labels.bundle.headerFormat = value,
+      ),
+    ),
+    _text(
+      label: huiText('Entry format'),
+      docKey: 'realDrops.labels.bundle.entryFormat',
+      path: r'$.presentation.labels.bundle.entryFormat',
+      value: bundle.entryFormat,
+      fallback: glossRealDropBundleEntryFormatDefault,
+      onChanged: (String value) => _mutatePresentation(
+        'bundle label entry format',
+        (GlossRealDropPresentation edited) =>
+            edited.labels.bundle.entryFormat = value,
+      ),
+    ),
+    _text(
+      label: huiText('More format'),
+      docKey: 'realDrops.labels.bundle.moreFormat',
+      path: r'$.presentation.labels.bundle.moreFormat',
+      value: bundle.moreFormat,
+      fallback: glossRealDropBundleMoreFormatDefault,
+      onChanged: (String value) => _mutatePresentation(
+        'bundle label more format',
+        (GlossRealDropPresentation edited) =>
+            edited.labels.bundle.moreFormat = value,
+      ),
+    ),
+  ];
 
-  Widget _filters(GlossRealDropPresentation doc) => InspectorSection(
+  Widget _filters(GlossRealDropPresentation doc) => AppSection(
     title: huiText('Filters'),
+    memoryKey: 'realDrops.filters',
     children: <Widget>[
-      HuiSwitchRow(
+      SwitchField(
         label: huiText('Only player-thrown drops'),
+        docKey: 'realDrops.filters.onlyPlayerDrops',
         value: doc.filters.onlyPlayerDrops,
         onChanged: (bool value) => _mutatePresentation(
           'drop source filter',
@@ -796,9 +861,9 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _list(
         label: huiText('Disabled worlds'),
-        help: huiText(
-          'Comma-separated world names that keep vanilla item rendering.',
-        ),
+        docKey: 'realDrops.filters.disabledWorlds',
+        path: r'$.presentation.filters.disabledWorlds',
+        placeholder: 'world_nether, world_the_end',
         value: doc.filters.disabledWorlds,
         onChanged: (List<String> value) => _mutatePresentation(
           'disabled drop worlds',
@@ -808,7 +873,9 @@ class _RealDropInspectorState extends State<RealDropInspector> {
       ),
       _list(
         label: huiText('Material blacklist'),
-        help: huiText('Comma-separated Bukkit material names kept vanilla.'),
+        docKey: 'realDrops.filters.materialBlacklist',
+        path: r'$.presentation.filters.materialBlacklist',
+        placeholder: 'BEDROCK, BARRIER',
         value: doc.filters.materialBlacklist,
         onChanged: (List<String> value) => _mutatePresentation(
           'drop material blacklist',
@@ -830,20 +897,19 @@ class _RealDropInspectorState extends State<RealDropInspector> {
   Widget _physics(GlossRealDropPresentation doc) {
     final GlossRealDropPhysics? physics = doc.physics;
     final bool enabled = physics?.enabled ?? false;
-    return InspectorSection(
+    return AppSection(
       title: huiText('Item physics'),
-      sectionKey: 'realDrops.physics',
-      description: huiText(
+      memoryKey: 'realDrops.physics',
+      tip: huiText(
         'Real changes to how the dropped item moves. These write to the '
         'entity, so its position, its collision and its pickup radius all '
         'follow.',
       ),
-      trailing: const HuiFieldHelp('realDrops.physics'),
       children: <Widget>[
-        HuiSwitchRow(
+        SwitchField(
           label: huiText('Move the item entity'),
+          docKey: 'realDrops.physics.enabled',
           value: enabled,
-          trailing: const HuiFieldHelp('realDrops.physics.enabled'),
           onChanged: (bool value) => _mutatePhysics(
             'drop physics',
             (GlossRealDropPhysics edited) => edited.enabled = value,
@@ -904,23 +970,26 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     required double value,
     required String fallback,
     required void Function(double value) onChanged,
-  }) => HuiField(
-    label: label,
-    defaultValue: fallback,
-    onReset: value == double.parse(fallback)
-        ? null
-        : () => onChanged(double.parse(fallback)),
-    trailing: HuiFieldHelp(docKey),
-    control: dom.div(<Widget>[
-      HuiNumberField(
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      defaultValue: fallback,
+      onReset: value == double.parse(fallback)
+          ? null
+          : () => onChanged(double.parse(fallback)),
+      problems: _issuesFor(path),
+      child: NumberField(
+        id: id,
         value: value,
         step: 0.05,
         decimals: 2,
         onChanged: onChanged,
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
   // --- script ---------------------------------------------------------------
 
@@ -928,45 +997,44 @@ class _RealDropInspectorState extends State<RealDropInspector> {
   ///
   /// Every expression here is compiled and type-checked by the server whether
   /// or not the switch is on, so the validation panel reports a broken one
-  /// either way — which is why the switch does not gate any of these controls.
+  /// either way, which is why the switch does not gate any of these controls.
   Widget _script(GlossRealDropPresentation doc) {
     final GlossRealDropScript? script = doc.script;
-    return InspectorSection(
+    return AppSection(
       title: huiText('Script'),
-      sectionKey: 'realDrops.script',
-      description: huiText(
+      memoryKey: 'realDrops.script',
+      tip: huiText(
         'Expressions are compiled once; stack-shared and settled-static '
         'results are reused when their inputs do not change. They move the '
         'displays only: the item, its collision and its pickup radius stay '
         'where Minecraft put them.',
       ),
-      trailing: const HuiFieldHelp('realDrops.script'),
       children: <Widget>[
-        HuiSwitchRow(
+        SwitchField(
           label: huiText('Run the script'),
+          docKey: 'realDrops.script.enabled',
           value: script?.enabled ?? false,
-          trailing: const HuiFieldHelp('realDrops.script.enabled'),
           onChanged: (bool value) => _mutateScript(
             'drop script',
             (GlossRealDropScript edited) => edited.enabled = value,
           ),
         ),
-        _vars(script),
-        _axis(
+        ..._vars(script),
+        ..._axis(
           title: huiText('Offset'),
           docKey: 'realDrops.script.offset',
           field: 'offset',
           axis: script?.offset,
           neutral: '0',
         ),
-        _axis(
+        ..._axis(
           title: huiText('Rotation'),
           docKey: 'realDrops.script.rotation',
           field: 'rotation',
           axis: script?.rotation,
           neutral: '0',
         ),
-        _axis(
+        ..._axis(
           title: huiText('Scale'),
           docKey: 'realDrops.script.scale',
           field: 'scale',
@@ -974,6 +1042,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
           neutral: '1',
         ),
         RealDropExprField(
+          id: _idFor(r'$.presentation.script.glow'),
           label: huiText('Glow'),
           docKey: 'realDrops.script.glow',
           value: script?.glow ?? '',
@@ -985,6 +1054,7 @@ class _RealDropInspectorState extends State<RealDropInspector> {
           ),
         ),
         RealDropExprField(
+          id: _idFor(r'$.presentation.script.visible'),
           label: huiText('Visible'),
           docKey: 'realDrops.script.visible',
           value: script?.visible ?? 'true',
@@ -1000,21 +1070,20 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     );
   }
 
-  /// One axis object: three expressions on one row each, sharing the shared
-  /// `axis` doc entry so the three vectors never drift apart in the help.
-  Widget _axis({
+  /// One axis object: three expressions under one heading, each with the
+  /// shared `axis` doc entry so the three vectors never drift apart in the
+  /// help.
+  List<Widget> _axis({
     required String title,
     required String docKey,
     required String field,
     required GlossRealDropScriptAxis? axis,
     required String neutral,
-  }) => dom.div(classes: 'hui-drop-subgroup', <Widget>[
-    dom.div(classes: 'hui-drop-subhead', <Widget>[
-      Text(title),
-      HuiFieldHelp(docKey),
-    ]),
+  }) => <Widget>[
+    _subhead(title, docKey),
     for (final String name in const <String>['x', 'y', 'z'])
       RealDropExprField(
+        id: _idFor('\$.presentation.script.$field.$name'),
         label: name.toUpperCase(),
         docKey: 'realDrops.axis.$name',
         neutral: neutral,
@@ -1043,136 +1112,103 @@ class _RealDropInspectorState extends State<RealDropInspector> {
           }
         }),
       ),
-  ]);
+  ];
 
   /// The `vars` list: add, remove and reorder, and never a sort.
   ///
-  /// Declaration order decides what each entry can read — an expression sees
-  /// every var declared before it and none declared after — so the order in
-  /// this list is the order in the file, and moving a row is a real edit to the
-  /// document rather than a view preference.
-  Widget _vars(GlossRealDropScript? script) {
+  /// Declaration order decides what each entry can read (an expression sees
+  /// every var declared before it and none declared after), so the order in
+  /// this list is the order in the file, and moving a row is a real edit to
+  /// the document rather than a view preference.
+  List<Widget> _vars(GlossRealDropScript? script) {
     final List<GlossRealDropScriptVar> vars =
         script?.vars ?? const <GlossRealDropScriptVar>[];
-    return dom.div(classes: 'hui-drop-subgroup', <Widget>[
-      dom.div(classes: 'hui-drop-subhead', <Widget>[
-        Text(huiText('Variables')),
-        const HuiFieldHelp('realDrops.script.vars'),
-      ]),
-      HuiInlineIssues(_issuesFor(r'$.presentation.script.vars')),
-      if (vars.isEmpty)
-        dom.p(classes: 'hui-drop-empty', <Widget>[
-          Text(
-            huiText(
-              'No variables. Name a condition once here and every expression '
-              'after it can read it.',
+    return <Widget>[
+      ActionRow(
+        dense: true,
+        leading: <Widget>[
+          dom.h3(classes: 'ui-section-title', <Widget>[
+            TipLabel(
+              label: Text(huiText('Variables')),
+              docKey: 'realDrops.script.vars',
             ),
+          ]),
+        ],
+        secondary: <RowAction>[
+          RowAction(
+            huiText('Add variable'),
+            vars.length >= GlossRealDropScript.maxVars
+                ? null
+                : () => _mutateScript(
+                    'add drop script variable',
+                    (GlossRealDropScript edited) => edited.vars.add(
+                      GlossRealDropScriptVar(
+                        name: _freshVarName(edited.vars),
+                        expression: '0',
+                      ),
+                    ),
+                  ),
+            icon: ArcaneIcon.plus(),
           ),
-        ])
-      else
-        HuiReorderList(
+        ],
+      ),
+      for (final HuiIssue issue in distinctIssues(
+        _exact(r'$.presentation.script.vars'),
+      ))
+        issueNote(issue),
+      if (vars.isNotEmpty)
+        ReorderList(
+          label: huiText('Variables'),
           itemCount: vars.length,
-          handleLabel: huiText(
-            'Drag to reorder — order decides what each one can read',
-          ),
           onReorder: (int from, int to) => _mutateScript(
             'reorder drop script variables',
             (GlossRealDropScript edited) =>
                 edited.vars.insert(to, edited.vars.removeAt(from)),
           ),
+          onRemove: (int index) => _mutateScript(
+            'remove drop script variable',
+            (GlossRealDropScript edited) => edited.vars.removeAt(index),
+          ),
           itemBuilder: (int index) => _varRow(vars, index),
         ),
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        onPressed: vars.length >= GlossRealDropScript.maxVars
-            ? null
-            : () => _mutateScript(
-                'add drop script variable',
-                (GlossRealDropScript edited) => edited.vars.add(
-                  GlossRealDropScriptVar(
-                    name: _freshVarName(edited.vars),
-                    expression: '0',
-                  ),
-                ),
-              ),
-        label: huiText('Add variable'),
-      ),
-    ]);
+    ];
   }
 
   Widget _varRow(List<GlossRealDropScriptVar> vars, int index) {
     final GlossRealDropScriptVar variable = vars[index];
-    return dom.div(classes: 'hui-drop-var-row', <Widget>[
-      TextInput(
-        value: variable.name,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: huiText('name'),
-        styles: huiTechnicalInputStyles,
-        attributes: <String, String>{
-          ...huiTechnicalInputAttributes,
-          'aria-label': huiText('Variable name'),
-        },
-        onChanged: (String value) => _mutateScript(
-          'rename drop script variable',
-          (GlossRealDropScript edited) =>
-              edited.vars[index].name = value.trim(),
+    final String id = 'real-drops-var-$index';
+    return Component.fragment(<Widget>[
+      Field(
+        label: huiText('Variable name'),
+        forId: '$id-name',
+        child: TextInput(
+          id: '$id-name',
+          value: variable.name,
+          size: _size,
+          fullWidth: true,
+          placeholder: huiText('name'),
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
+          onChanged: (String value) => _mutateScript(
+            'rename drop script variable',
+            (GlossRealDropScript edited) =>
+                edited.vars[index].name = value.trim(),
+          ),
         ),
       ),
       RealDropExprField(
+        id: '$id-expression',
         label: huiText('Expression'),
-        bare: true,
         value: variable.expression,
         placeholder: huiText('expression'),
-        issues: _exact('\$.presentation.script.vars.\${variable.name}'),
+        issues: _exact('\$.presentation.script.vars.${variable.name}'),
         onChanged: (String value) => _mutateScript(
           'edit drop script variable',
           (GlossRealDropScript edited) => edited.vars[index].expression = value,
         ),
       ),
-      dom.div(classes: 'hui-drop-rowactions', <Widget>[
-        _rowButton(
-          label: huiText('Move up'),
-          icon: ArcaneIcon.chevronUp(size: IconSize.sm),
-          onPressed: index == 0 ? null : () => _moveVar(index, index - 1),
-        ),
-        _rowButton(
-          label: huiText('Move down'),
-          icon: ArcaneIcon.chevronDown(size: IconSize.sm),
-          onPressed: index >= vars.length - 1
-              ? null
-              : () => _moveVar(index, index + 1),
-        ),
-        _rowButton(
-          label: huiText('Remove variable'),
-          icon: ArcaneIcon.trash2(size: IconSize.sm),
-          onPressed: () => _mutateScript(
-            'remove drop script variable',
-            (GlossRealDropScript edited) => edited.vars.removeAt(index),
-          ),
-        ),
-      ]),
     ]);
   }
-
-  Widget _rowButton({
-    required String label,
-    required ArcaneGlyph icon,
-    required void Function()? onPressed,
-  }) => Button(
-    variant: ButtonVariant.ghost,
-    size: ButtonSize.iconSm,
-    onPressed: onPressed,
-    attributes: <String, String>{'aria-label': label, 'title': label},
-    icon: icon,
-  );
-
-  void _moveVar(int from, int to) => _mutateScript(
-    'reorder drop script variables',
-    (GlossRealDropScript edited) =>
-        edited.vars.insert(to, edited.vars.removeAt(from)),
-  );
 
   /// A name nothing in the list already uses, so adding a row twice in a row
   /// does not produce two entries the server refuses as declared twice.
@@ -1186,60 +1222,64 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     }
   }
 
-  /// Issues on exactly this path. The prefix match [_issuesFor] does is wrong
-  /// for an expression field: `$.presentation.script.scale` would swallow all three axes.
-  List<HuiIssue> _exact(String path) => _store.issues
-      .where((HuiIssue issue) => issue.path == _selectedPath(path))
-      .toList();
+  /// A heading over a few fields inside a section.
+  Widget _subhead(String title, String docKey) => dom.h3(
+    classes: 'ui-section-title',
+    <Widget>[TipLabel(label: Text(title), docKey: docKey)],
+  );
 
   Widget _integer({
     required String label,
+    required String docKey,
     required String path,
     required int value,
     required void Function(int value) onChanged,
-    String? help,
-    String? docKey,
-  }) => HuiField(
-    label: label,
-    help: help,
-    trailing: docKey == null ? null : HuiFieldHelp(docKey),
-    control: dom.div(<Widget>[
-      HuiNumberField(
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: NumberField(
+        id: id,
         value: value.toDouble(),
         step: 1,
         decimals: 0,
         integer: true,
         onChanged: (double parsed) => onChanged(parsed.round()),
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
   Widget _decimal({
     required String label,
-    required String help,
+    required String docKey,
     required String path,
     required double value,
     required void Function(double value) onChanged,
     double step = 0.05,
-  }) => HuiField(
-    label: label,
-    help: help,
-    control: dom.div(<Widget>[
-      HuiNumberField(
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: NumberField(
+        id: id,
         value: value,
         step: step,
         decimals: 2,
         onChanged: onChanged,
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
   /// One label text field. A blank value is what the server swaps for
   /// [fallback], so the placeholder shows it and the reset restores it. The
-  /// formats are too long for the header's default chip, so the reset stands
-  /// alone beside the help.
+  /// formats are too long for the field's default chip, so the reset stands
+  /// alone at the end of the label line.
   Widget _text({
     required String label,
     required String docKey,
@@ -1247,67 +1287,67 @@ class _RealDropInspectorState extends State<RealDropInspector> {
     required String value,
     required String fallback,
     required void Function(String value) onChanged,
-  }) => HuiField(
-    label: label,
-    trailing: dom.div(classes: 'hui-field-trailing', <Widget>[
-      ArcaneTooltip(
-        text: huiText('Reset {label} to {defaultValue}', <String, Object?>{
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      trailing: AppIconButton(
+        icon: ArcaneIcon.rotateCcw(),
+        label: huiText('Reset {label} to {defaultValue}', <String, Object?>{
           'label': label,
           'defaultValue': fallback,
         }),
-        child: Button(
-          variant: ButtonVariant.ghost,
-          size: ButtonSize.iconSm,
-          disabled: value == fallback,
-          onPressed: () => onChanged(fallback),
-          attributes: <String, String>{
-            'aria-label': huiText(
-              'Reset {label} to {defaultValue}',
-              <String, Object?>{'label': label, 'defaultValue': fallback},
-            ),
-          },
-          icon: ArcaneIcon.rotateCcw(size: IconSize.sm),
-        ),
+        tipAtEnd: true,
+        onPressed: value == fallback ? null : () => onChanged(fallback),
       ),
-      HuiFieldHelp(docKey),
-    ]),
-    control: dom.div(<Widget>[
-      TextInput(
+      child: TextInput(
+        id: id,
         value: value,
-        size: ComponentSize.sm,
+        size: _size,
         fullWidth: true,
         placeholder: fallback,
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
+        styles: technicalInputStyles,
+        attributes: technicalInputAttributes,
         onChanged: onChanged,
       ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
-  );
+    );
+  }
 
   Widget _list({
     required String label,
-    required String help,
+    required String docKey,
+    required String path,
+    required String placeholder,
     required List<String> value,
     required void Function(List<String> value) onChanged,
-  }) => HuiField(
-    label: label,
-    help: help,
-    control: TextInput(
-      value: value.join(', '),
-      size: ComponentSize.sm,
-      fullWidth: true,
-      styles: huiTechnicalInputStyles,
-      onChanged: (String raw) => onChanged(
-        raw
-            .split(',')
-            .map((String entry) => entry.trim())
-            .where((String entry) => entry.isNotEmpty)
-            .toList(),
+  }) {
+    final String id = _idFor(path);
+    return Field(
+      label: label,
+      forId: id,
+      docKey: docKey,
+      problems: _issuesFor(path),
+      child: TextInput(
+        id: id,
+        value: value.join(', '),
+        size: _size,
+        fullWidth: true,
+        placeholder: placeholder,
+        styles: technicalInputStyles,
+        attributes: technicalInputAttributes,
+        onChanged: (String raw) => onChanged(
+          raw
+              .split(',')
+              .map((String entry) => entry.trim())
+              .where((String entry) => entry.isNotEmpty)
+              .toList(),
+        ),
       ),
-      attributes: huiTechnicalInputAttributes,
-    ),
-  );
+    );
+  }
 
   void _mutatePresentation(
     String label,

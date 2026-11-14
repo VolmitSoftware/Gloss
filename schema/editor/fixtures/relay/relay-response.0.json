@@ -1,0 +1,21 @@
+{
+  "type": "response",
+  "id": 7,
+  "status": 200,
+  "body": {
+    "changeId": "chg_7f3c9a1e5b2d4c60",
+    "idempotencyKey": "pub_4kB2f0Qx9w1mZr8c",
+    "status": "applied",
+    "message": "Published 1 change.",
+    "conflicts": [],
+    "documents": [],
+    "deleted": [
+      {
+        "kind": "menu",
+        "id": "shop/m0002"
+      }
+    ],
+    "images": [],
+    "removedImages": []
+  }
+}

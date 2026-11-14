@@ -28,24 +28,19 @@ import '../../logic/surface_validation.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
 import '../gloss/gloss_game_screen.dart';
-import '../gloss/gloss_preview_zoom.dart';
+import '../../ui/action_row.dart';
+import '../../ui/mode.dart';
 import '../gloss/gloss_text_line.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// Animation repaint period, matching the scoreboard stage.
 const Duration _tickPeriod = Duration(milliseconds: 50);
 
-/// The nine hotbar cells the action bar sits above.
-const int _hotbarSlots = 9;
-
 class SurfaceView extends StatefulWidget {
-  const SurfaceView({required this.store, this.gameContext = false, super.key});
+  const SurfaceView({required this.store, super.key});
 
   final EditorStore store;
-
-  /// Mounts the HUD line inside the shared Minecraft game-screen frame, which
-  /// draws the real hotbar, instead of the editor stage's mock one.
-  final bool gameContext;
 
   @override
   State<SurfaceView> createState() => _SurfaceViewState();
@@ -90,13 +85,10 @@ class _SurfaceViewState extends State<SurfaceView> {
     final GlossSurfaceDoc? doc = _store.surfaceDoc;
     if (doc == null) {
       _syncTicker(false);
-      if (component.gameContext) {
-        return glossGameEmpty(
-          anchor: GlossGameAnchor.hud,
-          label: huiText('Surface in game'),
-        );
-      }
-      return const dom.div(classes: 'hui-surface-stage is-empty', <Widget>[]);
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.hud,
+        label: huiText('Surface in game'),
+      );
     }
 
     final int nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -119,9 +111,7 @@ class _SurfaceViewState extends State<SurfaceView> {
     );
 
     final Widget hud = dom.div(
-      classes:
-          'hui-surface-hud is-${doc.resolvedSurface}'
-          '${component.gameContext ? ' is-game' : ''}',
+      classes: 'hui-surface-hud is-${doc.resolvedSurface}',
       <Widget>[
         if (silence != null) _silent(silence),
         if (silence == null && doc.resolvedSurface == glossSurfaceKindBossbar)
@@ -130,40 +120,20 @@ class _SurfaceViewState extends State<SurfaceView> {
           _title(resolved, nowMs),
         if (silence == null && doc.resolvedSurface == glossSurfaceKindActionbar)
           _actionbar(resolved, nowMs),
-        if (!component.gameContext) _hotbar(),
       ],
     );
 
-    if (component.gameContext) {
-      return GlossGameScreen(
-        anchor: GlossGameAnchor.hud,
-        label: huiText('Surface in game'),
-        controls: <Widget>[_playPause()],
-        child: hud,
-      );
-    }
-
-    return dom.div(classes: 'hui-surface-stage', <Widget>[
-      GlossPreviewZoom(
-        label: huiText('Surface preview'),
-        child: dom.div(classes: 'hui-surface-screen', <Widget>[
-          hud,
-          dom.div(classes: 'hui-surface-controls', <Widget>[
-            dom.span(classes: 'hui-surface-viewer', <Widget>[
-              Text(
-                huiText('Seen by {name}', <String, Object?>{
-                  'name': glossSurfaceSampleViewerName,
-                }),
-              ),
-            ]),
-            _playPause(),
-          ]),
-        ]),
+    return GlossGameScreen(
+      anchor: GlossGameAnchor.hud,
+      label: huiText('Surface in game'),
+      actions: <RowAction>[_playPause()],
+      status: _status(
+        doc,
+        resolved,
+        ModeScope.advanced(context) ? variantId : null,
       ),
-      dom.div(classes: 'hui-surface-readout', <Widget>[
-        Text(_readout(doc, resolved, variantId, silence)),
-      ]),
-    ]);
+      child: hud,
+    );
   }
 
   Widget _actionbar(GlossSurfacePresentation resolved, int nowMs) {
@@ -234,14 +204,6 @@ class _SurfaceViewState extends State<SurfaceView> {
     ),
   );
 
-  Widget _hotbar() => dom.div(classes: 'hui-surface-hotbar', <Widget>[
-    for (int index = 0; index < _hotbarSlots; index++)
-      dom.span(
-        classes: 'hui-surface-hotbar-slot${index == 0 ? ' is-selected' : ''}',
-        const <Widget>[],
-      ),
-  ]);
-
   Widget _silent(GlossSurfaceSilence silence) => dom.div(
     classes: 'hui-surface-silent',
     <Widget>[Text(_silentReason(silence))],
@@ -263,44 +225,27 @@ class _SurfaceViewState extends State<SurfaceView> {
     ),
   };
 
-  Widget _playPause() => Button(
-    variant: ButtonVariant.outline,
-    size: ButtonSize.iconSm,
-    onPressed: () => _store.animationsPlaying = !_store.animationsPlaying,
-    attributes: <String, String>{
-      'aria-label': _store.animationsPlaying
-          ? huiText('Pause animations')
-          : huiText('Play animations'),
-      'title': _store.animationsPlaying
-          ? huiText('Pause animations')
-          : huiText('Play animations'),
-    },
-    icon: _store.animationsPlaying
-        ? ArcaneIcon.pause(size: IconSize.sm)
-        : ArcaneIcon.play(size: IconSize.sm),
+  /// The animation transport. It drives the store's workspace-wide toggle,
+  /// so pausing here pauses every surface that references an animation.
+  RowAction _playPause() => RowAction(
+    _store.animationsPlaying
+        ? huiText('Pause animations')
+        : huiText('Play animations'),
+    () => _store.animationsPlaying = !_store.animationsPlaying,
+    icon: _store.animationsPlaying ? ArcaneIcon.pause() : ArcaneIcon.play(),
+    iconOnly: true,
   );
 
-  String _readout(
+  /// What the screen cannot show: the variant drawn (Advanced) and a title's
+  /// fade timing, which a browser cannot play the way the client queues it.
+  String? _status(
     GlossSurfaceDoc doc,
     GlossSurfacePresentation resolved,
     String? variantId,
-    GlossSurfaceSilence? silence,
   ) {
     final List<String> parts = <String>[
-      doc.resolvedSurface,
-      variantId == null
-          ? huiText('default presentation')
-          : huiText('variant: {id}', <String, Object?>{'id': variantId}),
-      huiText('lane {name}', <String, Object?>{
-        'name': resolved.priority ?? glossSurfaceDefaultPriority,
-      }),
-      huiText('slots {names}', <String, Object?>{
-        'names': (resolved.slots ?? const <String>['center']).join(', '),
-      }),
-      if (resolved.ttlTicks != null)
-        huiText('lives {ticks} ticks', <String, Object?>{
-          'ticks': resolved.ttlTicks,
-        }),
+      if (variantId != null)
+        huiText('variant: {id}', <String, Object?>{'id': variantId}),
       if (doc.resolvedSurface == glossSurfaceKindTitle)
         huiText(
           'fade {fadeIn}/{stay}/{fadeOut} ticks, trigger {trigger}',
@@ -311,8 +256,7 @@ class _SurfaceViewState extends State<SurfaceView> {
             'trigger': resolved.trigger,
           },
         ),
-      if (silence != null) _silentReason(silence),
     ];
-    return parts.join(' · ');
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 }

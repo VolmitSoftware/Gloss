@@ -51,6 +51,13 @@ const List<MirroredFixture> mirroredFixtures = <MirroredFixture>[
         'preview_expr_vectors_test.dart here and ExprVectorsTest there',
   ),
   MirroredFixture(
+    editorPath: 'test/fixtures/text_code_vectors.json',
+    glossPath: 'src/test/resources/text_code_vectors.json',
+    guards:
+        'how colour and format codes combine across lines, replayed by '
+        'text_code_vectors_test.dart here and TextCodeVectorsTest there',
+  ),
+  MirroredFixture(
     editorPath: 'test/fixtures/editor-sync-canonical-v3.json',
     glossPath: 'src/test/resources/editor-sync-canonical-v3.json',
     guards:

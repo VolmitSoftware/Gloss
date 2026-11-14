@@ -40,13 +40,18 @@ public final class DocumentStore<T> {
         File file = fileFor(id);
         byte[] encoded = (encode(file, value) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
         writtenHashes.put(file.getAbsolutePath(), DocumentHashes.sha256(encoded));
-        AtomicFiles.replace(file.toPath(), encoded);
+        DataFileFence.hold(() -> {
+            AtomicFiles.replace(file.toPath(), encoded);
+            return null;
+        });
     }
 
     public boolean delete(String id) throws IOException {
         File file = fileFor(id);
         writtenHashes.remove(file.getAbsolutePath());
-        return Files.deleteIfExists(file.toPath());
+        boolean deleted = DataFileFence.hold(() -> Files.deleteIfExists(file.toPath()));
+        WriteNotices.touched(file.toPath());
+        return deleted;
     }
 
     public boolean isOwnWrite(File file) {

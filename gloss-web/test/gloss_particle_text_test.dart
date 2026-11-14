@@ -28,7 +28,7 @@ void main() {
         '<PARTICLES:Player_Name>&6%player_name%</PARTICLES>',
       );
 
-      expect(rendered.text, '&6%player_name%');
+      expect(rendered.text, '§6%player_name%');
       expect(rendered.spans.single.name, 'player_name');
       expect(rendered.spans.single.start, 0);
       expect(rendered.spans.single.end, rendered.text.length);

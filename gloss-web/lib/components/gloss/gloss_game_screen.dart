@@ -1,5 +1,4 @@
-/// The shared Minecraft game-screen frame every Gloss surface mounts into
-/// when the shell asks for `gameContext`.
+/// The shared Minecraft game-screen frame every Gloss surface mounts into.
 ///
 /// Each surface on its own answers "what does this document render"; this
 /// frame answers "where does the player actually see it". It draws the same
@@ -21,6 +20,11 @@ import 'package:jaspr/dom.dart' as dom;
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 import '../../mc/scene/mc_camera.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/fit_box.dart';
+import '../../ui/menu.dart';
+import '../../ui/stage_frame.dart';
 import '../../mc/scene/mc_math.dart';
 import '../../mc/scene/mc_scene.dart';
 import '../mc/mc_stage.dart';
@@ -92,34 +96,36 @@ List<String> get _idleChat => <String>[
 
 /// One idle world per anchor, shared across rebuilds so the canvas is not
 /// recreated every time a HUD surface repaints.
-final Map<GlossGameAnchor, McStageController> _idleWorlds = <GlossGameAnchor, McStageController>{};
+final Map<GlossGameAnchor, McStageController> _idleWorlds =
+    <GlossGameAnchor, McStageController>{};
 
-McStageController glossGameWorldController(GlossGameAnchor anchor) =>
-    _idleWorlds.putIfAbsent(anchor, () {
-      final McStageController controller = McStageController(
-        kind: McStageKind.frame,
-        homePivot: const McVec3(0.5, 0, 0.5),
-        freeCamera: false,
-      );
-      if (anchor == GlossGameAnchor.overPlayer) {
-        controller.scene = McScene(<McSceneNode>[
-          McRigNode(
-            key: 'frame-player',
-            rigId: 'player',
-            textureId: 'player',
-            // Rigs are meshed facing +Z, toward the frame camera standing south.
-            transform: McMat4.translation(0.5, 0, 0.5),
-            poseTimeMs: 0,
-            hurt: 0,
-            capeTextureId: 'player_cape',
-          ),
-        ]);
-      }
-      return controller;
-    });
+McStageController glossGameWorldController(
+  GlossGameAnchor anchor,
+) => _idleWorlds.putIfAbsent(anchor, () {
+  final McStageController controller = McStageController(
+    kind: McStageKind.frame,
+    homePivot: const McVec3(0.5, 0, 0.5),
+    freeCamera: false,
+  );
+  if (anchor == GlossGameAnchor.overPlayer) {
+    controller.scene = McScene(<McSceneNode>[
+      McRigNode(
+        key: 'frame-player',
+        rigId: 'player',
+        textureId: 'player',
+        // Rigs are meshed facing +Z, toward the frame camera standing south.
+        transform: McMat4.translation(0.5, 0, 0.5),
+        poseTimeMs: 0,
+        hurt: 0,
+        capeTextureId: 'player_cape',
+      ),
+    ]);
+  }
+  return controller;
+});
 
-/// The frame with nothing anchored in it — what a surface renders under
-/// `gameContext` when it has no document to draw.
+/// The frame with nothing anchored in it: what a surface renders in the
+/// game screen when it has no document to draw.
 ///
 /// The editing surfaces answer that case with a bare `is-empty` stage, which is
 /// right for them: the empty artboard is still recognisably the artboard. In
@@ -140,7 +146,15 @@ class GlossGameScreen extends StatelessWidget {
     required this.anchor,
     required this.child,
     required this.label,
+    this.title,
+    this.actions = const <RowAction>[],
+    this.more = const <AppMenuEntry>[],
+    this.toggles = const <Widget>[],
     this.controls = const <Widget>[],
+    this.onReset,
+    this.status,
+    this.statusTip,
+    this.fit,
     this.world,
     this.worldOverlay = const <Widget>[],
     super.key,
@@ -152,12 +166,39 @@ class GlossGameScreen extends StatelessWidget {
   /// The surface itself, already rendered by the owning view.
   final Widget child;
 
-  /// Accessible name for the frame, e.g. "Scoreboard in game".
+  /// Accessible name of the game picture, e.g. "Scoreboard in game".
   final String label;
 
-  /// Editor affordances floated over the frame — play/pause and friends.
-  /// Empty renders no strip at all.
+  /// The stage frame's heading; [label] when null.
+  final String? title;
+
+  /// Header buttons (play, replay): dense, icon-only where they have an
+  /// icon, before Reset view and Fullscreen.
+  final List<RowAction> actions;
+
+  /// Entries of the header's `...` menu.
+  final List<AppMenuEntry> more;
+
+  /// Small controls in the header after the title (a [ToggleChoice], a
+  /// menu). Buttons go in [actions].
+  final List<Widget> toggles;
+
+  /// Preview inputs (who is watching, a sample message, a switch): a strip
+  /// under the header that wraps on narrow screens. Buttons go in [actions].
   final List<Widget> controls;
+
+  /// Puts the camera back; null hides Reset view.
+  final void Function()? onReset;
+
+  /// One short line under the screen; details in [statusTip].
+  final String? status;
+  final String? statusTip;
+
+  /// Scales [child] down as one picture when it does not fit the screen (a
+  /// fixed-size window: the tab list, the sidebar, the server row). Null
+  /// takes the anchor's default: on for [GlossGameAnchor.sidebar] and
+  /// [GlossGameAnchor.tabOverlay], off for the regions a surface fills.
+  final bool? fit;
 
   /// The world behind the HUD. A caller that draws in the world passes its
   /// own controller (scene + anchored text); every other anchor gets the
@@ -167,10 +208,48 @@ class GlossGameScreen extends StatelessWidget {
   /// Text the caller anchors in the world (drops label, hologram lines).
   final List<Widget> worldOverlay;
 
+  bool get _fits =>
+      fit ??
+      (anchor == GlossGameAnchor.sidebar ||
+          anchor == GlossGameAnchor.tabOverlay);
+
   @override
-  Widget build(BuildContext context) => dom.div(
+  Widget build(BuildContext context) =>
+      dom.div(classes: 'hui-game-frame', <Widget>[
+        StageFrame(
+          title: title ?? label,
+          fit: StageFit.free,
+          toggles: toggles,
+          actions: actions,
+          more: more,
+          onReset: onReset,
+          status: status,
+          statusTip: statusTip,
+          child: controls.isEmpty
+              ? _screen()
+              : dom.div(classes: 'hui-game-body', <Widget>[
+                  DensityScope.dense(
+                    child: dom.div(
+                      classes: 'hui-game-inputs',
+                      attributes: <String, String>{
+                        'role': 'group',
+                        'aria-label': huiText('Preview'),
+                      },
+                      controls,
+                    ),
+                  ),
+                  _screen(),
+                ]),
+        ),
+      ]);
+
+  Widget _screen() => dom.div(
     classes: 'hui-gloss-game is-${anchor.slug}',
-    attributes: <String, String>{'role': 'img', 'aria-label': label},
+    attributes: <String, String>{
+      'role': 'img',
+      'aria-label': label,
+      'data-game-drawn': '',
+    },
     <Widget>[
       dom.div(classes: 'hui-gloss-game-world', <Widget>[
         McStage(
@@ -179,7 +258,9 @@ class GlossGameScreen extends StatelessWidget {
           label: label,
         ),
       ]),
-      dom.div(classes: 'hui-gloss-game-anchor', <Widget>[child]),
+      dom.div(classes: 'hui-gloss-game-anchor', <Widget>[
+        if (_fits) FitBox(hug: true, child: child) else child,
+      ]),
       if (anchor.drawsHud) _crosshair(),
       if (anchor.drawsIdleChat)
         dom.div(classes: 'hui-gloss-game-chat', <Widget>[
@@ -187,47 +268,60 @@ class GlossGameScreen extends StatelessWidget {
             dom.div(classes: 'hui-gloss-game-chat-line', <Widget>[Text(line)]),
         ]),
       if (anchor.drawsHud) _hud(),
-      if (controls.isNotEmpty)
-        dom.div(
-          classes: 'hui-gloss-game-controls',
-          attributes: <String, String>{
-            'role': 'group',
-            'aria-label': huiText("{label} controls", <String, Object?>{
-              'label': label,
-            }),
-          },
-          controls,
-        ),
     ],
   );
 
-  Widget _crosshair() => const dom.div(classes: 'hui-gloss-game-crosshair', <Widget>[]);
+  Widget _crosshair() =>
+      const dom.div(classes: 'hui-gloss-game-crosshair', <Widget>[]);
 
   /// The client's bottom HUD from its own sprites at GUI scale 2: hotbar
   /// 182x22 flush to the bottom, XP bar 29 px up, hearts left and food right
   /// 39 px up, armor 49 px up (GUI pixels).
-  Widget _hud() => dom.div(classes: 'hui-gloss-game-hud', <Widget>[
-    dom.div(classes: 'hui-gloss-game-armor', <Widget>[
-      for (int i = 0; i < 10; i++)
-        dom.span(classes: 'hui-gloss-game-sprite is-armor-${i < 2 ? 'full' : 'empty'}', const <Widget>[]),
-    ]),
-    dom.div(classes: 'hui-gloss-game-hearts', <Widget>[
-      for (int i = 0; i < 10; i++)
-        dom.span(classes: 'hui-gloss-game-sprite is-heart-container', <Widget>[
-          if (i < 9) dom.span(classes: 'hui-gloss-game-sprite is-heart-${i < 8 ? 'full' : 'half'}', const <Widget>[]),
-        ]),
-    ]),
-    dom.div(classes: 'hui-gloss-game-food', <Widget>[
-      for (int i = 0; i < 10; i++)
-        dom.span(classes: 'hui-gloss-game-sprite is-food-empty', <Widget>[
-          if (i < 8) dom.span(classes: 'hui-gloss-game-sprite is-food-${i < 7 ? 'full' : 'half'}', const <Widget>[]),
-        ]),
-    ]),
-    const dom.div(classes: 'hui-gloss-game-sprite is-xp-background', <Widget>[
-      dom.div(classes: 'hui-gloss-game-sprite is-xp-progress', <Widget>[]),
-    ]),
-    const dom.div(classes: 'hui-gloss-game-sprite is-hotbar', <Widget>[
-      dom.div(classes: 'hui-gloss-game-sprite is-hotbar-selection', <Widget>[]),
-    ]),
-  ]);
+  Widget _hud() => dom.div(
+    classes: 'hui-gloss-game-hud',
+    attributes: const <String, String>{'data-game-drawn': ''},
+    <Widget>[
+      dom.div(classes: 'hui-gloss-game-armor', <Widget>[
+        for (int i = 0; i < 10; i++)
+          dom.span(
+            classes:
+                'hui-gloss-game-sprite is-armor-${i < 2 ? 'full' : 'empty'}',
+            const <Widget>[],
+          ),
+      ]),
+      dom.div(classes: 'hui-gloss-game-hearts', <Widget>[
+        for (int i = 0; i < 10; i++)
+          dom.span(classes: 'hui-gloss-game-sprite is-heart-container', <
+            Widget
+          >[
+            if (i < 9)
+              dom.span(
+                classes:
+                    'hui-gloss-game-sprite is-heart-${i < 8 ? 'full' : 'half'}',
+                const <Widget>[],
+              ),
+          ]),
+      ]),
+      dom.div(classes: 'hui-gloss-game-food', <Widget>[
+        for (int i = 0; i < 10; i++)
+          dom.span(classes: 'hui-gloss-game-sprite is-food-empty', <Widget>[
+            if (i < 8)
+              dom.span(
+                classes:
+                    'hui-gloss-game-sprite is-food-${i < 7 ? 'full' : 'half'}',
+                const <Widget>[],
+              ),
+          ]),
+      ]),
+      const dom.div(classes: 'hui-gloss-game-sprite is-xp-background', <Widget>[
+        dom.div(classes: 'hui-gloss-game-sprite is-xp-progress', <Widget>[]),
+      ]),
+      const dom.div(classes: 'hui-gloss-game-sprite is-hotbar', <Widget>[
+        dom.div(
+          classes: 'hui-gloss-game-sprite is-hotbar-selection',
+          <Widget>[],
+        ),
+      ]),
+    ],
+  );
 }

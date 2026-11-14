@@ -609,8 +609,9 @@ int _cellColor(Object? raw, PExprScope scope, void Function(String) sink) {
   }
 }
 
-/// A label's text is the other live field. It goes through [parseMcText], the
-/// twin of the plugin's `TextUtils.parse`, so a document renders the same runs
+/// A label's text is the other live field. It goes through
+/// [parseMcDisplayText], the twin of the plugin's `TextUtils.parse` on the
+/// whole label, so a document renders the same runs
 /// the retired layouts built. A failure renders nothing.
 McTextResult _labelText(
   String? raw,
@@ -633,7 +634,7 @@ McTextResult _labelText(
         emoji,
       ),
     );
-    return parseMcText(
+    return parseMcDisplayText(
       rendered.text,
     ).withParticleSpans(rendered.text, rendered.spans);
   } catch (failure) {
@@ -647,7 +648,7 @@ McTextResult _labelText(
 }
 
 List<StyledTextRun> _parseRuns(String text) {
-  final McTextResult parsed = parseMcText(text);
+  final McTextResult parsed = parseMcDisplayText(text);
   return _flattenRuns(parsed);
 }
 

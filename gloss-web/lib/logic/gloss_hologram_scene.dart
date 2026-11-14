@@ -35,14 +35,18 @@ import 'gloss_show.dart';
 import 'presentation_variants.dart';
 import '../model/gloss_presentation_variant.dart';
 import '../model/json_codec.dart';
+
 import 'dart:math' as math;
 
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
+import '../mc/scene/mc_camera.dart';
+import '../mc/scene/mc_math.dart';
 import '../model/gloss_hologram.dart';
 import '../preview/preview_types.dart';
 import '../preview/projection.dart';
 import 'gloss_text.dart';
+import 'mc_text.dart';
 
 /// Blocks per vanilla text pixel.
 const double glossTextBlocksPerPixel = 1 / 40;
@@ -546,6 +550,10 @@ List<HologramPreviewLine> hologramPreviewLines(
   ];
 }
 
+/// The rows of the hologram's main text display. Gloss joins the unscaled text
+/// lines into one `TextDisplay`, with blank rows where an object or a scaled
+/// line stands (`PersistentHologram.buildLineSet`), so a colour or format runs
+/// on into the next row until a colour code or `&r` changes it.
 List<GlossLineRender> hologramRenderedLines(
   GlossHologramDoc doc, {
   GlossAnimationResolver animations = const GlossNoAnimations(),
@@ -553,32 +561,64 @@ List<GlossLineRender> hologramRenderedLines(
   int nowMs = 0,
   double Function(String entity)? entityHeight,
   double Function(String entity)? entityWidth,
-}) => <GlossLineRender>[
-  for (final HologramPreviewLine line in hologramPreviewLines(
-    doc,
+}) {
+  final List<String> rows = <String>[
+    for (final HologramPreviewLine line in hologramPreviewLines(
+      doc,
+      nowMs: nowMs,
+      entityHeight: entityHeight,
+      entityWidth: entityWidth,
+    ))
+      if (line.isText && !line.isScaledText)
+        glossHologramLineText(line.source)
+      else
+        for (int row = 0; row < line.rows; row++) '',
+  ];
+  if (rows.isEmpty) return const <GlossLineRender>[];
+  return glossDisplayLines(
+    renderGlossLine(
+      rows.join('\n'),
+      animations: animations,
+      emoji: emoji,
+      nowMs: nowMs,
+      richText: true,
+    ),
+  );
+}
+
+/// Line [index] of [doc] as it reads in game: an unscaled text line continues
+/// the style the text lines above it leave open, because they share one
+/// display; a scaled line is its own display and starts fresh.
+GlossLineRender hologramLinePreview(
+  GlossHologramDoc doc,
+  int index, {
+  GlossAnimationResolver animations = const GlossNoAnimations(),
+  GlossEmojiResolver emoji = const GlossNoEmoji(),
+  int nowMs = 0,
+}) {
+  bool scaled(Object? line) =>
+      line is Map && line['scale'] is num && line['scale'] != 1;
+  bool text(Object? line) =>
+      line is String || (line is Map && line.containsKey('text'));
+  final Object? target = doc.lines[index];
+  final String own = glossHologramLineText(target);
+  GlossLineRender render(String value) => renderGlossLine(
+    value,
+    animations: animations,
+    emoji: emoji,
     nowMs: nowMs,
-    entityHeight: entityHeight,
-    entityWidth: entityWidth,
-  ))
-    if (line.isText && !line.isScaledText)
-      for (final String text in glossHologramLineText(line.source).split('\n'))
-        renderGlossLine(
-          text,
-          animations: animations,
-          emoji: emoji,
-          nowMs: nowMs,
-          richText: true,
-        )
-    else
-      for (int row = 0; row < line.rows; row++)
-        renderGlossLine(
-          '',
-          animations: animations,
-          emoji: emoji,
-          nowMs: nowMs,
-          richText: true,
-        ),
-];
+    richText: true,
+  );
+  if (scaled(target)) return render(own);
+  final List<String> above = <String>[
+    for (final Object? line in doc.lines.take(index))
+      if (text(line) && !scaled(line)) glossHologramLineText(line),
+  ];
+  return glossDisplayTail(
+    render(<String>[...above, own].join('\n')),
+    own.split('\n').length,
+  );
+}
 
 /// True when any line plays an animation — the surface's ticker gate.
 bool hologramIsAnimated(
@@ -591,24 +631,129 @@ bool hologramIsAnimated(
   return false;
 }
 
-/// The default orbit for a freshly opened hologram: pulled back far enough to
-/// frame the stack and the grid, aimed at the middle of the line stack.
-OrbitCamera hologramDefaultCamera(GlossHologramDoc doc) {
-  final List<double> position = doc.anchor.position;
-  final double stackHeight = doc.lines.length * glossHologramLineHeightBlocks;
-  return OrbitCamera(
-    target: PVec3(position[0], position[1] + stackHeight / 2, position[2]),
-    yawDegrees: 180,
-    pitchDegrees: -12,
-    distance: 6,
+/// The HUD band the game frame draws along its bottom, in GUI pixels: the
+/// height of `.hui-gloss-game-hud` in `12-gloss-fidelity.css` (hotbar, XP bar,
+/// hearts, food and armor).
+const double glossHudHeightGuiPx = 60;
+
+/// The frame's GUI scale for a game screen of this size, as the stylesheet
+/// picks `--gui`: 1 px below 640 x 480, else 2 px.
+double glossGuiScale(double widthPx, double heightPx) =>
+    widthPx < 640 || heightPx < 480 ? 1 : 2;
+
+/// Room kept between a framed hologram and the frame's edges, in pixels.
+const double hologramFrameMarginPx = 12;
+
+/// The hologram on the stage, in blocks: its widest row and its height, box
+/// padding included, measured from [bottom] (the box reaches below the anchor
+/// by its padding).
+typedef HologramStackSize = ({double width, double height, double bottom});
+
+HologramStackSize hologramStackSize(
+  GlossHologramDoc doc, {
+  double Function(String entity)? entityHeight,
+  double Function(String entity)? entityWidth,
+}) {
+  final double inset = hologramBoxInsetBlocks(doc);
+  final double scaleX = doc.style.scaleX;
+  final double rowHeight = glossHologramLineHeightBlocks * doc.style.scaleY;
+  double width = 0;
+  double height = 0;
+  for (final HologramPreviewLine line in hologramPreviewLines(
+    doc,
+    entityHeight: entityHeight,
+    entityWidth: entityWidth,
+  )) {
+    height += line.rows * rowHeight;
+    final double lineWidth = switch (line.kind) {
+      'text' when line.isScaledText => _rowsWidth(<GlossLineRender>[
+        renderGlossLine(line.value, richText: true),
+      ], scaleX * line.scale),
+      'text' => 0,
+      'entity' =>
+        (entityWidth?.call(line.value) ?? 1) * line.scale.clamp(.0625, 16),
+      _ => line.scale,
+    };
+    width = math.max(width, lineWidth);
+  }
+  width = math.max(
+    width,
+    _rowsWidth(
+      hologramRenderedLines(
+        doc,
+        entityHeight: entityHeight,
+        entityWidth: entityWidth,
+      ),
+      scaleX,
+    ),
   );
+  return (width: width + 2 * inset, height: height + 2 * inset, bottom: -inset);
 }
 
-OrbitCamera reframeHologramCamera(
-  OrbitCamera camera,
-  PVec3 previousFocus,
-  GlossHologramDoc doc,
-) {
-  final PVec3 nextFocus = hologramDefaultCamera(doc).target;
-  return camera.copyWith(target: camera.target + nextFocus - previousFocus);
+double _rowsWidth(List<GlossLineRender> rows, double scaleX) {
+  int widest = 0;
+  for (final GlossLineRender row in rows) {
+    widest = math.max(
+      widest,
+      mcLinePixels(<McSpan>[
+        for (final GlossTextPiece piece in row.pieces)
+          if (piece case GlossTextRun(:final McSpan span)) span,
+      ]),
+    );
+  }
+  return widest * glossTextBlocksPerPixel * scaleX.abs();
+}
+
+/// The game frame's camera for a hologram when it opens. It stands at the
+/// client's eye height, faces the stack like the frame's own camera, and backs
+/// off until the whole stack fits inside the frame above the HUD, centred in
+/// that room. It never comes nearer than the frame's own four blocks, so a
+/// short hologram reads at the size it has in game.
+McCamera hologramFrameCamera({
+  required McVec3 anchor,
+  required HologramStackSize stack,
+  required double viewportWidth,
+  required double viewportHeight,
+  double perspectivePx = huiPreviewPerspectivePx,
+}) {
+  final McCamera frame = mcCameraHome(McStageKind.frame, anchor);
+  final double hud =
+      glossHudHeightGuiPx * glossGuiScale(viewportWidth, viewportHeight);
+  final double roomHeight = math.max(
+    1,
+    viewportHeight - hud - 2 * hologramFrameMarginPx,
+  );
+  final double roomWidth = math.max(
+    1,
+    viewportWidth - 2 * hologramFrameMarginPx,
+  );
+  final double distance = math
+      .max(
+        frame.distance,
+        math.max(
+          stack.height * perspectivePx / roomHeight,
+          stack.width * perspectivePx / roomWidth,
+        ),
+      )
+      .clamp(mcCameraMinDistance, mcCameraMaxDistance)
+      .toDouble();
+  // The stack grows along the camera's up from the anchor and sits at the
+  // pivot's depth, so the pivot goes up the stack to its middle, less half
+  // the HUD band: the stack centres in the room above the HUD. The pitch keeps
+  // the eye at the client's eye height, and the up it gives moves the pivot,
+  // so settle the two together.
+  final double rise =
+      stack.bottom + stack.height / 2 - hud / 2 * distance / perspectivePx;
+  McCamera camera = frame.copyWith(distance: distance);
+  for (int step = 0; step < 8; step++) {
+    final McVec3 pivot = anchor + camera.up * rise;
+    final double sine = ((mcCameraEyeHeight - pivot.y) / distance)
+        .clamp(-1, 1)
+        .toDouble();
+    camera = camera.copyWith(
+      pivot: pivot,
+      pitchDeg: math.asin(sine) * 180 / math.pi,
+    );
+  }
+  return camera;
 }

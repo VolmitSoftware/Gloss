@@ -154,13 +154,26 @@ final class SyncProblems {
   }
 }
 
-/// One document the server kept its own copy of because it moved under the
-/// editor. The publish acknowledgement carries these as `{kind, id}`.
+/// One document or image the server did not overwrite while applying a
+/// publication. The acknowledgement carries these as
+/// `{kind, id, name, reason}`; images use kind `image` and their path as id.
 final class SyncConflict {
-  const SyncConflict({required this.kind, required this.id});
+  const SyncConflict({
+    required this.kind,
+    required this.id,
+    this.name = '',
+    this.reason = 'changed',
+  });
 
   final String kind;
   final String id;
+
+  /// The server's short label, or empty when it sent none.
+  final String name;
+
+  /// `changed` (the server copy moved), `deleted` (the server deleted it) or
+  /// `exists` (a create whose id the server already holds).
+  final String reason;
 
   static List<SyncConflict> of(Object? raw) {
     if (raw is! List) return const <SyncConflict>[];
@@ -169,10 +182,19 @@ final class SyncConflict {
       if (entry is! Map) continue;
       final Object? kind = entry['kind'];
       final Object? id = entry['id'];
+      final Object? name = entry['name'];
+      final Object? reason = entry['reason'];
       if (kind is! String || id is! String || kind.isEmpty || id.isEmpty) {
         continue;
       }
-      conflicts.add(SyncConflict(kind: kind, id: id));
+      conflicts.add(
+        SyncConflict(
+          kind: kind,
+          id: id,
+          name: name is String ? name : '',
+          reason: reason is String && reason.isNotEmpty ? reason : 'changed',
+        ),
+      );
     }
     return List<SyncConflict>.unmodifiable(conflicts);
   }

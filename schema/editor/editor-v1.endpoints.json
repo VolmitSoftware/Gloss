@@ -1,0 +1,237 @@
+{
+  "description": "Gloss editor API 1: routes, scopes, limits and constants. The plugin's EditorEndpointsTableTest pins this file to the code; the editor API section of gloss-web/sync-relay/README.md explains it.",
+  "protocol": 1,
+  "basePath": "/gloss",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/v1/hello",
+      "scope": null,
+      "counted": false
+    },
+    {
+      "method": "POST",
+      "path": "/v1/pair",
+      "scope": null,
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/token",
+      "scope": "token",
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/catalog",
+      "scope": "read",
+      "counted": false,
+      "query": [
+        "after"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/documents",
+      "scope": "read",
+      "counted": false,
+      "query": [
+        "after",
+        "maxBytes"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/documents/read",
+      "scope": "read",
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/documents/{kind}/{id}",
+      "scope": "read",
+      "counted": false
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/read",
+      "scope": "read",
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/images/{hex}",
+      "scope": "read",
+      "counted": false
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images",
+      "scope": "publish:images",
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/meta",
+      "scope": "read",
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notes",
+      "scope": "read",
+      "counted": false
+    },
+    {
+      "method": "GET",
+      "path": "/v1/history",
+      "scope": "history",
+      "counted": false,
+      "query": [
+        "kind",
+        "id",
+        "version"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/changes",
+      "scope": "publish",
+      "counted": true
+    },
+    {
+      "method": "GET",
+      "path": "/v1/events",
+      "scope": "read",
+      "counted": false,
+      "stream": true
+    }
+  ],
+  "errorStatus": {
+    "unauthorized": 401,
+    "token-expired": 401,
+    "token-revoked": 401,
+    "scope-missing": 403,
+    "folder-denied": 403,
+    "origin-not-allowed": 403,
+    "counter-replayed": 409,
+    "confirm-deletes": 428,
+    "pairing-invalid": 401,
+    "pairing-expired": 410,
+    "not-found": 404,
+    "invalid-request": 400,
+    "too-large": 413,
+    "rate-limited": 429,
+    "busy": 503,
+    "unsupported-protocol": 400,
+    "server-offline": 503,
+    "timeout": 504,
+    "internal": 500
+  },
+  "scopes": [
+    "read",
+    "history",
+    "publish:screens",
+    "publish:hud",
+    "publish:chat",
+    "publish:world",
+    "publish:players",
+    "publish:shared",
+    "publish:images",
+    "publish:commands"
+  ],
+  "kinds": {
+    "animation": "publish:shared",
+    "behavior": "publish:shared",
+    "bubble-style": "publish:chat",
+    "channel": "publish:chat",
+    "connections": "publish:chat",
+    "container-preview": "publish:screens",
+    "damage-indicators": "publish:world",
+    "emoji": "publish:chat",
+    "entity-overlays": "publish:world",
+    "glyph": "publish:shared",
+    "hologram": "publish:world",
+    "inventory": "publish:screens",
+    "leaderboard": "publish:hud",
+    "marker": "publish:world",
+    "menu": "publish:screens",
+    "motd": "publish:hud",
+    "nameplate": "publish:players",
+    "names": "publish:shared",
+    "nametag": "publish:players",
+    "panel": "publish:screens",
+    "presets": "publish:shared",
+    "real-drops": "publish:world",
+    "scoreboard": "publish:hud",
+    "strings": "publish:shared",
+    "surface": "publish:hud",
+    "tablist": "publish:hud",
+    "waypoint": "publish:world"
+  },
+  "headers": {
+    "counter": "X-Gloss-Counter",
+    "challenge": "X-Gloss-Challenge",
+    "serverKey": "X-Gloss-Server-Key",
+    "proof": "X-Gloss-Proof",
+    "retry": "Retry-After"
+  },
+  "pairing": {
+    "prefix": "GLS1.",
+    "linkTemplate": "https://gloss.volmitsoftware.com/#/pair/{code}",
+    "secretMinutes": 10,
+    "defaultTokenDays": 7,
+    "slidingExpiry": "A token expires its lifetime (tokenDays or expires=) after its last use; each use moves expiresAt forward.",
+    "defaultScopes": [
+      "read",
+      "history",
+      "publish:screens",
+      "publish:hud",
+      "publish:chat",
+      "publish:world",
+      "publish:players",
+      "publish:shared",
+      "publish:images"
+    ],
+    "maximumWaitingLinks": 64,
+    "maximumTokens": 256,
+    "tokenRecheckSeconds": 60,
+    "unconfirmedAdminDays": 7
+  },
+  "limits": {
+    "openBodyBytes": 4096,
+    "requestBodyBytes": 4194304,
+    "catalogPageEntries": 1000,
+    "catalogPageBytes": 524288,
+    "answerBytes": 1048576,
+    "maximumAnswerBytes": 4194304,
+    "relayMarginBytes": 16384,
+    "documentsReadRefs": 200,
+    "imagesReadHashes": 64,
+    "publishDocumentEntries": 2000,
+    "publishImageEntries": 4096,
+    "confirmDeletesAbove": 25,
+    "confirmDeletesPercent": 20,
+    "imageBytes": 524288,
+    "stagedImageMinutes": 10,
+    "catalogEventFrameBytes": 49152,
+    "eventQueueFrames": 256,
+    "eventFramesPerSecond": 20,
+    "concurrentRequestsPerToken": 8,
+    "requestsPerSecond": 20,
+    "pairAttemptsPerMinute": 10,
+    "connectionsPerAddress": 16,
+    "openConnections": 64,
+    "eventAuthSeconds": 10,
+    "idempotencyHours": 24
+  },
+  "relay": {
+    "agentPath": "/agent",
+    "appPath": "/app",
+    "challengePrefix": "gloss-relay/1 ",
+    "proofPrefix": "gloss-editor-proof/1 ",
+    "streamPath": "/v1/events",
+    "frameBytes": 1048576,
+    "protocol": 1
+  }
+}

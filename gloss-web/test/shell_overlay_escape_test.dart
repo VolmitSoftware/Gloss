@@ -4,18 +4,33 @@ import 'package:gloss_editor/components/shell/shell_keys.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('overlay Escape precedence', () {
-    test('an armed delete confirm is closed before the app overlays', () {
+  group('keys while an Arcane surface is open', () {
+    test('Escape over a dialog or sheet closes the owner state', () {
       expect(
-        huiOverlayEscapeTarget(confirmDeleteOpen: true),
-        HuiOverlayEscape.confirmDelete,
+        huiOverlayKey(const ShellKey(key: 'Escape', overlayOpen: true)),
+        HuiOverlayKey.closeOverlay,
       );
     });
 
-    test('with nothing armed the app closes its own dialogs and sheet', () {
+    test('an open menu answers its own keys, Escape included', () {
       expect(
-        huiOverlayEscapeTarget(confirmDeleteOpen: false),
-        HuiOverlayEscape.appOverlay,
+        huiOverlayKey(
+          const ShellKey(key: 'Escape', overlayOpen: true, menuOpen: true),
+        ),
+        HuiOverlayKey.ignore,
+      );
+    });
+
+    test('other keys and modified Escape are left alone', () {
+      expect(
+        huiOverlayKey(const ShellKey(key: 'k', overlayOpen: true)),
+        HuiOverlayKey.ignore,
+      );
+      expect(
+        huiOverlayKey(
+          const ShellKey(key: 'Escape', overlayOpen: true, ctrl: true),
+        ),
+        HuiOverlayKey.ignore,
       );
     });
   });

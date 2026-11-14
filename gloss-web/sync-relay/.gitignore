@@ -1,5 +1,4 @@
 .dart_tool/
-.release-gate/
 build/
 coverage/
 !pubspec.lock

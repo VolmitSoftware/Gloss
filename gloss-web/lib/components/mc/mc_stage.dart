@@ -4,7 +4,7 @@
 /// `spriteFor`), the CSS-3D layer the owning view places its text in, and the
 /// pointer, wheel, key and touch input that drives the shared camera.
 ///
-/// Jaspr renders the wrapper, the DOM layer and the controls; the canvas is
+/// Jaspr renders the wrapper and the DOM layer; the canvas is
 /// created and owned imperatively under an element Jaspr renders empty and
 /// never rebuilds (the `preview_stage.dart` bargain). Frames are dirty-gated:
 /// one is scheduled by a controller change, a resize, the pack arriving, a
@@ -47,7 +47,6 @@ class McStage extends StatefulWidget {
   const McStage({
     required this.controller,
     this.overlay = const <Widget>[],
-    this.controls = const <Widget>[],
     this.label,
     super.key,
   });
@@ -57,7 +56,6 @@ class McStage extends StatefulWidget {
   /// Anchored text: each child is a `dom.div(classes: 'hui-mc-anchor',
   /// styles: transform: mcDomAnchorTransform(...))` the owning view builds.
   final List<Widget> overlay;
-  final List<Widget> controls;
   final String? label;
 
   @override
@@ -226,8 +224,7 @@ class _McStageState extends State<McStage> {
     if (rect.width == _widthPx && rect.height == _heightPx) return;
     _widthPx = rect.width;
     _heightPx = rect.height;
-    _c.widthPx = rect.width;
-    _c.heightPx = rect.height;
+    _c.resize(rect.width, rect.height);
     _invalidate();
   }
 
@@ -549,7 +546,6 @@ class _McStageState extends State<McStage> {
             <Widget>[if (!webGl) ..._sprites(), ...component.overlay],
           ),
         ]),
-        if (component.controls.isNotEmpty) dom.div(classes: 'hui-mc-controls', component.controls),
       ],
     );
   }

@@ -26,8 +26,6 @@ final class SurfaceDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('surface');
 
-  @override
-  String get createLabel => huiText('New surface');
 
   @override
   String get pluralLabel => huiText('Surfaces');

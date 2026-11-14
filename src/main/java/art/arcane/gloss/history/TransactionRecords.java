@@ -35,15 +35,4 @@ public final class TransactionRecords {
                 .thenComparing(HistoryEntry::id));
         return List.copyOf(entries);
     }
-
-    public static List<HistoryEntry> of(List<GlossProjectTransaction.TransactionRecord> records,
-                                        String kind, String id) {
-        List<HistoryEntry> matched = new ArrayList<>();
-        for (HistoryEntry entry : of(records)) {
-            if (entry.kind().equals(kind) && entry.id().equals(id)) {
-                matched.add(entry);
-            }
-        }
-        return List.copyOf(matched);
-    }
 }

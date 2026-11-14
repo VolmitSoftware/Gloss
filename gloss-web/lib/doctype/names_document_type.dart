@@ -17,8 +17,6 @@ final class NamesDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('Names');
   @override
-  String get createLabel => huiText('Names');
-  @override
   String get pluralLabel => huiText('Names');
   @override
   int get tabOrder => 170;

@@ -409,43 +409,6 @@ void main() {
     });
   });
 
-  test('the default camera frames the stack midpoint', () {
-    final OrbitCamera camera = hologramDefaultCamera(_doc());
-    expect(camera.target.x, 0);
-    expect(camera.target.z, 0);
-    expect(
-      camera.target.y,
-      closeTo(64 + glossHologramLineHeightBlocks, 1e-9),
-      reason: 'two lines: half the stack above the anchor',
-    );
-  });
-
-  test('reframing follows a randomized anchor without losing the orbit', () {
-    const OrbitCamera authored = OrbitCamera(
-      target: PVec3(2, 65, 1),
-      yawDegrees: 137,
-      pitchDegrees: -31,
-      distance: 9,
-    );
-    final GlossHologramDoc moved = GlossHologramDoc(
-      anchor: GlossHologramAnchor(
-        world: 'world',
-        positionRaw: <num>[120, 82, -45],
-      ),
-      lines: <String>['one', 'two', 'three', 'four'],
-    );
-    final OrbitCamera reframed = reframeHologramCamera(
-      authored,
-      hologramDefaultCamera(_doc()).target,
-      moved,
-    );
-
-    expect(reframed.target, const PVec3(122, 83.25, -44));
-    expect(reframed.yawDegrees, authored.yawDegrees);
-    expect(reframed.pitchDegrees, authored.pitchDegrees);
-    expect(reframed.distance, authored.distance);
-  });
-
   test('authored time expressions keep the hologram ticker active', () {
     final GlossHologramDoc doc = GlossHologramDoc(
       lines: <String>["{{ select(['&c', '&b'], time.seconds) }}Live"],

@@ -51,6 +51,7 @@
 #   {expected}  編集保存時に期待するリビジョン
 #   {experience}  獲得した経験値
 #   {failed}  失敗した操作数
+#   {folders}  エディタートークンが変更できるフォルダー
 #   {from}  元の値または範囲の開始
 #   {fuel}  容器に残っている燃料
 #   {group}  言語エディターの分類
@@ -69,6 +70,7 @@
 #   {labels}  テキストラベル数
 #   {legacy}  インポート元の識別子
 #   {level}  表示するレベル
+#   {lifetime}  エディタートークンが失効するまでの未使用時間
 #   {limit}  許容上限
 #   {line}  メッセージ内の行番号
 #   {locale}  言語コード
@@ -79,6 +81,7 @@
 #   {message}  応答または診断のメッセージ
 #   {migrated}  変換した項目数
 #   {minimum}  許容最小値
+#   {minutes}  時間（分）
 #   {mode}  選択した操作または表示モード
 #   {name}  オブジェクト名
 #   {oldBoard}  以前のボード識別子
@@ -108,9 +111,9 @@
 #   {roll}  ロール角度
 #   {rotation}  表示の回転
 #   {scale}  表示またはプレビューの倍率
+#   {scopes}  エディタートークンが許可する操作
 #   {seconds}  時間（秒）
 #   {section}  言語エディターのセクション
-#   {session}  編集セッションの識別子
 #   {severity}  診断の重大度
 #   {skipped}  スキップした項目数
 #   {slots}  アイテムスロット数
@@ -118,12 +121,12 @@
 #   {special}  特殊表示要素数
 #   {state}  現在の状態
 #   {style}  表示スタイル
-#   {subject}  Webエディターで編集する対象
 #   {target}  言語選択を適用するプラグイン
 #   {temporary}  一時オブジェクト数
 #   {text}  表示するテキスト
 #   {title}  表示するタイトル
 #   {to}  変更先の値または範囲の終了
+#   {token}  エディタートークンの ID
 #   {total}  総項目数
 #   {type}  期待する値またはオブジェクトの種類
 #   {updated}  言語更新で変更されたメッセージ
@@ -295,16 +298,11 @@ preview = "プレビュードキュメントツール"
 "preview.dump" = "プレビュードキュメントを1回ビルドして要素数を表示する"
 "preview.list" = "プレビュードキュメントとそのマッチルールを一覧表示する"
 "preview.reset" = "同梱のプレビューデフォルトを復元する(それらを覆い隠す可能性のある追加のユーザードキュメントは削除しない)"
-web = "Gloss の Web エディターを開いて管理する"
-"web.open" = "ホストされた空の Gloss エディターを開く"
-"web.edit" = "稼働中の Gloss ドキュメントを1つ開く"
-"web.edit.document" = "この稼働中のドキュメントを Web エディターで開く"
-"web.workspace" = "稼働中の Gloss ワークスペース全体を開く"
-"web.sessions" = "有効な Web エディターのセッションを管理する"
-"web.sessions.list" = "有効な Web エディターのセッションを一覧表示する"
-"web.sessions.pull" = "Web エディターのセッションを今すぐ照会する"
-"web.sessions.revoke" = "Web エディターの編集権限を失効させる"
-"web.sessions.status" = "Web エディターのセッションを1つ表示する"
+editor = "Web エディターをこのサーバーとペアリングする"
+"editor.pair" = "ブラウザーをペアリングする使い捨てリンクを作成する"
+"editor.status" = "エディターのリスナー、中継サーバー、フィンガープリントを表示する"
+"editor.tokens" = "ペアリング済みのブラウザーを一覧表示する"
+"editor.revoke" = "ペアリングを解除するか、リンクを取り消す"
 language = "自分の言語またはサーバーの既定言語を選択"
 
 "import.mode" = "preview または apply"
@@ -334,7 +332,6 @@ panel_y = "絶対または~相対Y"
 panel_yaw = "絶対または~相対ヨー"
 panel_z = "絶対または~相対Z"
 content_menu = "読み込み済みメニューID"
-web_subject = "稼働中の Gloss ドキュメント ID"
 hologram_id = "新しいホログラムとルートメニューの ID"
 hologram_text = "任意の MiniMessage テキスト"
 image_path = "Glossのimagesフォルダ内のファイル"
@@ -355,7 +352,11 @@ row_x = "絶対または~相対の行X"
 row_y = "絶対または~相対の行Y"
 row_z = "絶対または~相対の行Z"
 source_menu = "読み込み済みのコピー元メニューID"
-web_session = "Web エディターのセッション ID"
+editor_label = "トークン一覧に表示する名前"
+editor_scopes = "エディターに許可する操作 (カンマ区切り)"
+editor_folders = "対象フォルダーを制限 (カンマ区切り)"
+editor_expires = "未使用時の有効期間 (例: 7d、12h、30m)"
+editor_token = "トークン ID、または all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &c権限がありません。"
@@ -391,6 +392,7 @@ lines = "{count} 行"
 header = "&8[&dGloss&8] &d{id} &7位置: &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8倍率 &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7はワールド &f{world}&7 にありますが、このワールドは読み込まれていません。"
 
 [command.board]
 exists = "&8[&dGloss&8] &cボード '&f{id}&c' は既に存在します。"
@@ -505,13 +507,12 @@ execution_failed = "コマンド {command} の実行に失敗しました: {reas
 menu_name_required = "メニュー名は空にできません"
 hologram_id_required = "ホログラム ID は空にできません"
 panel_id_required = "パネル ID は空にできません"
-web_subject_required = "Web エディターのドキュメント ID は空にできません"
-web_session_required = "Web エディターのセッション ID は空にできません"
 panel_player_required = "対象プレイヤーは空にできません"
 row_icon_type_required = "アイコンの種類は空にできません"
 row_style_property_required = "スタイルのプロパティは空にできません"
 import_source_required = "旧形式のインポート元は空にできません"
 import_source_unknown = "不明な旧形式のインポート元: {source}"
+editor_token_required = "トークン ID か all を指定してください"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &c権限 &f{permission}&c がありません。"
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cメニュー &f{menu}&c の内容操作に失敗し�
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cこのコマンドはプレイヤーのみ使用できます。"
 
-[gloss.message.web]
-header = "Web エディター"
-open_hover = "クリックして Gloss の Web エディターを開きます。"
-open = "&8[&dGloss&8]: &7Web エディター: &f{url}"
-preparing = "&8[&dGloss&8]: &7&f{subject}&7 の安全なエディター同期セッションを準備しています..."
-unavailable = "&8[&dGloss&8]: &cライブ Web 編集は利用できません。エディター同期の設定と中継サーバーへの接続を確認してください。"
-open_failed = "&8[&dGloss&8]: &cライブ Web エディターで &f{kind}={subject}&c を開けませんでした: {reason}"
-open_console = "&8[&dGloss&8]: &7編集権限リンク (&f{subject}&7): &f{url}"
-capability_warning = "&8[&dGloss&8]: &eこの URL は失効または期限切れまでサーバーに変更を公開できます。秘密として扱ってください。"
+[gloss.message.editor]
+link_ready = "リンクの準備ができました。{minutes} 分以内に開いてください"
+link_console = "&8[&dGloss&8]: &aリンクの準備ができました。{minutes} 分以内に開いてください: &f{url}"
+link_details = "&8[&dGloss&8]: &7スコープ {scopes}; {folders}; 未使用のまま {lifetime} で失効; トークン {token}"
+all_folders = "すべてのフォルダー"
+some_folders = "フォルダー {folders}"
 open_label = "エディターを開く"
-copy_label = "リンクをコピー"
+open_hover = "ブラウザーで開く"
+copy_label = "コピー"
+copy_hover = "リンクをコピー"
 revoke_label = "失効させる"
-link_hover = "エディターを開く、編集権限リンクをコピーする、またはセッション {session} を失効させます。"
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7有効なエディター同期セッションはありません。"
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7有効期限=&f{seconds}秒 &7公開リビジョン=&f{revision} &7保留=&f{pending}"
-revoked = "&8[&dGloss&8]: &aエディター同期セッション &f{session}&a を失効させました。"
-pulled = "&8[&dGloss&8]: &aエディター同期セッション &f{session}&a を照会しました。"
-unknown = "&8[&dGloss&8]: &cエディター同期セッション &f{session}&c は不明または期限切れです。"
-failed = "&8[&dGloss&8]: &cセッション &f{session}&c のエディター同期操作に失敗しました: {reason}"
+revoke_hover = "このリンクを取り消すか、ペアリングしたエディターを切断します"
+details_label = "詳細"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cエディターは停止中です。gloss.toml で [editor] enabled = true を設定してください"
+tokens_empty = "&8[&dGloss&8]: &7エディターのトークンはありません。"
+unknown_token = "&8[&dGloss&8]: &cトークン &f{token}&c はありません。"
+revoked_one = "&8[&dGloss&8]: &aトークンを 1 件失効させ、その接続を閉じました。"
+revoked_many = "&8[&dGloss&8]: &aトークンを {count} 件失効させ、その接続を閉じました。"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7変更を加えずに移行をプレビューするため、&f{source}&7 を走査しています..."

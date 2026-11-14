@@ -39,6 +39,6 @@ void stampDocumentTheme(Brightness brightness) {
       .getElementById('gloss-theme-color')
       ?.setAttribute(
         'content',
-        brightness == Brightness.light ? '#f6f5f0' : '#111310',
+        brightness == Brightness.light ? '#ffffff' : '#0a0a0a',
       );
 }

@@ -27,8 +27,6 @@ final class ConnectionsDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('connection messages');
 
-  @override
-  String get createLabel => huiText('New connection messages');
 
   @override
   String get pluralLabel => huiText('Connection messages');

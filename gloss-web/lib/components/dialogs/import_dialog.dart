@@ -1,21 +1,17 @@
-/// Import dialog: file picker, paste box, and a preview before anything is
-/// replaced.
+/// Import dialog: a file or pasted JSON, and a preview before the open
+/// document is replaced.
 ///
-/// The old editor replaced the whole document from a native `alert()` with no
-/// preview and no undo. Here the document is only touched when the user presses
-/// Replace, the parse result is shown first, and the replacement is a single
-/// undo step.
-///
-/// The pasted or picked JSON is auto-detected across every transferable Gloss
-/// document kind. Validation is shown before replacement but never blocks an
-/// import; only malformed JSON or a document that its detected codec cannot
-/// decode does.
+/// The document is only touched when the user presses Replace document. The
+/// pasted or picked JSON is auto-detected across every transferable Gloss
+/// document kind. Validation is shown first but never blocks an import; only
+/// malformed JSON or a document its detected codec cannot decode does.
 library;
 
 import 'dart:convert';
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../config/defaults.dart';
 import '../../doctype/document_type.dart';
@@ -30,9 +26,18 @@ import '../../services/catalogs.dart' show HuiCatalogs;
 import '../../services/file_transfer.dart';
 import '../../services/image_library.dart' show ImageLibrary;
 import '../../state/editor_store.dart';
+import '../../state/workspace.dart' show WorkspaceDoc;
 import '../../state/workspace_panel.dart';
-import '../common/common.dart';
-import 'dialog_parts.dart';
+import '../../ui/action_row.dart';
+import '../../ui/alert.dart';
+import '../../ui/dialog.dart';
+import '../../ui/empty_state.dart';
+import '../../ui/field.dart';
+import '../../ui/field_group.dart';
+import '../../ui/skeleton.dart';
+import '../../ui/technical_input.dart';
+import 'import_undo.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class ImportDialog extends StatefulWidget {
@@ -124,7 +129,7 @@ class _ImportDialogState extends State<ImportDialog> {
   }
 
   /// Validates through the detected kind's adapter, so the import preview
-  /// reports exactly what the document reports once it is open — one dispatch
+  /// reports exactly what the document reports once it is open: one dispatch
   /// instead of a second per-kind switch that can drift from
   /// [DocumentTypeAdapter.validate].
   List<HuiIssue> _validate(DocumentTypeAdapter type, Object document) =>
@@ -173,96 +178,109 @@ class _ImportDialogState extends State<ImportDialog> {
   String get _targetId =>
       _sourceName.isEmpty ? _store.menuId : menuIdFromFileName(_sourceName);
 
-  @override
-  Widget build(BuildContext context) => ArcaneDialog(
-    id: 'hui-import-dialog',
-    isOpen: component.isOpen,
-    onClose: component.onClose,
-    title: huiText('Import JSON'),
-    maxWidth: 720,
-    actions: <Widget>[
-      Button(
-        variant: ButtonVariant.outline,
-        onPressed: component.onClose,
-        label: huiText('Cancel'),
-      ),
-      Button(
-        variant: ButtonVariant.primary,
-        disabled: !_hasParsed,
-        onPressed: _hasParsed ? _replace : null,
-        icon: ArcaneIcon.upload(size: IconSize.sm),
-        label: huiText('Replace document'),
-      ),
-    ],
-    children: <Widget>[_body()],
-  );
-
-  Widget _body() => dom.div(classes: 'hui-dialog-body hui-stagger', <Widget>[
-    ArcaneAlert.warning(
-      message: huiText(
-        'Importing replaces the document you are editing. It is a single undo step, so Ctrl+Z brings the old one back.',
-      ),
-    ),
-    HuiDialogSection(
-      title: huiText('From a file'),
-      description: huiText(
-        'Menus, previews, holograms, animations, scoreboards, MOTD, emoji, '
-        'bubble styles and tablists all work; the file shape decides which. '
-        'Dropping JSON anywhere creates a new document. This dialog replaces '
-        'the active document only after you confirm below.',
-      ),
-      children: <Widget>[
-        dom.div(classes: 'hui-dialog-actions', <Widget>[
-          Button(
-            variant: ButtonVariant.outline,
-            size: ButtonSize.small,
-            loading: _picking,
-            onPressed: _pickFile,
-            icon: ArcaneIcon.folderOpen(size: IconSize.sm),
-            label: huiText('Choose a .json file'),
+  /// Whether Undo brings the open document back after the replace.
+  bool get _keepsUndo {
+    final DocumentTypeAdapter? type = _parsedType;
+    if (type == null) return true;
+    final String? fixedId = type.fixedRuntimeId;
+    return importKeepsUndo(
+      incomingIsMenu: _parsedDocument is HuiMenu,
+      incomingHasFixedFile: fixedId != null,
+      openIsMenu: _store.hasActiveDocument && _store.isMenuDoc,
+      fixedDocumentExists:
+          fixedId != null &&
+          _store.workspace.docs.any(
+            (WorkspaceDoc doc) =>
+                doc.kind == type.kind && doc.runtimeId == fixedId,
           ),
-          if (_sourceName.isNotEmpty)
-            dom.span(classes: 'hui-dialog-filename', <Widget>[
-              Text(_sourceName),
-            ]),
-        ]),
-      ],
-    ),
-    HuiDialogSection(
-      title: huiText('Or paste it'),
-      description: huiText(
-        'Anything the plugin accepts: single-value lists and '
-        'missing booleans are read the same way Gloss reads them.',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool keepsUndo = _keepsUndo;
+    // With nothing open there is nothing to replace: the store adds the
+    // import as a new document.
+    final bool replaces = _store.hasActiveDocument;
+    return AppDialog(
+      id: 'hui-import-dialog',
+      open: component.isOpen,
+      onClose: component.onClose,
+      wide: true,
+      title: huiText('Import JSON'),
+      footer: DialogFooter(
+        secondary: <RowAction>[
+          RowAction(
+            huiText('Choose a .json file'),
+            _picking ? null : _pickFile,
+            icon: ArcaneIcon.folderOpen(),
+            loading: _picking,
+          ),
+        ],
+        cancel: RowAction(huiText('Cancel'), component.onClose),
+        primary: RowAction(
+          replaces ? huiText('Replace document') : huiText('Import'),
+          _hasParsed ? _replace : null,
+          icon: ArcaneIcon.upload(),
+          destructive: replaces && _hasParsed && !keepsUndo,
+        ),
       ),
       children: <Widget>[
-        TextArea(
-          key: ValueKey<int>(_generation),
-          value: _text,
-          rows: 8,
-          fullWidth: true,
-          styles: huiTechnicalInputStyles,
-          placeholder: huiText('{ "offset": [0, 1.7, 2.5], "components": [] }'),
-          onChanged: _onText,
+        dom.p(classes: 'ui-section-description', <Widget>[
+          Component.text(
+            !replaces
+                ? huiText('Adds a new document.')
+                : _hasParsed
+                ? '${huiText('Replaces the open document.')} '
+                      '${keepsUndo ? huiText('Undo brings it back.') : huiText('Undo cannot bring it back.')}'
+                : huiText('Replaces the open document.'),
+          ),
+        ]),
+        Field(
+          label: huiText('JSON'),
+          forId: 'hui-import-json',
+          hint: _sourceName.isEmpty ? null : _sourceName,
+          tip: huiText(
+            'Every Gloss document kind works; the JSON decides which. '
+            'Dropping a file on the editor makes a new document instead.',
+          ),
+          // A textarea takes no attributes of its own; direction and
+          // spellcheck inherit from this wrapper.
+          child: dom.div(attributes: technicalInputAttributes, <Widget>[
+            TextArea(
+              key: ValueKey<int>(_generation),
+              id: 'hui-import-json',
+              value: _text,
+              rows: 8,
+              fullWidth: true,
+              styles: technicalInputStyles,
+              placeholder: huiText(
+                '{ "offset": [0, 1.7, 2.5], "components": [] }',
+              ),
+              onChanged: _onText,
+            ),
+          ]),
+        ),
+        FieldGroup(
+          title: huiText('Preview'),
+          tip: huiText(
+            'Problems show for reference. They never block an import.',
+          ),
+          children: <Widget>[_preview()],
         ),
       ],
-    ),
-    HuiDialogSection(
-      title: huiText('Preview'),
-      description: huiText('Nothing is written until you press Replace.'),
-      children: <Widget>[_preview()],
-    ),
-  ]);
+    );
+  }
 
   Widget _preview() {
     // The picker is a real wait: the browser dialog, then a full file read.
-    // Standing in for the summary that is about to appear keeps the section
-    // from collapsing and reflowing everything under it.
     if (_picking) {
-      return HuiSkeleton(label: huiText('Reading the file'), lines: 4);
+      return Skeleton(label: huiText('Reading the file'), rows: 4);
     }
     final String? error = _parseError?.call();
     if (error != null) {
-      return ArcaneAlert.error(
+      return AppAlert(
+        tone: AlertTone.error,
         title: huiText('Could not read that file'),
         message: error,
       );
@@ -271,123 +289,77 @@ class _ImportDialogState extends State<ImportDialog> {
     if (document is HuiPreviewDoc) return _previewDocSummary(document);
     if (document is HuiMenu) return _menuSummary(document);
     if (document is GlossDoc) return _glossSummary(document);
-    return ArcaneEmptyState(
-      title: huiText('Nothing to import yet'),
-      description: huiText(
-        'Choose a file or paste JSON above. Every runtime document kind is '
-        'detected as you type, and validation issues are listed here before '
-        'anything is replaced.',
-      ),
-      icon: ArcaneIcon.fileCode(size: IconSize.lg),
+    return EmptyState(
+      message: huiText('Nothing to import yet'),
+      icon: ArcaneIcon.fileCode(),
     );
   }
 
-  Widget _menuSummary(HuiMenu menu) {
-    final int errors = _issues
-        .where((HuiIssue issue) => issue.severity == HuiSeverity.error)
-        .length;
-    final int warnings = _issues
-        .where((HuiIssue issue) => issue.severity == HuiSeverity.warning)
-        .length;
+  Widget _summary(List<String> facts) => dom.div(<Widget>[
+    dom.p(<Widget>[Component.text(facts.join(' · '))]),
+    _issueList(),
+  ]);
 
-    return dom.div(classes: 'hui-import-preview', <Widget>[
-      HuiChips(
-        labels: <String>[
-          huiText('menu document'),
-          huiText('id {id}', <String, Object?>{'id': _targetId}),
-          huiPlural(
-            'import.components.count',
-            menu.components.length,
-            oneEnglish: '{count} component',
-            otherEnglish: '{count} components',
-          ),
-          menu.followPlayer
-              ? huiText('follows player')
-              : huiText('fixed in place'),
-          if (menu.maxDistance != null)
-            huiText('maxDistance {distance}', <String, Object?>{
-              'distance': menu.maxDistance,
-            })
-          else
-            huiText('unlimited range'),
-          _errorCountLabel(errors),
-          _warningCountLabel(warnings),
-        ],
-      ),
-      _issueList(),
-    ]);
-  }
+  Widget _menuSummary(HuiMenu menu) => _summary(<String>[
+    huiText('menu document'),
+    huiText('id {id}', <String, Object?>{'id': _targetId}),
+    huiPlural(
+      'import.components.count',
+      menu.components.length,
+      oneEnglish: '{count} component',
+      otherEnglish: '{count} components',
+    ),
+    menu.followPlayer ? huiText('follows player') : huiText('fixed in place'),
+    if (menu.maxDistance != null)
+      huiText('maxDistance {distance}', <String, Object?>{
+        'distance': menu.maxDistance,
+      })
+    else
+      huiText('unlimited range'),
+    _errorCountLabel(_count(HuiSeverity.error)),
+    _warningCountLabel(_count(HuiSeverity.warning)),
+  ]);
 
-  Widget _previewDocSummary(HuiPreviewDoc doc) {
-    final int errors = _issues.length;
-    return dom.div(classes: 'hui-import-preview', <Widget>[
-      HuiChips(
-        labels: <String>[
-          huiText('container-preview document'),
-          huiText('id {id}', <String, Object?>{'id': _targetId}),
-          huiPlural(
-            'import.elements.count',
-            doc.elements.length,
-            oneEnglish: '{count} element',
-            otherEnglish: '{count} elements',
-          ),
-          huiPlural(
-            'import.variants.count',
-            doc.variants.length,
-            oneEnglish: '{count} variant',
-            otherEnglish: '{count} variants',
-          ),
-          doc.card == null
-              ? huiText('no card (bare content)')
-              : huiText('has a card'),
-          huiPlural(
-            'import.expression_errors.count',
-            errors,
-            oneEnglish: '{count} expression error',
-            otherEnglish: '{count} expression errors',
-          ),
-        ],
-      ),
-      if (errors > 0)
-        dom.p(classes: 'hui-dialog-note', <Widget>[
-          Text(
-            huiText(
-              'Expression errors are shown for reference and do not '
-              'block importing — the document still replaces the current '
-              'one when you press Replace.',
-            ),
-          ),
-        ]),
-      _issueList(),
-    ]);
-  }
+  Widget _previewDocSummary(HuiPreviewDoc doc) => _summary(<String>[
+    huiText('container-preview document'),
+    huiText('id {id}', <String, Object?>{'id': _targetId}),
+    huiPlural(
+      'import.elements.count',
+      doc.elements.length,
+      oneEnglish: '{count} element',
+      otherEnglish: '{count} elements',
+    ),
+    huiPlural(
+      'import.variants.count',
+      doc.variants.length,
+      oneEnglish: '{count} variant',
+      otherEnglish: '{count} variants',
+    ),
+    doc.card == null
+        ? huiText('no card (bare content)')
+        : huiText('has a card'),
+    huiPlural(
+      'import.expression_errors.count',
+      _issues.length,
+      oneEnglish: '{count} expression error',
+      otherEnglish: '{count} expression errors',
+    ),
+  ]);
 
-  Widget _glossSummary(GlossDoc doc) {
-    final int errors = _issues
-        .where((HuiIssue issue) => issue.severity == HuiSeverity.error)
-        .length;
-    final int warnings = _issues
-        .where((HuiIssue issue) => issue.severity == HuiSeverity.warning)
-        .length;
-    return dom.div(classes: 'hui-import-preview', <Widget>[
-      HuiChips(
-        labels: <String>[
-          _glossDocumentKindLabel(doc),
-          huiText('id {id}', <String, Object?>{'id': _targetId}),
-          huiText('schema {version}', <String, Object?>{
-            'version': doc.schemaVersion,
-          }),
-          huiText('revision {revision}', <String, Object?>{
-            'revision': doc.revision,
-          }),
-          ..._documentFacts(doc),
-          _errorCountLabel(errors),
-          _warningCountLabel(warnings),
-        ],
-      ),
-      _issueList(),
-    ]);
-  }
+  Widget _glossSummary(GlossDoc doc) => _summary(<String>[
+    _glossDocumentKindLabel(doc),
+    huiText('id {id}', <String, Object?>{'id': _targetId}),
+    huiText('schema {version}', <String, Object?>{
+      'version': doc.schemaVersion,
+    }),
+    huiText('revision {revision}', <String, Object?>{'revision': doc.revision}),
+    ..._documentFacts(doc),
+    _errorCountLabel(_count(HuiSeverity.error)),
+    _warningCountLabel(_count(HuiSeverity.warning)),
+  ]);
+
+  int _count(HuiSeverity severity) =>
+      _issues.where((HuiIssue issue) => issue.severity == severity).length;
 
   List<String> _documentFacts(GlossDoc doc) => switch (doc) {
     final GlossHologramDoc hologram => <String>[
@@ -507,48 +479,63 @@ class _ImportDialogState extends State<ImportDialog> {
     otherEnglish: '{count} warnings',
   );
 
+  /// The first dozen issues, grouped by severity under small headings.
   Widget _issueList() {
     if (_issues.isEmpty) {
-      return dom.p(classes: 'hui-dialog-note', <Widget>[
-        Text(huiText('No issues found in the imported document.')),
+      return dom.p(<Widget>[
+        Component.text(huiText('No issues found in the imported document.')),
       ]);
     }
-    return dom.ul(classes: 'hui-import-issues', <Widget>[
-      for (final HuiIssue issue in _issues.take(12))
-        dom.li(
-          classes: classNames(<String?>[
-            'hui-import-issue',
-            switch (issue.severity) {
-              HuiSeverity.error => 'is-error',
-              HuiSeverity.warning => 'is-warning',
-              HuiSeverity.info => 'is-info',
-            },
-          ]),
-          <Widget>[
-            dom.code(<Widget>[Text(issue.path)]),
-            dom.span(<Widget>[Text(issue.message)]),
-          ],
-        ),
-      if (_issues.length > 12)
-        dom.li(classes: 'hui-import-issue', <Widget>[
-          dom.span(<Widget>[
-            Text(
-              huiText("and {value} more…", <String, Object?>{
-                'value': _issues.length - 12,
+    final List<HuiIssue> shown = _issues.take(12).toList();
+    return dom.div(<Widget>[
+      for (final HuiSeverity severity in HuiSeverity.values)
+        if (shown.any(
+          (HuiIssue issue) => issue.severity == severity,
+        )) ...<Widget>[
+          dom.h4(classes: 'ui-section-title', <Widget>[
+            Component.text(
+              huiText("{severityLabel} ({length})", <String, Object?>{
+                'severityLabel': _severityLabel(severity),
+                'length': _count(severity),
               }),
             ),
           ]),
+          dom.ul(<Widget>[
+            for (final HuiIssue issue in shown)
+              if (issue.severity == severity)
+                dom.li(<Widget>[
+                  Component.text('${issue.message} '),
+                  dom.code(
+                    attributes: const <String, String>{'dir': 'ltr'},
+                    <Widget>[Component.text(issue.path)],
+                  ),
+                ]),
+          ]),
+        ],
+      if (_issues.length > shown.length)
+        dom.p(<Widget>[
+          Component.text(
+            huiText("and {value} more…", <String, Object?>{
+              'value': _issues.length - shown.length,
+            }),
+          ),
         ]),
     ]);
   }
+
+  String _severityLabel(HuiSeverity severity) => switch (severity) {
+    HuiSeverity.error => huiText('Errors'),
+    HuiSeverity.warning => huiText('Warnings'),
+    HuiSeverity.info => huiText('Notes'),
+  };
 }
 
 /// The parsed-but-not-yet-adopted document, presented as the document state
 /// its [DocumentTypeAdapter] expects.
 ///
 /// The store still owns the catalogs, image library and workspace animation /
-/// emoji resolvers — validation of an imported document resolves references
-/// against the workspace it is about to join — but the document slots carry
+/// emoji resolvers (validation of an imported document resolves references
+/// against the workspace it is about to join), but the document slots carry
 /// the candidate, never the open document.
 final class _ImportedDocumentState implements DocumentStateView {
   @override
@@ -584,11 +571,6 @@ final class _ImportedDocumentState implements DocumentStateView {
 
   @override
   GlossEmojiResolver get workspaceEmoji => store.workspaceEmoji;
-
-  /// The candidate was decoded here, not read back from storage, so there is
-  /// no byte-exact source to preserve.
-  @override
-  String? get preservedMenuSource => null;
 
   @override
   HuiCatalogs get catalogs => store.catalogs;

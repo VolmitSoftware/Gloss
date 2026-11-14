@@ -51,6 +51,7 @@
 #   {expected}  Wersja oczekiwana przy zapisywaniu zmiany
 #   {experience}  Zdobyte doświadczenie
 #   {failed}  Liczba nieudanych operacji
+#   {folders}  Foldery, które może zmieniać token edytora
 #   {from}  Wartość źródłowa lub początek zakresu
 #   {fuel}  Pozostałe paliwo w pojemniku
 #   {group}  Kategoria edytora języka
@@ -69,6 +70,7 @@
 #   {labels}  Liczba etykiet tekstowych
 #   {legacy}  Identyfikator w źródle importu
 #   {level}  Wyświetlany poziom
+#   {lifetime}  Czas bez użycia, po którym token edytora wygasa
 #   {limit}  Dopuszczalny limit
 #   {line}  Numer wiersza w wiadomości
 #   {locale}  Kod języka
@@ -79,6 +81,7 @@
 #   {message}  Komunikat zwrotny lub diagnostyczny
 #   {migrated}  Liczba przekonwertowanych wpisów
 #   {minimum}  Minimalna dopuszczalna wartość
+#   {minutes}  Czas w minutach
 #   {mode}  Wybrany tryb działania lub wyświetlania
 #   {name}  Nazwa obiektu
 #   {oldBoard}  Poprzedni identyfikator tabeli
@@ -108,9 +111,9 @@
 #   {roll}  Kąt przechylenia w stopniach
 #   {rotation}  Obrót wyświetlanego obiektu
 #   {scale}  Skala wyświetlania lub podglądu
+#   {scopes}  Działania dozwolone przez token edytora
 #   {seconds}  Czas w sekundach
 #   {section}  Sekcja edytora języków
-#   {session}  Identyfikator sesji edytora
 #   {severity}  Poziom ważności komunikatu diagnostycznego
 #   {skipped}  Liczba pominiętych wpisów
 #   {slots}  Liczba miejsc na przedmioty
@@ -118,12 +121,12 @@
 #   {special}  Liczba specjalnych elementów wyświetlania
 #   {state}  Bieżący stan
 #   {style}  Styl wyświetlania
-#   {subject}  Dokument edytowany w sesji edytora internetowego
 #   {target}  Wtyczka, dla której wybierany jest język
 #   {temporary}  Liczba obiektów tymczasowych
 #   {text}  Wyświetlany tekst
 #   {title}  Wyświetlany tytuł
 #   {to}  Wartość docelowa lub koniec zakresu
+#   {token}  Identyfikator tokenu edytora
 #   {total}  Łączna liczba wpisów
 #   {type}  Oczekiwany typ wartości lub obiektu
 #   {updated}  liczba komunikatów zmienionych przez aktualizację języka
@@ -295,16 +298,11 @@ preview = "Narzędzia dokumentów podglądu"
 "preview.dump" = "Zbuduj raz dokument podglądu i wypisz liczbę jego elementów"
 "preview.list" = "Wyświetl dokumenty podglądu i ich reguły dopasowania"
 "preview.reset" = "Przywróć wbudowane domyślne podglądy (nie usuwa dodatkowych dokumentów użytkownika, które mogą je przesłaniać)"
-web = "Otwórz edytor internetowy Gloss i zarządzaj nim"
-"web.open" = "Otwórz pusty hostowany edytor Gloss"
-"web.edit" = "Otwórz jeden dokument Gloss na żywo"
-"web.edit.document" = "Otwórz ten dokument na żywo w edytorze internetowym"
-"web.workspace" = "Otwórz cały obszar roboczy Gloss na żywo"
-"web.sessions" = "Zarządzaj aktywnymi sesjami edytora internetowego"
-"web.sessions.list" = "Wyświetl aktywne sesje edytora internetowego"
-"web.sessions.pull" = "Sprawdź teraz sesję edytora internetowego"
-"web.sessions.revoke" = "Odwołaj link dostępu do edytora internetowego"
-"web.sessions.status" = "Pokaż jedną sesję edytora internetowego"
+editor = "Sparuj edytor internetowy z tym serwerem"
+"editor.pair" = "Utwórz jednorazowy link do sparowania przeglądarki"
+"editor.status" = "Pokaż nasłuch, przekaźnik i odcisk klucza edytora"
+"editor.tokens" = "Wyświetl sparowane przeglądarki"
+"editor.revoke" = "Zakończ parowanie lub anuluj link"
 language = "Wybierz swój język lub domyślny język serwera"
 
 "import.mode" = "preview lub apply"
@@ -334,7 +332,6 @@ panel_y = "Bezwzględne lub ~względne Y"
 panel_yaw = "Bezwzględne lub ~względne odchylenie"
 panel_z = "Bezwzględne lub ~względne Z"
 content_menu = "ID załadowanego menu"
-web_subject = "Identyfikator dokumentu Gloss na żywo"
 hologram_id = "ID nowego hologramu i menu głównego"
 hologram_text = "Opcjonalny tekst MiniMessage"
 image_path = "Plik w folderze obrazów Gloss"
@@ -355,7 +352,11 @@ row_x = "Bezwzględne lub ~względne X wiersza"
 row_y = "Bezwzględne lub ~względne Y wiersza"
 row_z = "Bezwzględne lub ~względne Z wiersza"
 source_menu = "ID załadowanego menu źródłowego"
-web_session = "Identyfikator sesji edytora internetowego"
+editor_label = "Nazwa widoczna na liście tokenów"
+editor_scopes = "Co edytor może robić, rozdzielone przecinkami"
+editor_folders = "Ogranicz do tych folderów, rozdzielonych przecinkami"
+editor_expires = "Ważność bez użycia, np. 7d, 12h lub 30m"
+editor_token = "Identyfikator tokenu lub all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cNie masz uprawnień."
@@ -391,6 +392,7 @@ lines = "{count} linii"
 header = "&8[&dGloss&8] &d{id} &7w &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8skala &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7znajduje się w świecie &f{world}&7, który nie jest załadowany."
 
 [command.board]
 exists = "&8[&dGloss&8] &cTabela '&f{id}&c' już istnieje."
@@ -505,13 +507,12 @@ execution_failed = "Nie udało się wykonać polecenia {command}: {reason}"
 menu_name_required = "Nazwa menu nie może być pusta"
 hologram_id_required = "ID hologramu nie może być puste"
 panel_id_required = "Identyfikator panelu nie może być pusty"
-web_subject_required = "Identyfikator dokumentu edytora internetowego nie może być pusty"
-web_session_required = "Identyfikator sesji edytora internetowego nie może być pusty"
 panel_player_required = "Gracz docelowy nie może być pusty"
 row_icon_type_required = "Typ ikony nie może być pusty"
 row_style_property_required = "Właściwość stylu nie może być pusta"
 import_source_required = "Źródło importu starszych danych nie może być puste"
 import_source_unknown = "Nieznane źródło importu starszych danych: {source}"
+editor_token_required = "Podaj identyfikator tokenu lub all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cNie masz uprawnienia &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cOperacja na zawartości menu &f{menu}&c nie powiodła
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cTo polecenie jest dostępne tylko dla graczy."
 
-[gloss.message.web]
-header = "Edytor internetowy"
-open_hover = "Kliknij, aby otworzyć edytor internetowy Gloss."
-open = "&8[&dGloss&8]: &7Edytor internetowy: &f{url}"
-preparing = "&8[&dGloss&8]: &7Przygotowywanie bezpiecznej sesji edytora na żywo dla &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cEdycja internetowa na żywo jest niedostępna. Sprawdź konfigurację synchronizacji i połączenie z przekaźnikiem."
-open_failed = "&8[&dGloss&8]: &cNie można otworzyć &f{kind}={subject}&c w edytorze internetowym na żywo: {reason}"
-open_console = "&8[&dGloss&8]: &7Link dostępu do edytora dla &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eTen adres URL pozwala publikować zmiany na serwerze do chwili odwołania dostępu lub wygaśnięcia. Zachowaj go w tajemnicy."
+[gloss.message.editor]
+link_ready = "Link gotowy. Otwórz go w ciągu {minutes} min"
+link_console = "&8[&dGloss&8]: &aLink gotowy. Otwórz go w ciągu {minutes} min: &f{url}"
+link_details = "&8[&dGloss&8]: &7Uprawnienia {scopes}; {folders}; wygasa po {lifetime} bez użycia; token {token}"
+all_folders = "wszystkie foldery"
+some_folders = "foldery {folders}"
 open_label = "Otwórz edytor"
-copy_label = "Kopiuj link"
+open_hover = "Otwórz w przeglądarce"
+copy_label = "Kopiuj"
+copy_hover = "Kopiuj link"
 revoke_label = "Odwołaj"
-link_hover = "Otwórz edytor, skopiuj link dostępu lub odwołaj sesję {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Brak aktywnych sesji edytora internetowego."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7wygasa=&f{seconds}s &7publikacja=&f{revision} &7oczekujące=&f{pending}"
-revoked = "&8[&dGloss&8]: &aOdwołano sesję edytora internetowego &f{session}&a."
-pulled = "&8[&dGloss&8]: &aSprawdzono sesję edytora internetowego &f{session}&a."
-unknown = "&8[&dGloss&8]: &cNieznana lub wygasła sesja edytora internetowego &f{session}&c."
-failed = "&8[&dGloss&8]: &cOperacja edytora internetowego dla sesji &f{session}&c nie powiodła się: {reason}"
+revoke_hover = "Anuluj ten link lub odłącz sparowany przez niego edytor"
+details_label = "Szczegóły"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cEdytor nie działa; ustaw [editor] enabled = true w gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7Brak tokenów edytora."
+unknown_token = "&8[&dGloss&8]: &cBrak tokenu &f{token}&c."
+revoked_one = "&8[&dGloss&8]: &aOdwołano 1 token; jego połączenia zostały zamknięte."
+revoked_many = "&8[&dGloss&8]: &aOdwołano tokeny: {count}; ich połączenia zostały zamknięte."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Skanowanie &f{source}&7 w celu podglądu migracji bez zmieniania danych..."

@@ -16,3 +16,6 @@
 library;
 
 export 'pane_dom_stub.dart' if (dart.library.js_interop) 'pane_dom_web.dart';
+
+/// A touch screen: no keyboard to show keys for.
+const String coarsePointerQuery = '(pointer: coarse)';

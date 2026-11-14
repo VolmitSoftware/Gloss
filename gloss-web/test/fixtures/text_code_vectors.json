@@ -1,0 +1,339 @@
+{
+  "about": "Shared Minecraft text code vectors. 'display' is what the client draws when the whole text is one text display (style carries across newlines). 'perLine' is what it draws when every line is its own entity or component (each line starts fresh). A run lists its text, colour and the formats that are on. 'nametags' are a prefix, name and suffix: 'team' is the tag above the head (the client puts prefix, name and suffix under one component in the team colour), 'nameplate' is the legacy display name Gloss nameplates show. 'bubbles' are a chat bubble's prefix, format and message wrapped as one block. Gloss is the source; the editor copy is refreshed from it.",
+  "vectors": [
+    {
+      "id": "colour-then-format-then-newline",
+      "text": "&c&lA\nB",
+      "display": [
+        [{ "text": "A", "color": "#FF5555", "bold": true }],
+        [{ "text": "B", "color": "#FF5555", "bold": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FF5555", "bold": true }],
+        [{ "text": "B", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "format-then-colour-clears-the-format",
+      "text": "&lA&cB\nC",
+      "display": [
+        [{ "text": "A", "color": "#FFFFFF", "bold": true }, { "text": "B", "color": "#FF5555" }],
+        [{ "text": "C", "color": "#FF5555" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FFFFFF", "bold": true }, { "text": "B", "color": "#FF5555" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "stacked-formats",
+      "text": "&6&l&o&nA&mB",
+      "display": [
+        [
+          { "text": "A", "color": "#FFAA00", "bold": true, "italic": true, "underlined": true },
+          { "text": "B", "color": "#FFAA00", "bold": true, "italic": true, "underlined": true, "strikethrough": true }
+        ]
+      ],
+      "perLine": [
+        [
+          { "text": "A", "color": "#FFAA00", "bold": true, "italic": true, "underlined": true },
+          { "text": "B", "color": "#FFAA00", "bold": true, "italic": true, "underlined": true, "strikethrough": true }
+        ]
+      ]
+    },
+    {
+      "id": "reset-mid-line",
+      "text": "&b&lA&rB\nC",
+      "display": [
+        [{ "text": "A", "color": "#55FFFF", "bold": true }, { "text": "B", "color": "#FFFFFF" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#55FFFF", "bold": true }, { "text": "B", "color": "#FFFFFF" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "reset-at-line-start",
+      "text": "&a&oA\n&rB\nC",
+      "display": [
+        [{ "text": "A", "color": "#55FF55", "italic": true }],
+        [{ "text": "B", "color": "#FFFFFF" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#55FF55", "italic": true }],
+        [{ "text": "B", "color": "#FFFFFF" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "style-carries-over-an-empty-line",
+      "text": "&d&lA\n\nB",
+      "display": [
+        [{ "text": "A", "color": "#FF55FF", "bold": true }],
+        [],
+        [{ "text": "B", "color": "#FF55FF", "bold": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FF55FF", "bold": true }],
+        [],
+        [{ "text": "B", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "code-at-a-line-end",
+      "text": "A&e&n\nB",
+      "display": [
+        [{ "text": "A", "color": "#FFFFFF" }],
+        [{ "text": "B", "color": "#FFFF55", "underlined": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FFFFFF" }],
+        [{ "text": "B", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "uppercase-codes",
+      "text": "&C&LA&RB",
+      "display": [
+        [{ "text": "A", "color": "#FF5555", "bold": true }, { "text": "B", "color": "#FFFFFF" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FF5555", "bold": true }, { "text": "B", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "obfuscated-carries-across-a-newline",
+      "text": "&kA\nB",
+      "display": [
+        [{ "text": "A", "color": "#FFFFFF", "obfuscated": true }],
+        [{ "text": "B", "color": "#FFFFFF", "obfuscated": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FFFFFF", "obfuscated": true }],
+        [{ "text": "B", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "hash-hex-then-format",
+      "text": "&#FF00AA&lA\nB",
+      "display": [
+        [{ "text": "A", "color": "#FF00AA", "bold": true }],
+        [{ "text": "B", "color": "#FF00AA", "bold": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FF00AA", "bold": true }],
+        [{ "text": "B", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "every-hex-spelling",
+      "text": "&x&1&2&3&4&5&6A&xABCDEFB[00FF7F]C&#0a0B0cD",
+      "display": [
+        [
+          { "text": "A", "color": "#123456" },
+          { "text": "B", "color": "#ABCDEF" },
+          { "text": "C", "color": "#00FF7F" },
+          { "text": "D", "color": "#0A0B0C" }
+        ]
+      ],
+      "perLine": [
+        [
+          { "text": "A", "color": "#123456" },
+          { "text": "B", "color": "#ABCDEF" },
+          { "text": "C", "color": "#00FF7F" },
+          { "text": "D", "color": "#0A0B0C" }
+        ]
+      ]
+    },
+    {
+      "id": "hex-colour-clears-the-format",
+      "text": "&l&oA[33CCFF]B",
+      "display": [
+        [{ "text": "A", "color": "#FFFFFF", "bold": true, "italic": true }, { "text": "B", "color": "#33CCFF" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FFFFFF", "bold": true, "italic": true }, { "text": "B", "color": "#33CCFF" }]
+      ]
+    },
+    {
+      "id": "section-sign-codes",
+      "text": "§9§mA\n§oB",
+      "display": [
+        [{ "text": "A", "color": "#5555FF", "strikethrough": true }],
+        [{ "text": "B", "color": "#5555FF", "strikethrough": true, "italic": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#5555FF", "strikethrough": true }],
+        [{ "text": "B", "color": "#FFFFFF", "italic": true }]
+      ]
+    },
+    {
+      "id": "unknown-code-stays-literal",
+      "text": "&zA&2B",
+      "display": [
+        [{ "text": "&zA", "color": "#FFFFFF" }, { "text": "B", "color": "#00AA00" }]
+      ],
+      "perLine": [
+        [{ "text": "&zA", "color": "#FFFFFF" }, { "text": "B", "color": "#00AA00" }]
+      ]
+    },
+    {
+      "id": "minimessage-line-next-to-a-legacy-line",
+      "syntax": "minimessage",
+      "text": "<gold>A</gold>\n&cB<bold>C",
+      "display": [
+        [{ "text": "A", "color": "#FFAA00" }],
+        [{ "text": "B", "color": "#FF5555" }, { "text": "C", "color": "#FF5555", "bold": true }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FFAA00" }],
+        [{ "text": "B", "color": "#FF5555" }, { "text": "C", "color": "#FF5555", "bold": true }]
+      ]
+    },
+    {
+      "id": "open-minimessage-tag-carries-in-a-display",
+      "syntax": "minimessage",
+      "text": "<aqua><italic>A\nB&eC",
+      "display": [
+        [{ "text": "A", "color": "#55FFFF", "italic": true }],
+        [{ "text": "B", "color": "#55FFFF", "italic": true }, { "text": "C", "color": "#FFFF55" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#55FFFF", "italic": true }],
+        [{ "text": "B", "color": "#FFFFFF" }, { "text": "C", "color": "#FFFF55" }]
+      ]
+    },
+    {
+      "id": "colour-in-item-text-clears-the-default-italic",
+      "text": "&7Info &oA",
+      "display": [
+        [{ "text": "Info ", "color": "#AAAAAA" }, { "text": "A", "color": "#AAAAAA", "italic": true }]
+      ],
+      "perLine": [
+        [{ "text": "Info ", "color": "#AAAAAA" }, { "text": "A", "color": "#AAAAAA", "italic": true }]
+      ],
+      "name": [
+        [{ "text": "Info ", "color": "#AAAAAA" }, { "text": "A", "color": "#AAAAAA", "italic": true }]
+      ],
+      "lore": [
+        [{ "text": "Info ", "color": "#AAAAAA" }, { "text": "A", "color": "#AAAAAA", "italic": true }]
+      ]
+    },
+    {
+      "id": "reset-in-item-text-returns-to-the-item-default",
+      "text": "&cA&rB",
+      "display": [
+        [{ "text": "A", "color": "#FF5555" }, { "text": "B", "color": "#FFFFFF" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FF5555" }, { "text": "B", "color": "#FFFFFF" }]
+      ],
+      "name": [
+        [{ "text": "A", "color": "#FF5555" }, { "text": "B", "color": "#FFFFFF", "italic": true }]
+      ],
+      "lore": [
+        [{ "text": "A", "color": "#FF5555" }, { "text": "B", "color": "#AA00AA", "italic": true }]
+      ]
+    },
+    {
+      "id": "minimessage-in-item-text-keeps-the-default-italic",
+      "syntax": "minimessage",
+      "text": "<gold>Title\n&7Info",
+      "display": [
+        [{ "text": "Title", "color": "#FFAA00" }],
+        [{ "text": "Info", "color": "#AAAAAA" }]
+      ],
+      "perLine": [
+        [{ "text": "Title", "color": "#FFAA00" }],
+        [{ "text": "Info", "color": "#AAAAAA" }]
+      ],
+      "lore": [
+        [{ "text": "Title", "color": "#FFAA00", "italic": true }],
+        [{ "text": "Info", "color": "#AAAAAA" }]
+      ]
+    },
+    {
+      "id": "closing-tag-with-nothing-open-prints",
+      "text": "A</red>B\nC",
+      "display": [
+        [{ "text": "A</red>B", "color": "#FFFFFF" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ],
+      "perLine": [
+        [{ "text": "A</red>B", "color": "#FFFFFF" }],
+        [{ "text": "C", "color": "#FFFFFF" }]
+      ]
+    },
+    {
+      "id": "section-sign-before-no-code-is-skipped",
+      "text": "§zA&cB§",
+      "display": [
+        [{ "text": "A", "color": "#FFFFFF" }, { "text": "B", "color": "#FF5555" }]
+      ],
+      "perLine": [
+        [{ "text": "A", "color": "#FFFFFF" }, { "text": "B", "color": "#FF5555" }]
+      ]
+    }
+  ],
+  "nametags": [
+    {
+      "id": "uncoloured-prefix",
+      "name": "Steve", "color": "red", "prefix": "[VIP] ", "suffix": "",
+      "team": [[{ "text": "[VIP] Steve", "color": "#FF5555" }]],
+      "nameplate": [[{ "text": "[VIP] ", "color": "#FFFFFF" }, { "text": "Steve", "color": "#FF5555" }]]
+    },
+    {
+      "id": "prefix-format-stays-in-the-prefix",
+      "name": "Steve", "color": "gold", "prefix": "&lVIP ", "suffix": " &7*",
+      "team": [[
+        { "text": "VIP ", "color": "#FFAA00", "bold": true },
+        { "text": "Steve ", "color": "#FFAA00" },
+        { "text": "*", "color": "#AAAAAA" }
+      ]],
+      "nameplate": [[
+        { "text": "VIP ", "color": "#FFFFFF", "bold": true },
+        { "text": "Steve ", "color": "#FFAA00" },
+        { "text": "*", "color": "#AAAAAA" }
+      ]]
+    },
+    {
+      "id": "coloured-prefix-keeps-its-colour",
+      "name": "Steve", "color": "yellow", "prefix": "&c[Admin] ", "suffix": "",
+      "team": [[{ "text": "[Admin] ", "color": "#FF5555" }, { "text": "Steve", "color": "#FFFF55" }]],
+      "nameplate": [[{ "text": "[Admin] ", "color": "#FF5555" }, { "text": "Steve", "color": "#FFFF55" }]]
+    },
+    {
+      "id": "uncoloured-suffix",
+      "name": "Steve", "color": "green", "prefix": "", "suffix": " [AFK]",
+      "team": [[{ "text": "Steve [AFK]", "color": "#55FF55" }]],
+      "nameplate": [[{ "text": "Steve [AFK]", "color": "#55FF55" }]]
+    }
+  ],
+  "bubbles": [
+    {
+      "id": "prefix-wraps-with-the-message",
+      "prefix": "&7[Guide] ", "format": "{message}", "message": "one two three four", "wrap": 12,
+      "display": [
+        [{ "text": "[Guide] one", "color": "#AAAAAA" }],
+        [{ "text": "two three", "color": "#AAAAAA" }],
+        [{ "text": "four", "color": "#AAAAAA" }]
+      ]
+    },
+    {
+      "id": "format-colours-the-message-after-a-styled-prefix",
+      "prefix": "&b&lVIP&r ", "format": "&e{message}", "message": "hi there", "wrap": 32,
+      "display": [
+        [{ "text": "VIP", "color": "#55FFFF", "bold": true }, { "text": " ", "color": "#FFFFFF" }, { "text": "hi there", "color": "#FFFF55" }]
+      ]
+    },
+    {
+      "id": "rich-prefix-closes-before-the-message",
+      "prefix": "<bold>Pre</bold> ", "format": "{message}", "message": "a b", "wrap": 32,
+      "display": [
+        [{ "text": "Pre", "color": "#FFFFFF", "bold": true }, { "text": " a b", "color": "#FFFFFF" }]
+      ]
+    }
+  ]
+}

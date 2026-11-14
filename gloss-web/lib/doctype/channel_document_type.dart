@@ -17,8 +17,6 @@ final class ChannelDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => 'chat channel';
   @override
-  String get createLabel => 'New chat channel';
-  @override
   String get pluralLabel => 'Chat channels';
   @override
   int get tabOrder => 76;

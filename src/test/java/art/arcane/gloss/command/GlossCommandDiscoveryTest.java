@@ -1,6 +1,5 @@
 package art.arcane.gloss.command;
 
-import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.volmlib.util.director.compat.DirectorEngineFactory;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeEngine;
@@ -19,6 +18,7 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class GlossCommandDiscoveryTest {
@@ -78,7 +78,7 @@ public class GlossCommandDiscoveryTest {
     List<String> suggestions = engine.tabComplete(
         new DirectorInvocation(new TestSender(), "gloss", List.of("")));
 
-    assertTrue(suggestions.containsAll(List.of("menu", "panel", "preview", "item", "web", "import")));
+    assertTrue(suggestions.containsAll(List.of("menu", "panel", "preview", "item", "editor", "import")));
     assertFalse(suggestions.contains("panels"));
     assertFalse(suggestions.contains("menus"));
     assertFalse(suggestions.contains("previews"));
@@ -203,36 +203,19 @@ public class GlossCommandDiscoveryTest {
   }
 
   @Test
-  public void webGroupExposesEveryDocumentAndSessionSurface() {
+  public void editorGroupHasTheAnimusSubcommandsAndKeyedPairOptions() {
     DirectorRuntimeEngine engine = engine();
-    DirectorRuntimeNode web = child(engine.getRoot(), "web");
-    DirectorRuntimeNode edit = child(web, "edit");
-    DirectorRuntimeNode sessions = child(web, "sessions");
+    DirectorRuntimeNode editor = child(engine.getRoot(), "editor");
 
-    assertNotNull(web);
-    Set<String> webNames = web.getChildren().stream()
+    assertNotNull(editor);
+    assertNull(child(engine.getRoot(), "web"));
+    Set<String> names = editor.getChildren().stream()
         .map(node -> node.getDescriptor().getName())
         .collect(Collectors.toUnmodifiableSet());
-    assertEquals(Set.of("open", "workspace", "edit", "sessions"), webNames);
-
-    Set<String> editNames = edit.getChildren().stream()
-        .map(node -> node.getDescriptor().getName())
-        .collect(Collectors.toUnmodifiableSet());
-    assertEquals(Set.copyOf(EditorSyncDocumentKind.ORDERED_WIRE_NAMES), editNames);
-    assertTrue(parameter(child(edit, "menu"), "id").getCustomHandlerOrNull()
-        instanceof CommandGlossWebEdit.MenuIdHandler);
-    assertTrue(parameter(child(edit, "panel"), "id").getCustomHandlerOrNull()
-        instanceof CommandGlossWebEdit.PanelIdHandler);
-
-    Set<String> sessionNames = sessions.getChildren().stream()
-        .map(node -> node.getDescriptor().getName())
-        .collect(Collectors.toUnmodifiableSet());
-    assertEquals(Set.of("list", "status", "revoke", "pull"), sessionNames);
-    assertEquals(List.of("page", "sender"), parameterNames(child(sessions, "list")));
-    assertEquals(List.of("session", "sender"), parameterNames(child(sessions, "status")));
-    assertEquals(List.of("session", "sender"), parameterNames(child(sessions, "revoke")));
-    assertEquals(List.of("session", "sender"), parameterNames(child(sessions, "pull")));
-    assertFalse(child(sessions, "pull").allNames().contains("poll"));
+    assertEquals(Set.of("pair", "status", "tokens", "revoke"), names);
+    assertEquals(List.of("label", "scopes", "folders", "expires", "sender"), parameterNames(child(editor, "pair")));
+    assertTrue(parameter(child(editor, "revoke"), "token").getCustomHandlerOrNull()
+        instanceof CommandGlossEditor.TokenHandler);
   }
 
   private static DirectorRuntimeEngine engine() {

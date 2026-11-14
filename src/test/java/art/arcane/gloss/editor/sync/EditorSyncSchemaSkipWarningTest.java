@@ -33,7 +33,7 @@ public class EditorSyncSchemaSkipWarningTest {
     write(data.resolve("animations/future.json"), FUTURE_SCHEMA);
 
     EditorSyncProject project = new EditorSyncContentSnapshotBuilder(data)
-        .open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024);
+        .open(1024 * 1024);
 
     assertEquals(List.of("current"),
         EditorSyncDocuments.parse(project.json()).stream()
@@ -48,7 +48,7 @@ public class EditorSyncSchemaSkipWarningTest {
     write(data.resolve("tablist.json"), "{\"schemaVersion\":1,\"revision\":1}");
 
     EditorSyncProject project = new EditorSyncContentSnapshotBuilder(data)
-        .open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024);
+        .open(1024 * 1024);
 
     assertTrue(EditorSyncDocuments.parse(project.json()).isEmpty());
     assertEquals(List.of("schema-skipped|tablist|tablist||declares an unsupported schemaVersion"),

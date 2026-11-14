@@ -1,0 +1,11 @@
+{
+  "protocol": 1,
+  "protocols": [
+    1
+  ],
+  "fingerprint": "sha256:7aa588dcfd87124ac87c2d8317881456ab88fbc37239ccab3e01e8ee9d63316d",
+  "gloss": "3.3.0",
+  "platform": "paper",
+  "minecraft": "26.3",
+  "serverName": "Twin Peaks"
+}

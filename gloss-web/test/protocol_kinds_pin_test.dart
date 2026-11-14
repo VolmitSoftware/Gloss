@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 import 'support/gloss_repository.dart';
+import 'support/sync_kinds.dart';
 
-/// `sync-relay/protocol.md` states the document kinds the transport carries.
+/// `sync-relay/README.md` states the document kinds the transport carries.
 /// Gloss is the truth repo for that list, so the table is derived from
 /// `EditorSyncDocumentKind` in the parent repository rather than maintained by
-/// hand: a kind a lane adds shows up in the protocol or this test fails.
+/// hand: a new kind shows up in the protocol or this test fails.
 void main() {
   test('the protocol kind table matches the Gloss repository', () {
     final File source = File(
@@ -19,13 +20,13 @@ void main() {
     expect(source.existsSync(), isTrue, reason: 'Missing ${source.path}');
 
     final String table = protocolKindTable(source.readAsStringSync());
-    final String protocol = File('sync-relay/protocol.md').readAsStringSync();
+    final String protocol = File('sync-relay/README.md').readAsStringSync();
 
     expect(
       protocol.contains(table),
       isTrue,
       reason:
-          'sync-relay/protocol.md is missing the generated kind table:\n$table',
+          'sync-relay/README.md is missing the generated kind table:\n$table',
     );
   });
 
@@ -46,62 +47,6 @@ void main() {
       expect(slug.hasMatch(kind.wireName), isTrue, reason: kind.wireName);
     }
   });
-}
-
-/// One row of the protocol's kind table.
-final class ProtocolKind {
-  const ProtocolKind({
-    required this.wireName,
-    required this.storageName,
-    required this.layout,
-    required this.versioned,
-    required this.singletonId,
-  });
-
-  final String wireName;
-  final String storageName;
-  final String layout;
-  final bool versioned;
-  final String singletonId;
-
-  String get row =>
-      '| `$wireName` | `$storageName` | $layout | ${versioned ? 'yes' : 'no'} '
-      '| ${singletonId.isEmpty ? '-' : '`$singletonId`'} |';
-}
-
-List<ProtocolKind> protocolKinds(String java) {
-  final RegExp constant = RegExp(
-    r'\n  [A-Z_]+\(\s*"([a-z0-9-]+)"\s*,\s*"([^"]+)"\s*,\s*'
-    r'Layout\.([A-Z_]+)\s*,\s*(true|false)\s*,\s*([^,]+?)\s*,',
-  );
-  final List<ProtocolKind> kinds = <ProtocolKind>[];
-  for (final RegExpMatch match in constant.allMatches(java)) {
-    final String rawSingleton = match.group(5)!.trim();
-    final String singletonId;
-    if (rawSingleton == 'null') {
-      singletonId = '';
-    } else if (rawSingleton.startsWith('"')) {
-      singletonId = rawSingleton.substring(1, rawSingleton.length - 1);
-    } else if (rawSingleton.endsWith('DEFAULT_ID')) {
-      singletonId = 'default';
-    } else {
-      singletonId = rawSingleton;
-    }
-    kinds.add(
-      ProtocolKind(
-        wireName: match.group(1)!,
-        storageName: match.group(2)!,
-        layout: match.group(3)!,
-        versioned: match.group(4) == 'true',
-        singletonId: singletonId,
-      ),
-    );
-  }
-  kinds.sort(
-    (ProtocolKind left, ProtocolKind right) =>
-        left.wireName.compareTo(right.wireName),
-  );
-  return kinds;
 }
 
 String protocolKindTable(String java) => <String>[

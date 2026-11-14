@@ -36,40 +36,26 @@ final class EditorSyncPublicationValidator {
   private static final Set<String> ACCEPTED_MEDIA_TYPES = Set.of(
       "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp");
 
-  ValidatedProject validate(EditorSyncStoredSession session, EditorSyncPublication publication,
+  ValidatedProject validate(Base session, EditorSyncPublication publication,
                             int maximumBytes, JsonObject serverProject) {
     if (!session.baseRevision().equals(publication.baseRevision())) {
       throw new IllegalArgumentException("publication baseRevision does not match the session base");
     }
     EditorSyncProject published = EditorSyncProject.validated(publication.snapshot(), maximumBytes);
     validateTopLevel(published);
-    if (published.kind() != session.kind()) {
-      throw new IllegalArgumentException("publication kind does not match the session");
-    }
-    if (!published.subjectId().equals(session.subjectId())) {
-      throw new IllegalArgumentException("publication subject does not match the session");
-    }
     requireImmutableConstraints(session, published.json());
     requireEchoedUnhandledKinds(session.baseProject(), published.json());
-    if (session.kind() != EditorSyncKind.WORKSPACE && session.kind() != EditorSyncKind.PRESETS
-        && !presets(session.baseProject()).document().equals(presets(serverProject).document())) {
-      throw new IllegalArgumentException("Preset catalog changed after this session opened; open a new session");
-    }
     Map<DocumentKey, ParsedEntry> serverDocuments = parseDocuments(serverProject);
     Map<DocumentKey, ParsedEntry> sessionDocuments = parseDocuments(session.baseProject());
     Map<DocumentKey, ParsedEntry> publishedDocuments = parseDocuments(published.json());
-    enforceDocumentScope(session, sessionDocuments, publishedDocuments);
+    enforceDocumentKinds(publishedDocuments);
     Reconciliation reconciled = applyServerRevisions(serverDocuments, sessionDocuments,
         publishedDocuments, presets(published.json()));
-    Map<DocumentKey, ParsedEntry> appliedDocuments = prepareApplied(reconciled.applied(), presets(serverProject),
-        session.kind() == EditorSyncKind.WORKSPACE);
-    validatePanels(session, serverDocuments, appliedDocuments);
-    Map<String, byte[]> baseImages = parseImages(serverProject, maximumBytes,
-        session.kind() == EditorSyncKind.WORKSPACE);
-    Map<String, byte[]> publishedImages = parseImages(published.json(), maximumBytes,
-        session.kind() == EditorSyncKind.WORKSPACE);
-    enforceImageScope(session, baseImages, publishedImages);
-    validateReferences(session, baseImages, appliedDocuments, publishedImages);
+    Map<DocumentKey, ParsedEntry> appliedDocuments = prepareApplied(reconciled.applied());
+    validatePanels(serverDocuments, appliedDocuments);
+    Map<String, byte[]> baseImages = parseImages(serverProject, maximumBytes);
+    Map<String, byte[]> publishedImages = parseImages(published.json(), maximumBytes);
+    validateReferences(appliedDocuments, publishedImages);
 
     List<EditorSyncDocuments.Entry> appliedEntries = appliedDocuments.values().stream()
         .map(ParsedEntry::entry)
@@ -80,7 +66,7 @@ final class EditorSyncPublicationValidator {
     List<String> appliedWarnings = new ArrayList<>(structuredWarnings(serverProject));
     appliedWarnings.addAll(warnings(appliedEntries));
     EditorSyncProject appliedProject = EditorSyncContentSnapshotBuilder.project(
-        session.kind(), session.subjectId(), appliedEntries, publishedImages, constraints,
+        appliedEntries, publishedImages, constraints,
         new EditorSyncProjectSections(appliedWarnings, serverSection(serverProject, "history",
                 new JsonArray()).getAsJsonArray(),
             serverSection(serverProject, "schemas", new JsonObject()).getAsJsonObject(),
@@ -92,9 +78,22 @@ final class EditorSyncPublicationValidator {
         baseImages, publishedImages, changedKinds, imagesChanged, reconciled.conflicts());
   }
 
-  ValidatedProject validateBase(EditorSyncStoredSession session, int maximumBytes) {
-    return validate(session, new EditorSyncPublication(1L, session.baseRevision(),
-        session.baseProject()), maximumBytes, session.baseProject());
+  /**
+   * The project a publication is judged against: the workspace the changeset was merged onto
+   * (constraints and unhandled kinds come from it).
+   */
+  record Base(JsonObject baseProject) {
+    Base {
+      Objects.requireNonNull(baseProject, "baseProject");
+    }
+
+    static Base of(EditorSyncProject project) {
+      return new Base(project.json());
+    }
+
+    String baseRevision() {
+      return EditorSyncJson.requireString(baseProject, "baseRevision");
+    }
   }
 
   private void validateTopLevel(EditorSyncProject project) {
@@ -123,76 +122,31 @@ final class EditorSyncPublicationValidator {
     return extra;
   }
 
-  private void requireImmutableConstraints(EditorSyncStoredSession session, JsonObject project) {
+  private void requireImmutableConstraints(Base session, JsonObject project) {
     JsonObject stored = EditorSyncJson.requireObject(session.baseProject(), "constraints");
     JsonObject published = EditorSyncJson.requireObject(project, "constraints");
     if (!EditorSyncJson.canonical(stored).equals(EditorSyncJson.canonical(published))) {
       throw new IllegalArgumentException("sync publication cannot change its capability constraints");
     }
-    validateConstraintShape(session, stored);
+    validateConstraintShape(stored);
   }
 
-  private void validateConstraintShape(EditorSyncStoredSession session, JsonObject constraints) {
-    Set<String> expectedKeys = switch (session.kind()) {
-      case MENU -> Set.of("subjectId", "documentKinds", "createDocumentKinds",
-          "allowDeletes", "newImagePrefix");
-      case PANEL -> Set.of("subjectId", "documentKinds", "createDocumentKinds",
-          "allowDeletes", "newMenuPrefix", "newImagePrefix");
-      default -> Set.of("subjectId", "documentKinds", "createDocumentKinds", "allowDeletes");
-    };
-    if (constraints.has("presets")) {
-      expectedKeys = new HashSet<>(expectedKeys);
-      expectedKeys.add("presets");
-      DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, constraints.get("presets").toString());
-    }
-    requireExactKeys(constraints, expectedKeys, "sync constraints");
-    if (!session.subjectId().equals(EditorSyncJson.requireString(constraints, "subjectId"))) {
-      throw new IllegalArgumentException("sync constraints do not match the session subject");
+  private void validateConstraintShape(JsonObject constraints) {
+    requireExactKeys(constraints, Set.of("subjectId", "documentKinds", "createDocumentKinds", "allowDeletes"),
+        "sync constraints");
+    if (!EditorSyncContentSnapshotBuilder.WORKSPACE_SUBJECT_ID.equals(
+        EditorSyncJson.requireString(constraints, "subjectId"))) {
+      throw new IllegalArgumentException("sync constraints do not name the workspace");
     }
     List<String> documentKinds = sortedUniqueKinds(
         EditorSyncJson.requireArray(constraints, "documentKinds"), "documentKinds");
     List<String> createKinds = sortedUniqueKinds(
         EditorSyncJson.requireArray(constraints, "createDocumentKinds"), "createDocumentKinds");
-    boolean allowDeletes = requireBoolean(constraints, "allowDeletes");
-    List<String> expectedDocumentKinds;
-    List<String> expectedCreateKinds;
-    if (session.kind() == EditorSyncKind.WORKSPACE) {
-      if (!allowDeletes) {
-        throw new IllegalArgumentException("workspace sync constraints must allow deletes");
-      }
-      if (!documentKinds.containsAll(EditorSyncDocumentKind.ORDERED_WIRE_NAMES)
-          || !createKinds.containsAll(EditorSyncDocumentKind.ORDERED_WIRE_NAMES)) {
-        throw new IllegalArgumentException("sync constraint document kinds are invalid");
-      }
-      return;
-    } else if (session.kind() == EditorSyncKind.PANEL) {
-      expectedDocumentKinds = List.of("menu", "panel");
-      expectedCreateKinds = List.of("menu");
-      if (allowDeletes) {
-        throw new IllegalArgumentException("individual sync constraints must prohibit deletes");
-      }
-      JsonObject panel = panelJson(session.baseProject(), session.subjectId());
-      String root = EditorSyncJson.requireString(panel, "rootMenuId");
-      int separator = root.lastIndexOf('/');
-      String expectedMenuPrefix = separator >= 0 ? root.substring(0, separator + 1) : root + "/";
-      if (!expectedMenuPrefix.equals(EditorSyncJson.requireString(constraints, "newMenuPrefix"))
-          || !("sync/" + session.subjectId() + "/")
-          .equals(EditorSyncJson.requireString(constraints, "newImagePrefix"))) {
-        throw new IllegalArgumentException("panel sync creation prefix is invalid");
-      }
-    } else {
-      expectedDocumentKinds = List.of(EditorSyncDocumentKind.forSubject(session.kind()).wireName());
-      expectedCreateKinds = List.of();
-      if (allowDeletes) {
-        throw new IllegalArgumentException("individual sync constraints must prohibit deletes");
-      }
-      if (session.kind() == EditorSyncKind.MENU
-          && !("sync/menus/" + session.subjectId() + "/")
-          .equals(EditorSyncJson.requireString(constraints, "newImagePrefix"))) {
-        throw new IllegalArgumentException("menu sync image creation prefix is invalid");
-      }
+    if (!requireBoolean(constraints, "allowDeletes")) {
+      throw new IllegalArgumentException("workspace sync constraints must allow deletes");
     }
-    if (!documentKinds.equals(expectedDocumentKinds) || !createKinds.equals(expectedCreateKinds)) {
+    if (!documentKinds.containsAll(EditorSyncDocumentKind.ORDERED_WIRE_NAMES)
+        || !createKinds.containsAll(EditorSyncDocumentKind.ORDERED_WIRE_NAMES)) {
       throw new IllegalArgumentException("sync constraint document kinds are invalid");
     }
   }
@@ -243,50 +197,11 @@ final class EditorSyncPublicationValidator {
     return Map.copyOf(documents);
   }
 
-  private void enforceDocumentScope(EditorSyncStoredSession session,
-                                    Map<DocumentKey, ParsedEntry> base,
-                                    Map<DocumentKey, ParsedEntry> published) {
-    JsonObject constraints = EditorSyncJson.requireObject(session.baseProject(), "constraints");
-    Set<String> allowedKinds = new HashSet<>(sortedUniqueKinds(
-        EditorSyncJson.requireArray(constraints, "documentKinds"), "documentKinds"));
-    Set<String> createKinds = new HashSet<>(sortedUniqueKinds(
-        EditorSyncJson.requireArray(constraints, "createDocumentKinds"), "createDocumentKinds"));
+  private void enforceDocumentKinds(Map<DocumentKey, ParsedEntry> published) {
     for (DocumentKey key : published.keySet()) {
-      if (!allowedKinds.contains(key.kind().wireName())) {
-        throw new IllegalArgumentException("document kind is outside the session capability: "
+      if (!EditorSyncDocumentKind.ORDERED_WIRE_NAMES.contains(key.kind().wireName())) {
+        throw new IllegalArgumentException("document kind is not handled by this server: "
             + key.kind().wireName());
-      }
-      if (!base.containsKey(key)) {
-        if (!createKinds.contains(key.kind().wireName())) {
-          throw new IllegalArgumentException("sync cannot create " + key.kind().wireName()
-              + " documents in this session");
-        }
-        if (session.kind() == EditorSyncKind.PANEL && key.kind() == EditorSyncDocumentKind.MENU
-            && !key.id().startsWith(EditorSyncJson.requireString(constraints, "newMenuPrefix"))) {
-          throw new IllegalArgumentException("new menu is outside the session prefix: " + key.id());
-        }
-      }
-    }
-    if (!requireBoolean(constraints, "allowDeletes") && !published.keySet().containsAll(base.keySet())) {
-      throw new IllegalArgumentException("individual sync sessions cannot delete documents");
-    }
-    if (session.kind() == EditorSyncKind.WORKSPACE) {
-      return;
-    }
-    DocumentKey subject = new DocumentKey(EditorSyncDocumentKind.forSubject(session.kind()),
-        session.subjectId());
-    if (!published.containsKey(subject)) {
-      throw new IllegalArgumentException("sync publication is missing its subject document");
-    }
-    if (session.kind() != EditorSyncKind.PANEL && published.size() != 1) {
-      throw new IllegalArgumentException("individual sync may publish only its subject document");
-    }
-    if (session.kind() == EditorSyncKind.PANEL) {
-      long panels = published.keySet().stream()
-          .filter(key -> key.kind() == EditorSyncDocumentKind.PANEL)
-          .count();
-      if (panels != 1L) {
-        throw new IllegalArgumentException("panel sync must publish exactly its subject panel");
       }
     }
   }
@@ -303,10 +218,9 @@ final class EditorSyncPublicationValidator {
         : DocumentPresetCatalog.empty();
   }
 
-  private Map<DocumentKey, ParsedEntry> prepareApplied(Map<DocumentKey, ParsedEntry> entries,
-                                                      DocumentPresetCatalog fallback, boolean workspace) {
+  private Map<DocumentKey, ParsedEntry> prepareApplied(Map<DocumentKey, ParsedEntry> entries) {
     ParsedEntry catalog = entries.get(new DocumentKey(EditorSyncDocumentKind.PRESETS, "presets"));
-    DocumentPresetCatalog presets = catalog == null ? workspace ? DocumentPresetCatalog.empty() : fallback
+    DocumentPresetCatalog presets = catalog == null ? DocumentPresetCatalog.empty()
         : DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, catalog.entry().json());
     Map<DocumentKey, ParsedEntry> prepared = new LinkedHashMap<>();
     for (Map.Entry<DocumentKey, ParsedEntry> entry : entries.entrySet()) {
@@ -350,9 +264,13 @@ final class EditorSyncPublicationValidator {
         continue;
       }
       if (!key.kind().versioned()) {
-        applied.put(key, sameSource(previous.entry().json(), incoming.entry().json())
-            ? previous
-            : normalizeNew(incoming, presets));
+        if (sameSource(previous.entry().json(), incoming.entry().json())) {
+          applied.put(key, previous);
+          continue;
+        }
+        String edited = EditorSyncAuthoredSource.edit(previous.entry().json(),
+            JsonParser.parseString(incoming.entry().json()));
+        applied.put(key, edited == null ? normalizeNew(incoming, presets) : normalize(incoming, edited, presets));
         continue;
       }
       long previousRevision = Objects.requireNonNull(previous.entry().revision());
@@ -370,7 +288,8 @@ final class EditorSyncPublicationValidator {
       }
       JsonObject changed = JsonParser.parseString(incoming.entry().json()).getAsJsonObject();
       changed.addProperty("revision", previousRevision + 1L);
-      String persistedShape = GSON.toJson(changed) + System.lineSeparator();
+      String edited = EditorSyncAuthoredSource.edit(previous.entry().json(), changed);
+      String persistedShape = edited == null ? GSON.toJson(changed) + System.lineSeparator() : edited;
       EditorSyncDocumentKind.ParsedDocument parsed = key.kind().parse(key.id(), persistedShape, presets);
       String normalized = key.kind().wireSource(key.id(), persistedShape, parsed, presets);
       EditorSyncDocuments.Entry revised = new EditorSyncDocuments.Entry(
@@ -411,8 +330,12 @@ final class EditorSyncPublicationValidator {
   }
 
   private ParsedEntry normalizeNew(ParsedEntry incoming, DocumentPresetCatalog presets) {
+    return normalize(incoming, ensureLineEnd(incoming.entry().json()), presets);
+  }
+
+  /** {@code incoming} as it will be written: {@code persistedShape}, checked by the kind's parser. */
+  private ParsedEntry normalize(ParsedEntry incoming, String persistedShape, DocumentPresetCatalog presets) {
     EditorSyncDocumentKind kind = EditorSyncDocumentKind.parseWireName(incoming.entry().kind());
-    String persistedShape = ensureLineEnd(incoming.entry().json());
     EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(incoming.entry().id(), persistedShape, presets);
     String source = kind.wireSource(incoming.entry().id(), persistedShape, parsed, presets);
     if (source.equals(incoming.entry().json())) {
@@ -424,8 +347,7 @@ final class EditorSyncPublicationValidator {
     return new ParsedEntry(normalized, parsed.value());
   }
 
-  private void validatePanels(EditorSyncStoredSession session,
-                              Map<DocumentKey, ParsedEntry> base,
+  private void validatePanels(Map<DocumentKey, ParsedEntry> base,
                               Map<DocumentKey, ParsedEntry> applied) {
     Map<UUID, String> uuidOwners = new HashMap<>();
     Set<String> menuIds = new HashSet<>();
@@ -457,22 +379,9 @@ final class EditorSyncPublicationValidator {
         }
       }
     }
-    if (session.kind() == EditorSyncKind.PANEL) {
-      ParsedEntry panelEntry = applied.get(new DocumentKey(EditorSyncDocumentKind.PANEL,
-          session.subjectId()));
-      PanelDefinition panel = (PanelDefinition) Objects.requireNonNull(panelEntry).value();
-      Set<String> reachable = reachableMenus(panel, applied);
-      for (DocumentKey key : applied.keySet()) {
-        if (key.kind() == EditorSyncDocumentKind.MENU && !base.containsKey(key)
-            && !reachable.contains(key.id())) {
-          throw new IllegalArgumentException("new menu is unreachable from the panel root: " + key.id());
-        }
-      }
-    }
   }
 
-  private Map<String, byte[]> parseImages(JsonObject project, int maximumBytes,
-                                          boolean workspace) {
+  private Map<String, byte[]> parseImages(JsonObject project, int maximumBytes) {
     JsonArray values = EditorSyncJson.requireArray(project, "images");
     if (values.size() > EditorSyncSnapshotBuilder.MAX_IMAGE_COUNT) {
       throw new IllegalArgumentException("images exceed "
@@ -502,9 +411,8 @@ final class EditorSyncPublicationValidator {
       if (totalBytes > maximumBytes) {
         throw new EditorSyncProjectTooLargeException(totalBytes, maximumBytes);
       }
-      EditorSyncSnapshotBuilder.ValidatedImage image = workspace
-          ? validateWorkspaceImage(path, decoded.mediaType(), decoded.data())
-          : validateImage(path, decoded.mediaType(), decoded.data());
+      EditorSyncSnapshotBuilder.ValidatedImage image =
+          validateWorkspaceImage(path, decoded.mediaType(), decoded.data());
       validated.put(path, image);
       images.put(path, decoded.data());
     }
@@ -512,41 +420,12 @@ final class EditorSyncPublicationValidator {
     return Map.copyOf(images);
   }
 
-  private void enforceImageScope(EditorSyncStoredSession session,
-                                 Map<String, byte[]> base,
-                                 Map<String, byte[]> published) {
-    if (session.kind() == EditorSyncKind.WORKSPACE) {
-      return;
-    }
-    if (!published.keySet().containsAll(base.keySet())) {
-      throw new IllegalArgumentException("individual sync sessions cannot delete images");
-    }
-    if (session.kind() != EditorSyncKind.MENU && session.kind() != EditorSyncKind.PANEL) {
-      if (!published.isEmpty()) {
-        throw new IllegalArgumentException("this individual subject cannot publish images");
-      }
-      return;
-    }
-    JsonObject constraints = EditorSyncJson.requireObject(session.baseProject(), "constraints");
-    String prefix = EditorSyncJson.requireString(constraints, "newImagePrefix");
-    for (String path : published.keySet()) {
-      if (!base.containsKey(path) && !path.startsWith(prefix)) {
-        throw new IllegalArgumentException("new image is outside the session prefix: " + path);
-      }
-    }
-  }
-
-  private void validateReferences(EditorSyncStoredSession session,
-                                  Map<String, byte[]> baseImages,
-                                  Map<DocumentKey, ParsedEntry> documents,
+  private void validateReferences(Map<DocumentKey, ParsedEntry> documents,
                                   Map<String, byte[]> images) {
-    Set<String> referenced = new HashSet<>();
     List<String> menuSources = new ArrayList<>();
     for (Map.Entry<DocumentKey, ParsedEntry> document : documents.entrySet()) {
       if (document.getKey().kind() == EditorSyncDocumentKind.MENU) {
-        String source = document.getValue().entry().json();
-        menuSources.add(source);
-        EditorSyncSnapshotBuilder.collectImagePaths(JsonParser.parseString(source), referenced);
+        menuSources.add(document.getValue().entry().json());
       }
     }
     Map<String, EditorSyncSnapshotBuilder.ValidatedImage> validatedImages = new LinkedHashMap<>();
@@ -555,45 +434,6 @@ final class EditorSyncPublicationValidator {
           EditorSyncSnapshotBuilder.validateWorkspaceImage(image.getKey(), image.getValue()));
     }
     EditorSyncSnapshotBuilder.validateReferencedImageBudgets(menuSources, validatedImages);
-    if (session.kind() == EditorSyncKind.WORKSPACE) {
-      return;
-    }
-    for (String path : images.keySet()) {
-      if (!referenced.contains(path) && !baseImages.containsKey(path)) {
-        throw new IllegalArgumentException("new unreferenced image is not allowed: " + path);
-      }
-    }
-  }
-
-  private Set<String> reachableMenus(PanelDefinition panel,
-                                     Map<DocumentKey, ParsedEntry> documents) {
-    Map<String, String> menus = new HashMap<>();
-    for (Map.Entry<DocumentKey, ParsedEntry> entry : documents.entrySet()) {
-      if (entry.getKey().kind() == EditorSyncDocumentKind.MENU) {
-        menus.put(entry.getKey().id(), entry.getValue().entry().json());
-      }
-    }
-    ArrayDeque<String> pending = new ArrayDeque<>();
-    Set<String> visited = new HashSet<>();
-    pending.add(panel.rootMenuId());
-    while (!pending.isEmpty()) {
-      String id = pending.removeFirst();
-      if (!visited.add(id)) {
-        continue;
-      }
-      if (visited.size() > EditorSyncSnapshotBuilder.MAX_MENU_COUNT) {
-        throw new IllegalArgumentException("panel menu graph exceeds "
-            + EditorSyncSnapshotBuilder.MAX_MENU_COUNT + " menus");
-      }
-      String source = menus.get(id);
-      if (source == null) {
-        continue;
-      }
-      Set<String> targets = new TreeSet<>();
-      EditorSyncSnapshotBuilder.collectTargets(JsonParser.parseString(source), targets);
-      pending.addAll(targets);
-    }
-    return Set.copyOf(visited);
   }
 
   /**
@@ -676,15 +516,6 @@ final class EditorSyncPublicationValidator {
     }
   }
 
-  private EditorSyncSnapshotBuilder.ValidatedImage validateImage(
-      String path, String declaredMediaType, byte[] data) {
-    String detected = EditorSyncSnapshotBuilder.detectMediaType(data);
-    if (!detected.equals(declaredMediaType)) {
-      throw new IllegalArgumentException("image media type does not match its bytes: " + path);
-    }
-    return EditorSyncSnapshotBuilder.validateImage(path, data);
-  }
-
   private EditorSyncSnapshotBuilder.ValidatedImage validateWorkspaceImage(
       String path, String declaredMediaType, byte[] data) {
     String detected = EditorSyncSnapshotBuilder.detectMediaType(data);
@@ -692,19 +523,6 @@ final class EditorSyncPublicationValidator {
       throw new IllegalArgumentException("image media type does not match its bytes: " + path);
     }
     return EditorSyncSnapshotBuilder.validateWorkspaceImage(path, data);
-  }
-
-  private JsonObject panelJson(JsonObject project, String id) {
-    for (EditorSyncDocuments.Entry entry : EditorSyncDocuments.parse(project)) {
-      if (entry.kind().equals(EditorSyncDocumentKind.PANEL.wireName()) && entry.id().equals(id)) {
-        JsonElement parsed = JsonParser.parseString(entry.json());
-        if (!parsed.isJsonObject()) {
-          throw new IllegalArgumentException("panel document must be a JSON object: " + id);
-        }
-        return parsed.getAsJsonObject();
-      }
-    }
-    throw new IllegalArgumentException("sync project is missing its panel document");
   }
 
   private List<String> sortedUniqueKinds(JsonArray array, String label) {
@@ -715,7 +533,7 @@ final class EditorSyncPublicationValidator {
         throw new IllegalArgumentException(label + " must contain strings");
       }
       String wireName = value.getAsString();
-      if (!EditorSyncKind.WIRE_KIND_PATTERN.matcher(wireName).matches()) {
+      if (!EditorSyncDocuments.WIRE_KIND_PATTERN.matcher(wireName).matches()) {
         throw new IllegalArgumentException(label + " must contain sync v3 slugs");
       }
       if (previous != null && previous.compareTo(wireName) >= 0) {

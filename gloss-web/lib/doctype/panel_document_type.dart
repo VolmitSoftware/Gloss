@@ -25,8 +25,6 @@ final class PanelDocumentType extends DocumentTypeAdapter {
   @override
   String get noun => huiText('flow map');
 
-  @override
-  String get createLabel => huiText('New menu flow map');
 
   @override
   String get pluralLabel => huiText('Flow maps');
@@ -53,9 +51,6 @@ final class PanelDocumentType extends DocumentTypeAdapter {
 
   @override
   bool get undoable => true;
-
-  @override
-  bool get sourcePreserving => false;
 
   @override
   String? get syncWireKind => 'panel';
@@ -116,11 +111,6 @@ final class PanelDocumentType extends DocumentTypeAdapter {
   @override
   String exportJson(DocumentStateView state) => throw StateError(
     huiText('Panel metadata is editor-only and cannot be exported.'),
-  );
-
-  @override
-  String formattedJson(DocumentStateView state) => throw StateError(
-    huiText('Panel metadata is editor-only and cannot be formatted.'),
   );
 
   @override

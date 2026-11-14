@@ -2,17 +2,25 @@
 ///
 /// Mirrors the plugin pipeline in `util/common/TextUtils.java`: legacy `&` and
 /// `§` codes — including the `&x&r&r&g&g&b&b` hex form — are converted to valid
-/// MiniMessage tags before parsing.
+/// MiniMessage tags before parsing. A colour code becomes `<reset>` plus the
+/// colour, exactly as `TextUtils.translateLegacy` writes it, so a colour clears
+/// bold, italic, underline, strikethrough and obfuscation like the client's
+/// own `§` handling; a format code adds to the current style.
 ///
 /// This is only `TextUtils.parse`. A menu text icon reaches it through
-/// `TextPipeline.menuText` first (emoji substitution, then the `[RRGGBB]`
-/// bracket-hex translation): see `glossRenderMenuText` in `logic/gloss_text.dart`,
-/// which is what [McTextCache] applies before parsing.
+/// `TextPipeline.menuText` first (functions, expressions, emoji, then the
+/// colour stage): see `glossRenderMenuText` in `logic/gloss_text.dart`, which
+/// is what [McTextCache] applies before parsing.
 ///
-/// Line splitting happens BEFORE parsing (`TextMenuIcon` splits on `\n` and
-/// parses each line on its own), so tag state never carries across lines.
-/// Splitting follows Java's `String.split` semantics, which drop trailing
-/// empty parts: `"a\n"` is one line, `"\n"` is zero lines, `""` is one line.
+/// Two line shapes, matching what the plugin sends:
+///
+/// - [parseMcText]: one entity per line. `TextMenuIcon` splits on `\n` and
+///   spawns one display per line, so each line starts from the default style.
+///   Splitting follows Java's `String.split` semantics, which drop trailing
+///   empty parts: `"a\n"` is one line, `"\n"` is zero lines, `""` is one line.
+/// - [parseMcDisplayText]: one text display. The whole string is one
+///   component, so style carries across newlines and only `&r` or a colour
+///   code changes it, the way the client draws it.
 library;
 
 import 'dart:math' as math;
@@ -22,6 +30,13 @@ import 'gloss_particle_text.dart';
 
 /// Colour applied to text with no colour tag in scope.
 const int mcDefaultTextColor = 0xFFFFFF;
+
+/// The server list draws a MOTD in grey (`ServerSelectionList`, -8355712).
+const int mcMotdTextColor = 0x808080;
+
+/// A container window draws its title in dark grey with no shadow
+/// (`AbstractContainerScreen`, -12566464).
+const int mcContainerTitleColor = 0x404040;
 
 /// The 16 vanilla named colours, keyed by their MiniMessage tag name.
 const Map<String, int> mcNamedColors = <String, int>{
@@ -208,16 +223,23 @@ class McTextResult {
   int get maxLinePixels {
     int widest = 0;
     for (final List<McSpan> line in lines) {
-      int width = 1;
-      for (final McSpan span in line) {
-        for (final int codePoint in span.text.runes) {
-          width += _glyphAdvance(codePoint) + (span.bold ? 1 : 0);
-        }
-      }
-      widest = math.max(widest, width);
+      widest = math.max(widest, mcLinePixels(line));
     }
     return widest;
   }
+}
+
+/// One line's width in font pixels, measured like `HologramBoxLayout.measure`:
+/// each glyph's advance, one more per bold glyph, one pixel for the display
+/// background.
+int mcLinePixels(Iterable<McSpan> line) {
+  int width = 1;
+  for (final McSpan span in line) {
+    for (final int codePoint in span.text.runes) {
+      width += _glyphAdvance(codePoint) + (span.bold ? 1 : 0);
+    }
+  }
+  return width;
 }
 
 /// Advances of ASCII 32 to 126 in `org.bukkit.map.MinecraftFont`, in pixels.
@@ -234,21 +256,59 @@ int _glyphAdvance(int codePoint) => codePoint >= 32 && codePoint <= 126
     ? _glyphAdvances[codePoint - 32]
     : 6;
 
-/// Parses a HoloUI text icon string into styled lines.
-McTextResult parseMcText(String raw) {
+/// Parses a HoloUI text icon string into styled lines, one entity per line.
+McTextResult parseMcText(
+  String raw, {
+  int defaultColor = mcDefaultTextColor,
+}) {
   // A set literal is a LinkedHashSet, so warning order stays stable.
   final Set<String> warnings = <String>{};
   final List<List<McSpan>> lines = <List<McSpan>>[];
   for (final String line in _splitLines(raw)) {
     final String miniMessage = _legacyToMiniMessage(line);
     final List<_Node> nodes = _classify(_tokenize(miniMessage), warnings);
-    lines.add(_render(nodes, warnings));
+    lines.add(_render(nodes, warnings, defaultColor));
   }
   return McTextResult(
     lines: List<List<McSpan>>.unmodifiable(lines),
     warnings: List<String>.unmodifiable(warnings),
     renderedText: raw,
   );
+}
+
+/// Parses the text of one display: one component whose style runs on across
+/// newlines. Every `\n` starts a line, trailing ones included, as the client
+/// breaks a text display. [defaultColor] is the surface's own colour for
+/// uncoloured text and after a reset.
+McTextResult parseMcDisplayText(
+  String raw, {
+  int defaultColor = mcDefaultTextColor,
+}) {
+  final Set<String> warnings = <String>{};
+  final List<_Node> nodes = _classify(
+    _tokenize(_legacyToMiniMessage(raw)),
+    warnings,
+  );
+  return McTextResult(
+    lines: mcSplitSpanLines(_render(nodes, warnings, defaultColor)),
+    warnings: List<String>.unmodifiable(warnings),
+    renderedText: raw,
+  );
+}
+
+/// Breaks styled runs at each `\n`; every piece keeps its run's style.
+List<List<McSpan>> mcSplitSpanLines(List<McSpan> spans) {
+  final List<List<McSpan>> lines = <List<McSpan>>[<McSpan>[]];
+  for (final McSpan span in spans) {
+    final List<String> parts = span.text.split('\n');
+    for (int index = 0; index < parts.length; index++) {
+      if (index > 0) lines.add(<McSpan>[]);
+      if (parts[index].isNotEmpty) lines.last.add(span.withText(parts[index]));
+    }
+  }
+  return List<List<McSpan>>.unmodifiable(<List<McSpan>>[
+    for (final List<McSpan> line in lines) List<McSpan>.unmodifiable(line),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,10 +370,16 @@ String _legacyToMiniMessage(String line) {
     if ((prefix == '&' || prefix == '§') && i + 1 < line.length) {
       final String? tag = _legacyCodeTags[line[i + 1].toLowerCase()];
       if (tag != null) {
-        out.write('<$tag>');
+        out.write(_isLegacyFormat(tag) ? '<$tag>' : '<reset><$tag>');
         i++;
         continue;
       }
+    }
+    // The client skips a section sign and the character after it when that
+    // is no code, and drops one that ends the text.
+    if (prefix == '§') {
+      i++;
+      continue;
     }
     out.write(line[i]);
   }
@@ -321,14 +387,14 @@ String _legacyToMiniMessage(String line) {
 }
 
 /// `TextUtils.legacyHex`: an `&`/`§` marker, `x`, then six `&<hex digit>` pairs
-/// become `<#rrggbb>`. One character short of the full token and it stays
+/// become `<reset><#rrggbb>`. One character short of the full token and it stays
 /// literal — the Java guard is `offset + 13 >= text.length()`.
 String? _legacyHex(String text, int offset) {
   if (offset + 13 >= text.length) return null;
   final String marker = text[offset];
   if (marker != '&' && marker != '§') return null;
   if (text[offset + 1].toLowerCase() != 'x') return null;
-  final StringBuffer hex = StringBuffer('<#');
+  final StringBuffer hex = StringBuffer('<reset><#');
   for (int index = offset + 2; index < offset + 14; index += 2) {
     final String lead = text[index];
     final String digit = text[index + 1];
@@ -337,6 +403,16 @@ String? _legacyHex(String text, int offset) {
   }
   return (hex..write('>')).toString();
 }
+
+/// The format codes add to the style; every other code (a colour, or `r`)
+/// starts from a reset.
+bool _isLegacyFormat(String tag) =>
+    tag == 'obfuscated' ||
+    tag == 'bold' ||
+    tag == 'strikethrough' ||
+    tag == 'underlined' ||
+    tag == 'italic' ||
+    tag == 'reset';
 
 /// `Character.digit(c, 16) >= 0`.
 bool _isHexDigit(String char) {
@@ -740,8 +816,8 @@ bool _tagCloses(String closeKey, String openKey) =>
         openKey.codeUnitAt(closeKey.length) == 0x3A &&
         openKey.startsWith(closeKey));
 
-_Style _resolveStyle(List<_Frame> stack) {
-  int rgb = mcDefaultTextColor;
+_Style _resolveStyle(List<_Frame> stack, int defaultColor) {
+  int rgb = defaultColor;
   bool bold = false;
   bool italic = false;
   bool underlined = false;
@@ -819,7 +895,11 @@ int _countGradientChars(
   return count;
 }
 
-List<McSpan> _render(List<_Node> nodes, Set<String> warnings) {
+List<McSpan> _render(
+  List<_Node> nodes,
+  Set<String> warnings,
+  int defaultColor,
+) {
   final List<_Frame> stack = <_Frame>[];
   final List<McSpan> spans = <McSpan>[];
   final StringBuffer buffer = StringBuffer();
@@ -857,11 +937,11 @@ List<McSpan> _render(List<_Node> nodes, Set<String> warnings) {
       return;
     }
     if (!stack.any((_Frame frame) => frame.gradient != null)) {
-      emit(text, _resolveStyle(stack));
+      emit(text, _resolveStyle(stack, defaultColor));
       return;
     }
     for (final int rune in text.runes) {
-      emit(String.fromCharCode(rune), _resolveStyle(stack));
+      emit(String.fromCharCode(rune), _resolveStyle(stack, defaultColor));
       for (final _Frame frame in stack) {
         final _GradientRun? gradient = frame.gradient;
         if (gradient != null) {
@@ -887,12 +967,14 @@ List<McSpan> _render(List<_Node> nodes, Set<String> warnings) {
         (_Frame frame) => _tagCloses(tag.key, frame.key),
       );
       if (index < 0) {
+        // MiniMessage prints a closing tag that closes nothing.
         warnings.add(
           huiText(
             'Closing tag {tag} has no matching opening tag.',
             <String, Object?>{'tag': tag.raw},
           ),
         );
+        writeText(tag.raw);
         continue;
       }
       stack.removeRange(index, stack.length);

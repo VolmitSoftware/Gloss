@@ -11,6 +11,7 @@ library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 
+import '../../config/kind_groups.dart';
 import '../../doctype/doctype.dart';
 import '../../logic/multi_select.dart';
 import '../../model/model.dart';
@@ -18,6 +19,8 @@ import '../../state/editor_store.dart';
 import '../../state/workspace.dart';
 import 'shell_intents.dart';
 import 'shortcut_sheet.dart';
+import 'view_rules.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class ShellAction {
@@ -38,7 +41,7 @@ class ShellAction {
   final String group;
   final String label;
   final void Function() run;
-  final Widget? icon;
+  final ArcaneGlyph? icon;
 
   /// Platform-neutral spec such as `mod+Shift+Z`, rendered per platform.
   final String? shortcut;
@@ -78,17 +81,24 @@ List<ShellAction> buildShellActions(
   ShellIntents intents, {
   void Function()? onShowShortcuts,
   void Function()? onReplayTour,
+  bool advanced = true,
+  bool compact = false,
 }) {
   final EditorStore store = intents.store;
+  final ViewChoices views = viewChoices(
+    store.docType,
+    advanced: advanced,
+    compact: compact,
+  );
   final int selected = store.selectionIds.length;
   final String documentNoun = store.docType.noun;
   final List<ShellAction> actions = <ShellAction>[
     ShellAction(
       id: 'file.new',
       group: shellGroupFile,
-      label: huiText('New menu'),
+      label: huiText('New document'),
       icon: ArcaneIcon.filePlus(size: IconSize.sm),
-      keywords: const <String>['document', 'blank', 'create'],
+      keywords: const <String>['document', 'blank', 'create', 'random'],
       run: intents.newDocument,
     ),
     ShellAction(
@@ -138,6 +148,54 @@ List<ShellAction> buildShellActions(
       icon: ArcaneIcon.images(size: IconSize.sm),
       keywords: const <String>['upload', 'texture', 'library', 'zip'],
       run: intents.openImages,
+    ),
+    ShellAction(
+      id: 'file.bundle.import',
+      group: shellGroupFile,
+      label: huiText('Import workspace bundle'),
+      icon: ArcaneIcon.folderInput(size: IconSize.sm),
+      keywords: const <String>['workspace', 'restore', 'backup'],
+      run: intents.importBundle,
+    ),
+    ShellAction(
+      id: 'file.bundle.export',
+      group: shellGroupFile,
+      label: huiText('Export workspace bundle'),
+      icon: ArcaneIcon.folderOutput(size: IconSize.sm),
+      keywords: const <String>['workspace', 'backup', 'download'],
+      run: intents.exportBundle,
+    ),
+    ShellAction(
+      id: 'file.erase',
+      group: shellGroupFile,
+      label: huiText('Erase all local data'),
+      icon: ArcaneIcon.trash2(size: IconSize.sm),
+      keywords: const <String>['reset', 'clear', 'storage'],
+      run: intents.eraseData,
+    ),
+    if (intents.onPairServer != null)
+      ShellAction(
+        id: 'file.pair',
+        group: shellGroupFile,
+        label: huiText('Pair a server'),
+        icon: ArcaneIcon.link(size: IconSize.sm),
+        keywords: const <String>['pair', 'link', 'connect', 'server'],
+        run: intents.pairServer,
+      ),
+    ShellAction(
+      id: 'file.server',
+      group: shellGroupFile,
+      label: huiText('Server'),
+      icon: ArcaneIcon.server(size: IconSize.sm),
+      keywords: const <String>[
+        'sync',
+        'publish',
+        'pair',
+        'link',
+        'problems',
+        'history',
+      ],
+      run: intents.openServer,
     ),
     ShellAction(
       id: 'edit.undo',
@@ -210,7 +268,7 @@ List<ShellAction> buildShellActions(
     // enough one. The palette hides disabled actions outright, so gating align
     // at two would hide it exactly when the user is looking for it and would
     // never say why; the intents' guard toast names the requirement instead.
-    for (final (String id, String label, HuiAlign align, Widget icon)
+    for (final (String id, String label, HuiAlign align, ArcaneGlyph icon)
         in _alignments)
       ShellAction(
         id: 'selection.align.$id',
@@ -243,7 +301,8 @@ List<ShellAction> buildShellActions(
     // rail order. "To front" and "to back" move the selection past the nearest
     // unselected component, so with everything selected they are no-ops — and
     // again the toast, not a hidden row, is what says so.
-    for (final (String id, String label, HuiZOrder op, Widget icon) in _depths)
+    for (final (String id, String label, HuiZOrder op, ArcaneGlyph icon)
+        in _depths)
       ShellAction(
         id: 'selection.$id',
         group: shellGroupSelection,
@@ -265,50 +324,47 @@ List<ShellAction> buildShellActions(
         enabled: store.isMenuDoc,
         run: () => intents.addComponent(type),
       ),
-    // The four modes are offered for every kind; a kind that cannot serve one
-    // has it listed disabled, and the switcher's tooltip carries the reason.
-    ShellAction(
-      id: 'view.visual',
-      group: shellGroupView,
-      label: huiText("Visual mode ({surfaceLabel})", <String, Object?>{
-        'surfaceLabel': store.docType.surfaceLabel,
-      }),
-      icon: ArcaneIcon.eye(size: IconSize.sm),
-      shortcut: huiShortcutSpec('view.visual'),
-      keywords: const <String>['surface', 'editor', 'design'],
-      enabled: store.docType.supportsView(EditorView.visual),
-      run: () => intents.setView(EditorView.visual),
-    ),
-    ShellAction(
-      id: 'view.preview',
-      group: shellGroupView,
-      label: huiText('Preview mode'),
-      icon: ArcaneIcon.rotate3d(size: IconSize.sm),
-      shortcut: huiShortcutSpec('view.preview'),
-      keywords: const <String>['3d', 'player', 'simulate', 'stage', 'in game'],
-      enabled: store.docType.supportsView(EditorView.preview),
-      run: () => intents.setView(EditorView.preview),
-    ),
-    ShellAction(
-      id: 'view.code',
-      group: shellGroupView,
-      label: huiText('Code mode'),
-      icon: ArcaneIcon.code(size: IconSize.sm),
-      shortcut: huiShortcutSpec('view.code'),
-      keywords: const <String>['json', 'text'],
-      enabled: store.docType.supportsView(EditorView.code),
-      run: () => intents.setView(EditorView.code),
-    ),
-    ShellAction(
-      id: 'view.split',
-      group: shellGroupView,
-      label: huiText('Split mode'),
-      icon: ArcaneIcon.layers(size: IconSize.sm),
-      shortcut: huiShortcutSpec('view.split'),
-      keywords: const <String>['side by side', 'json'],
-      enabled: store.docType.supportsView(EditorView.split),
-      run: () => intents.setView(EditorView.split),
-    ),
+    // Only the views the bar offers for this kind, mode and width.
+    if (views.editPreview) ...<ShellAction>[
+      ShellAction(
+        id: 'view.visual',
+        group: shellGroupView,
+        label: huiText('Edit'),
+        icon: ArcaneIcon.pencil(size: IconSize.sm),
+        shortcut: huiShortcutSpec('view.visual'),
+        keywords: const <String>['surface', 'editor', 'design', 'visual'],
+        run: () => intents.setView(EditorView.visual),
+      ),
+      ShellAction(
+        id: 'view.preview',
+        group: shellGroupView,
+        label: huiText('Preview'),
+        icon: ArcaneIcon.eye(size: IconSize.sm),
+        shortcut: huiShortcutSpec('view.preview'),
+        keywords: const <String>['3d', 'player', 'simulate', 'in game'],
+        run: () => intents.setView(EditorView.preview),
+      ),
+    ],
+    if (views.code)
+      ShellAction(
+        id: 'view.code',
+        group: shellGroupView,
+        label: huiText('Code'),
+        icon: ArcaneIcon.code(size: IconSize.sm),
+        shortcut: huiShortcutSpec('view.code'),
+        keywords: const <String>['json', 'text'],
+        run: intents.toggleCode,
+      ),
+    if (views.split)
+      ShellAction(
+        id: 'view.split',
+        group: shellGroupView,
+        label: huiText('Split view'),
+        icon: ArcaneIcon.columns2(size: IconSize.sm),
+        shortcut: huiShortcutSpec('view.split'),
+        keywords: const <String>['side by side', 'json'],
+        run: intents.toggleSplit,
+      ),
     ShellAction(
       id: 'view.theme',
       group: shellGroupView,
@@ -402,7 +458,7 @@ List<ShellAction> buildShellActions(
       ShellAction(
         id: 'help.tour',
         group: shellGroupHelp,
-        label: huiText('Replay the guided tour'),
+        label: huiText('Guided tour'),
         icon: ArcaneIcon.compass(size: IconSize.sm),
         keywords: const <String>['onboarding', 'intro', 'walkthrough', 'first'],
         run: onReplayTour,
@@ -417,9 +473,7 @@ List<ShellAction> buildShellActions(
     ),
   ];
 
-  // Library scope. The tab strip is the pointer route; these are the same
-  // switches by name, which is what makes the mode reachable from the keyboard
-  // without spending a chord on each of ten kinds.
+  // The library's kind filter, by name.
   actions.add(
     ShellAction(
       id: 'library.mode.all',
@@ -431,25 +485,30 @@ List<ShellAction> buildShellActions(
       run: () => intents.setMode(null),
     ),
   );
-  for (final DocumentTypeAdapter type in DocumentTypeRegistry.tabs) {
-    actions.add(
-      ShellAction(
-        id: 'library.mode.${type.kind.name}',
-        group: shellGroupLibrary,
-        label: huiText("Show only {toLowerCase}", <String, Object?>{
-          'toLowerCase': type.pluralLabel.toLowerCase(),
-        }),
-        icon: type.tabIcon(),
-        keywords: <String>['mode', 'filter', 'scope', type.noun],
-        enabled: !identical(store.mode, type),
-        run: () => intents.setMode(type),
-      ),
-    );
+  for (final KindGroup group in groupsFor(advanced: advanced)) {
+    for (final KindInfo info in kindsIn(group, advanced: advanced)) {
+      final DocumentTypeAdapter type = DocumentTypeRegistry.of(info.kind);
+      actions.add(
+        ShellAction(
+          id: 'library.mode.${info.kind.name}',
+          group: shellGroupLibrary,
+          label: huiText('Show only {toLowerCase}', <String, Object?>{
+            'toLowerCase': info.label.toLowerCase(),
+          }),
+          icon: type.tabIcon(),
+          keywords: <String>['mode', 'filter', 'scope', type.noun, group.label],
+          enabled: !identical(store.mode, type),
+          run: () => intents.setMode(type),
+        ),
+      );
+    }
   }
 
   final String? activeId = store.workspace.activeId;
   for (final WorkspaceDoc doc in store.workspace.recent) {
-    if (doc.id == activeId) continue;
+    if (doc.id == activeId || !listedInMode(doc, advanced: advanced)) {
+      continue;
+    }
     actions.add(
       ShellAction(
         id: 'doc.${doc.id}',
@@ -481,8 +540,8 @@ String _selectionNoun(int selected) => huiPlural(
 
 /// Lucide's object-alignment glyphs: a vertical rule means the components line
 /// up horizontally, and the other way round.
-List<(String, String, HuiAlign, Widget)> get _alignments =>
-    <(String, String, HuiAlign, Widget)>[
+List<(String, String, HuiAlign, ArcaneGlyph)> get _alignments =>
+    <(String, String, HuiAlign, ArcaneGlyph)>[
       (
         'left',
         huiText('Align left edges'),
@@ -521,8 +580,8 @@ List<(String, String, HuiAlign, Widget)> get _alignments =>
       ),
     ];
 
-List<(String, String, HuiZOrder, Widget)> get _depths =>
-    <(String, String, HuiZOrder, Widget)>[
+List<(String, String, HuiZOrder, ArcaneGlyph)> get _depths =>
+    <(String, String, HuiZOrder, ArcaneGlyph)>[
       (
         'forward',
         huiText('Bring forward'),

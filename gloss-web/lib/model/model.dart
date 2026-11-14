@@ -32,6 +32,7 @@ export 'gloss_names.dart';
 export 'gloss_strings.dart';
 export 'gloss_presets.dart';
 export 'gloss_waypoint.dart';
+export 'gloss_leaderboard.dart';
 export 'gloss_glyph.dart';
 export 'gloss_display_refresh.dart';
 export 'gloss_behavior.dart';

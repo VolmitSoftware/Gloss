@@ -13,49 +13,27 @@ import '../../state/workspace.dart';
 import '../gloss/gloss_game_screen.dart';
 import '../gloss/gloss_text_line.dart';
 import '../../logic/gloss_text.dart';
+import '../../logic/mc_text.dart';
 import '../../logic/gloss_show.dart';
 import '../../logic/player_identity_preview.dart';
 import '../../mc/scene/mc_math.dart';
 import '../../mc/scene/mc_camera.dart';
 import '../../mc/scene/mc_scene.dart';
 import '../../services/showcase_randomizer.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/technical_input.dart';
 import '../mc/mc_stage_controller.dart';
 import '../mc/mc_dom_layer.dart';
 import '../scoreboard/scoreboard_selection.dart';
 
-class _LaneStage extends StatelessWidget {
-  const _LaneStage({
-    required this.gameContext,
-    required this.anchor,
-    required this.label,
-    required this.stageClass,
-    required this.child,
-  });
-
-  final bool gameContext;
-  final GlossGameAnchor anchor;
-  final String label;
-  final String stageClass;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (gameContext) {
-      return GlossGameScreen(anchor: anchor, label: label, child: child);
-    }
-    return dom.div(classes: '$stageClass-stage', <Widget>[child]);
-  }
-}
-
+/// The lane kinds (inventory, nameplate, nametag, marker) draw once, in the
+/// game screen frame.
 class InventoryView extends StatefulWidget {
-  const InventoryView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const InventoryView({required this.store, super.key});
 
   final EditorStore store;
-  final bool gameContext;
 
   @override
   State<InventoryView> createState() => _InventoryViewState();
@@ -63,7 +41,6 @@ class InventoryView extends StatefulWidget {
 
 class _InventoryViewState extends State<InventoryView> {
   EditorStore get store => component.store;
-  bool get gameContext => component.gameContext;
 
   @override
   void initState() {
@@ -85,19 +62,25 @@ class _InventoryViewState extends State<InventoryView> {
   Widget build(BuildContext context) {
     final GlossInventoryDoc? doc = store.inventoryDoc;
     if (doc == null) {
-      return const dom.div(classes: 'hui-inventory-stage is-empty', <Widget>[]);
+      return glossGameEmpty(
+        anchor: GlossGameAnchor.screen,
+        label: huiText('Chest window'),
+      );
     }
-    return _LaneStage(
-      gameContext: gameContext,
+    // Slots are sized in GUI pixels, so the window has a natural size the
+    // frame scales down as one picture.
+    return GlossGameScreen(
       anchor: GlossGameAnchor.screen,
       label: huiText('Chest window'),
-      stageClass: 'hui-inventory',
+      fit: true,
       child: dom.div(classes: 'hui-inventory-screen', <Widget>[
         dom.div(classes: 'hui-inventory-title', <Widget>[
+          // The title goes through Bukkit's legacy string setter, so
+          // MiniMessage tags stay literal there.
           GlossTextLine(
             render: renderGlossLine(
               doc.title,
-              richText: true,
+              defaultColor: mcContainerTitleColor,
               animations: store.workspaceAnimations,
               emoji: store.workspaceEmoji,
             ),
@@ -107,7 +90,10 @@ class _InventoryViewState extends State<InventoryView> {
           classes: 'hui-inventory-grid',
           styles: dom.Styles(
             raw: <String, String>{
-              'grid-template-columns': 'repeat(${doc.width}, 1fr)',
+              'grid-template-columns':
+                  'repeat(${doc.width}, calc(18 * var(--gui, 2px)))',
+              // Fixed rows: a long fallback label must not stretch a slot.
+              'grid-auto-rows': 'calc(18 * var(--gui, 2px))',
             },
           ),
           <Widget>[
@@ -118,6 +104,16 @@ class _InventoryViewState extends State<InventoryView> {
       ]),
     );
   }
+
+  /// `minecraft:gray_stained_glass_pane` -> `GSG`.
+  static String _initials(String item) => item
+      .split(':')
+      .last
+      .split('_')
+      .where((String word) => word.isNotEmpty)
+      .take(3)
+      .map((String word) => word[0].toUpperCase())
+      .join();
 
   Widget _slot(GlossInventoryDoc doc, int slot) {
     final int row = slot ~/ doc.width;
@@ -135,18 +131,26 @@ class _InventoryViewState extends State<InventoryView> {
         ? Map<String, Object?>.from(rawIcon)
         : const <String, Object?>{};
     final String item = icon['item'] is String ? icon['item'] as String : '';
-    final String? texture = store.catalogs.textureFor(item);
+    // The catalog keys vanilla items without their namespace.
+    final String? texture =
+        store.catalogs.textureFor(item) ??
+        (item.startsWith('minecraft:')
+            ? store.catalogs.textureFor(item.substring('minecraft:'.length))
+            : null);
     final String name = icon['name'] is String ? icon['name'] as String : item;
     final String label = renderGlossLine(name, richText: true).plainText;
     final int count = icon['count'] is num ? (icon['count'] as num).toInt() : 1;
     return dom.div(
       classes: 'hui-inventory-slot',
+      styles: const dom.Styles(raw: <String, String>{'overflow': 'hidden'}),
       attributes: <String, String>{'title': label, 'aria-label': label},
       <Widget>[
         if (texture != null) dom.img(src: texture, alt: label),
         if (texture == null && item.isNotEmpty)
+          // No texture: the initials fit the slot; the full name is the
+          // slot's label.
           dom.span(classes: 'hui-inventory-missing', <Widget>[
-            Text(item.split(':').last.replaceAll('_', ' ')),
+            Text(_initials(item)),
           ]),
         if (item.isNotEmpty && count > 1)
           dom.span(classes: 'hui-inventory-count', <Widget>[Text('$count')]),
@@ -156,14 +160,9 @@ class _InventoryViewState extends State<InventoryView> {
 }
 
 class PlayerIdentityView extends StatefulWidget {
-  const PlayerIdentityView({
-    required this.store,
-    this.gameContext = false,
-    super.key,
-  });
+  const PlayerIdentityView({required this.store, super.key});
 
   final EditorStore store;
-  final bool gameContext;
 
   @override
   State<PlayerIdentityView> createState() => _PlayerIdentityViewState();
@@ -269,11 +268,25 @@ class _PlayerIdentityViewState extends State<PlayerIdentityView> {
         }
         for (final GlossNameplateLine line in presentation.lines) {
           if (glossShowMatches(line.show, scope: scope)) {
-            final double health = (scope.variable('subject.health') as num?)?.toDouble() ?? 18;
-            final double maximum = (scope.variable('subject.maxHealth') as num?)?.toDouble() ?? 20;
-            final String text = line.text.replaceAll('{bar}', presentation.healthBar.render(presentation.healthSegments.clamp(1, 40), health, maximum, health))
+            final double health =
+                (scope.variable('subject.health') as num?)?.toDouble() ?? 18;
+            final double maximum =
+                (scope.variable('subject.maxHealth') as num?)?.toDouble() ?? 20;
+            final String text = line.text
+                .replaceAll(
+                  '{bar}',
+                  presentation.healthBar.render(
+                    presentation.healthSegments.clamp(1, 40),
+                    health,
+                    maximum,
+                    health,
+                  ),
+                )
                 .replaceAll('{health}', presentation.healthBar.number(health))
-                .replaceAll('{max_health}', presentation.healthBar.number(maximum));
+                .replaceAll(
+                  '{max_health}',
+                  presentation.healthBar.number(maximum),
+                );
             lines.add('$relationColor$text');
           }
         }
@@ -284,19 +297,26 @@ class _PlayerIdentityViewState extends State<PlayerIdentityView> {
         if (entry.value != null) entry.key: entry.value!,
     };
     if (nameplate != null) {
-      final List<({String id, GlossNametagDoc doc})> tags = <({String id, GlossNametagDoc doc})>[];
+      final List<({String id, GlossNametagDoc doc})> tags =
+          <({String id, GlossNametagDoc doc})>[];
       for (final WorkspaceDoc document in store.workspace.docs) {
         if (document.kind != DocumentTypes.nametag.kind) continue;
         try {
-          tags.add((id: document.runtimeId ?? document.id,
-            doc: decodeGlossNametagDoc(document.json)));
+          tags.add((
+            id: document.runtimeId ?? document.id,
+            doc: decodeGlossNametagDoc(document.json),
+          ));
         } on HuiFormatException {
           continue;
         }
       }
-      final String identity = resolveIdentityPreviewName(tags, scope,
-        animations: store.workspaceAnimations, emoji: store.workspaceEmoji,
-        nowMs: DateTime.now().millisecondsSinceEpoch);
+      final String identity = resolveIdentityPreviewName(
+        tags,
+        scope,
+        animations: store.workspaceAnimations,
+        emoji: store.workspaceEmoji,
+        nowMs: DateTime.now().millisecondsSinceEpoch,
+      );
       sampleValues['subject.name'] = identity;
       sampleValues['subject.displayName'] = identity;
     }
@@ -305,7 +325,7 @@ class _PlayerIdentityViewState extends State<PlayerIdentityView> {
     );
     return GlossGameScreen(
       anchor: GlossGameAnchor.overPlayer,
-      label: huiText(nametag == null ? 'Nameplate in game' : 'Nametag in game'),
+      label: nametag == null ? huiText('Nameplate') : huiText('Nametag'),
       world: world,
       worldOverlay: <Widget>[
         if (lines.isNotEmpty)
@@ -321,98 +341,108 @@ class _PlayerIdentityViewState extends State<PlayerIdentityView> {
               },
             ),
             <Widget>[
+              // A nameplate's lines share one display, so a colour or format
+              // runs on into the next line.
               dom.div(classes: 'hui-identity-billboard', <Widget>[
-                for (final String line in lines)
-                  dom.div(<Widget>[
-                    GlossTextLine(
-                      render: renderGlossLine(
-                        line,
-                        richText: true,
-                        nowMs: DateTime.now().millisecondsSinceEpoch,
-                        animations: store.workspaceAnimations,
-                        emoji: store.workspaceEmoji,
-                        expressionSamples: GlossTextExpressionSamples(
-                          values: sampleValues,
-                        ),
-                      ),
+                for (final GlossLineRender line in glossDisplayLines(
+                  renderGlossLine(
+                    lines.join('\n'),
+                    richText: true,
+                    nowMs: DateTime.now().millisecondsSinceEpoch,
+                    animations: store.workspaceAnimations,
+                    emoji: store.workspaceEmoji,
+                    expressionSamples: GlossTextExpressionSamples(
+                      values: sampleValues,
                     ),
-                  ]),
+                  ),
+                ))
+                  dom.div(<Widget>[GlossTextLine(render: line)]),
               ]),
             ],
           ),
       ],
       controls: <Widget>[
-        TextInput(
-          value: _name,
-          placeholder: 'Preview player',
-          size: ComponentSize.sm,
-          attributes: const <String, String>{'aria-label': 'Preview player'},
-          onChanged: (String value) => setState(() => _name = value),
+        Field(
+          label: huiText('Sample name'),
+          forId: 'hui-identity-sample-name',
+          child: TextInput(
+            id: 'hui-identity-sample-name',
+            value: _name,
+            size: controlSize(Density.dense),
+            fullWidth: true,
+            attributes: technicalInputAttributes,
+            onChanged: (String value) => setState(() => _name = value),
+          ),
         ),
-        TextInput(
-          value: _permissions,
-          placeholder: 'Preview permissions',
-          size: ComponentSize.sm,
-          attributes: const <String, String>{
-            'aria-label': 'Preview permissions',
-          },
-          onChanged: (String value) => setState(() => _permissions = value),
+        Field(
+          label: huiText('Permissions'),
+          forId: 'hui-identity-sample-permissions',
+          child: TextInput(
+            id: 'hui-identity-sample-permissions',
+            value: _permissions,
+            size: controlSize(Density.dense),
+            fullWidth: true,
+            attributes: technicalInputAttributes,
+            onChanged: (String value) => setState(() => _permissions = value),
+          ),
         ),
-        Button(
-          label: _sneaking ? 'Sneaking' : 'Standing',
-          variant: ButtonVariant.outline,
-          onPressed: () => setState(() => _sneaking = !_sneaking),
-        ),
-        if (nameplate != null)
-          Button(
-            label: _invisible ? 'Invisible player' : 'Visible player',
-            variant: ButtonVariant.outline,
-            onPressed: () => setState(() => _invisible = !_invisible),
-          ),
-        if (nameplate != null)
-          Button(
-            label: _spectator ? 'Spectator player' : 'Survival player',
-            variant: ButtonVariant.outline,
-            onPressed: () => setState(() => _spectator = !_spectator),
-          ),
-        if (nameplate != null)
-          Button(
-            label: _npc ? 'NPC subject' : 'Player subject',
-            variant: ButtonVariant.outline,
-            onPressed: () => setState(() => _npc = !_npc),
-          ),
-        if (nameplate != null)
-          Button(
-            label: _self ? 'Own viewer' : 'Other viewer',
-            variant: ButtonVariant.outline,
-            onPressed: () => setState(() => _self = !_self),
-          ),
+      ],
+      actions: <RowAction>[
+        _toggle(huiText('Sneaking'), ArcaneIcon.footprints(), _sneaking, () {
+          _sneaking = !_sneaking;
+        }),
+        if (nameplate != null) ...<RowAction>[
+          _toggle(huiText('Invisible'), ArcaneIcon.eyeOff(), _invisible, () {
+            _invisible = !_invisible;
+          }),
+          _toggle(huiText('Spectator'), ArcaneIcon.ghost(), _spectator, () {
+            _spectator = !_spectator;
+          }),
+          _toggle(huiText('NPC'), ArcaneIcon.bot(), _npc, () {
+            _npc = !_npc;
+          }),
+          _toggle(huiText('Own plate'), ArcaneIcon.userRound(), _self, () {
+            _self = !_self;
+          }),
+        ],
         if (nametag != null)
-          Button(
-            label: _sameTeam ? 'Same team' : 'Other team',
-            variant: ButtonVariant.outline,
-            onPressed: () => setState(() => _sameTeam = !_sameTeam),
-          ),
-        Button(
-          label: 'Randomize',
-          variant: ButtonVariant.outline,
-          onPressed: () {
+          _toggle(huiText('Same team'), ArcaneIcon.users(), _sameTeam, () {
+            _sameTeam = !_sameTeam;
+          }),
+        RowAction(
+          huiText('Randomize document'),
+          () {
             final String? id = store.workspace.activeId;
             if (id != null) randomizeShowcaseDocument(store, id);
           },
+          icon: ArcaneIcon.dices(),
+          iconOnly: true,
         ),
-        if (lines.isEmpty) const Text('Hidden for this preview player'),
       ],
+      status: lines.isEmpty ? huiText('Hidden') : null,
       child: const dom.div(<Widget>[]),
     );
   }
+
+  /// A preview state the sample player is in, as a pressed header button.
+  RowAction _toggle(
+    String label,
+    ArcaneGlyph icon,
+    bool on,
+    void Function() flip,
+  ) => RowAction(
+    label,
+    () => setState(flip),
+    icon: icon,
+    iconOnly: true,
+    pressed: on,
+  );
 }
 
 class MarkerView extends StatefulWidget {
-  const MarkerView({required this.store, this.gameContext = false, super.key});
+  const MarkerView({required this.store, super.key});
 
   final EditorStore store;
-  final bool gameContext;
 
   @override
   State<MarkerView> createState() => _MarkerViewState();
@@ -426,7 +456,6 @@ class _MarkerViewState extends State<MarkerView> {
   );
 
   EditorStore get store => component.store;
-  bool get gameContext => component.gameContext;
 
   @override
   void initState() {
@@ -489,10 +518,11 @@ class _MarkerViewState extends State<MarkerView> {
           ),
           <Widget>[
             dom.div(classes: 'hui-identity-billboard', <Widget>[
+              // The label is sent as a legacy string: the marker colour tints
+              // the locator bar only, and MiniMessage tags stay literal.
               GlossTextLine(
                 render: renderGlossLine(
-                  '<${doc.color}>${doc.label}',
-                  richText: true,
+                  doc.label,
                   animations: store.workspaceAnimations,
                   emoji: store.workspaceEmoji,
                 ),

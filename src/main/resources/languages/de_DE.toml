@@ -51,6 +51,7 @@
 #   {expected}  Erwartete Revision
 #   {experience}  Gewonnene Erfahrung
 #   {failed}  Anzahl fehlgeschlagener Vorgänge
+#   {folders}  Ordner, die ein Editor-Token ändern darf
 #   {from}  Erster angezeigter Eintrag
 #   {fuel}  Verbleibender Brennstoff
 #   {group}  Nachrichtenkategorie
@@ -69,6 +70,7 @@
 #   {labels}  Anzahl der Beschriftungen
 #   {legacy}  Kennung in der Importquelle
 #   {level}  Aktueller Füllstand
+#   {lifetime}  Ungenutzte Zeit bis zum Ablauf eines Editor-Tokens
 #   {limit}  Erlaubter absoluter Grenzwert
 #   {line}  Zeilennummer
 #   {locale}  Sprachkennung
@@ -79,6 +81,7 @@
 #   {message}  Nachrichtentext
 #   {migrated}  Migrierte Einträge
 #   {minimum}  Erlaubter Mindestwert
+#   {minutes}  Zeit in Minuten
 #   {mode}  Sichtbarkeits- oder Folgemodus
 #   {name}  Name des Objekts oder Dokuments
 #   {oldBoard}  Bisherige Panel-ID
@@ -108,9 +111,9 @@
 #   {roll}  Drehung um die Blickachse
 #   {rotation}  Drehmodus beim Folgen
 #   {scale}  Darstellungsskalierung
+#   {scopes}  Erlaubte Aktionen eines Editor-Tokens
 #   {seconds}  Dauer oder Frist in Sekunden
 #   {section}  Abschnitt des Spracheneditors
-#   {session}  ID der Bearbeitungssitzung
 #   {severity}  Schweregrad des Problems
 #   {skipped}  Übersprungene Einträge
 #   {slots}  Anzahl der Plätze
@@ -118,12 +121,12 @@
 #   {special}  Anzahl der Spezialelemente
 #   {state}  Panel- oder Importstatus
 #   {style}  Name des Sprechblasenstils
-#   {subject}  ID des bearbeiteten Dokuments
 #   {target}  Plugin für die Sprachauswahl
 #   {temporary}  Anzahl temporärer Hologramme
 #   {text}  Zeileninhalt
 #   {title}  Scoreboard-Titel
 #   {to}  Letzter angezeigter Eintrag
+#   {token}  ID des Editor-Tokens
 #   {total}  Gesamtzahl der Einträge
 #   {type}  Parametertyp
 #   {updated}  Durch eine Sprachaktualisierung geänderte Nachrichten
@@ -295,16 +298,11 @@ preview = "Werkzeuge für Vorschaudokumente"
 "preview.dump" = "Ein Vorschaudokument einmal erstellen und seine Elementanzahlen ausgeben"
 "preview.list" = "Vorschaudokumente und ihre Zuordnungsregeln auflisten"
 "preview.reset" = "Mitgelieferte Vorschau-Standards wiederherstellen (entfernt keine zusätzlichen Benutzerdokumente, die sie überdecken können)"
-web = "Den Gloss-Webeditor öffnen und verwalten"
-"web.open" = "Einen leeren gehosteten Gloss-Editor öffnen"
-"web.edit" = "Ein aktuelles Gloss-Dokument öffnen"
-"web.edit.document" = "Dieses aktuelle Dokument im Webeditor öffnen"
-"web.workspace" = "Den vollständigen aktuellen Gloss-Arbeitsbereich öffnen"
-"web.sessions" = "Aktive Webeditor-Sitzungen verwalten"
-"web.sessions.list" = "Aktive Webeditor-Sitzungen auflisten"
-"web.sessions.pull" = "Eine Webeditor-Sitzung jetzt abfragen"
-"web.sessions.revoke" = "Einen Webeditor-Zugang widerrufen"
-"web.sessions.status" = "Eine Webeditor-Sitzung anzeigen"
+editor = "Den Webeditor mit diesem Server koppeln"
+"editor.pair" = "Einen einmaligen Link zum Koppeln eines Browsers erstellen"
+"editor.status" = "Listener, Relay und Fingerabdruck des Editors anzeigen"
+"editor.tokens" = "Gekoppelte Browser auflisten"
+"editor.revoke" = "Eine Kopplung beenden oder einen Link verwerfen"
 language = "Wähle deine Sprache oder die Standardsprache des Servers"
 
 "import.mode" = "preview oder apply"
@@ -334,7 +332,6 @@ panel_y = "Absolute oder ~relative Y-Koordinate"
 panel_yaw = "Absoluter oder ~relativer Yaw"
 panel_z = "Absolute oder ~relative Z-Koordinate"
 content_menu = "ID eines geladenen Menüs"
-web_subject = "ID des aktuellen Gloss-Dokuments"
 hologram_id = "ID des neuen Hologramms und des Hauptmenüs"
 hologram_text = "Optionaler MiniMessage-Text"
 image_path = "Datei unterhalb des Gloss-Bilderordners"
@@ -355,7 +352,11 @@ row_x = "Absolute oder ~relative X-Koordinate der Zeile"
 row_y = "Absolute oder ~relative Y-Koordinate der Zeile"
 row_z = "Absolute oder ~relative Z-Koordinate der Zeile"
 source_menu = "ID eines geladenen Quellmenüs"
-web_session = "Sitzungs-ID des Webeditors"
+editor_label = "Name in der Token-Liste"
+editor_scopes = "Erlaubte Aktionen des Editors, durch Kommas getrennt"
+editor_folders = "Auf diese Ordner beschränken, durch Kommas getrennt"
+editor_expires = "Gültigkeit ohne Nutzung, etwa 7d, 12h oder 30m"
+editor_token = "Token-ID oder all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cDir fehlt die Berechtigung."
@@ -391,6 +392,7 @@ lines = "{count} Zeilen"
 header = "&8[&dGloss&8] &d{id} &7bei &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8Skalierung &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7ist in der Welt &f{world}&7, die nicht geladen ist."
 
 [command.board]
 exists = "&8[&dGloss&8] &cScoreboard '&f{id}&c' existiert bereits."
@@ -505,13 +507,12 @@ execution_failed = "Befehl {command} konnte nicht ausgeführt werden: {reason}"
 menu_name_required = "Der Menüname darf nicht leer sein"
 hologram_id_required = "Die Hologramm-ID darf nicht leer sein"
 panel_id_required = "Die Panel-ID darf nicht leer sein"
-web_subject_required = "Die Dokument-ID des Webeditors darf nicht leer sein"
-web_session_required = "Die Sitzungs-ID des Webeditors darf nicht leer sein"
 panel_player_required = "Der Zielspieler darf nicht leer sein"
 row_icon_type_required = "Der Icon-Typ darf nicht leer sein"
 row_style_property_required = "Die Stileigenschaft darf nicht leer sein"
 import_source_required = "Die Importquelle für das alte Format darf nicht leer sein"
 import_source_unknown = "Unbekannte Importquelle für das alte Format: {source}"
+editor_token_required = "Gib eine Token-ID oder all an"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cDir fehlt die Berechtigung &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cBearbeitung des Inhalts von Menü &f{menu}&c fehlgesc
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cDieser Befehl ist nur für Spieler verfügbar."
 
-[gloss.message.web]
-header = "Webeditor"
-open_hover = "Klicken, um den Gloss-Webeditor zu öffnen."
-open = "&8[&dGloss&8]: &7Webeditor: &f{url}"
-preparing = "&8[&dGloss&8]: &7Sichere Sitzung zur Editorsynchronisierung für &f{subject}&7 wird vorbereitet..."
-unavailable = "&8[&dGloss&8]: &cDie direkte Webbearbeitung ist nicht verfügbar. Prüfe die Synchronisierungseinstellungen und die Verbindung zum Relay."
-open_failed = "&8[&dGloss&8]: &c&f{kind}={subject}&c konnte nicht im Live-Webeditor geöffnet werden: {reason}"
-open_console = "&8[&dGloss&8]: &7Editor-Zugangslink für &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eMit dieser URL können bis zum Widerruf oder Ablauf Änderungen auf dem Server veröffentlicht werden. Halte sie geheim."
+[gloss.message.editor]
+link_ready = "Link bereit. Öffne ihn innerhalb von {minutes} Minuten"
+link_console = "&8[&dGloss&8]: &aLink bereit. Öffne ihn innerhalb von {minutes} Minuten: &f{url}"
+link_details = "&8[&dGloss&8]: &7Bereiche {scopes}; {folders}; endet nach {lifetime} ohne Nutzung; Token {token}"
+all_folders = "alle Ordner"
+some_folders = "Ordner {folders}"
 open_label = "Editor öffnen"
-copy_label = "Link kopieren"
+open_hover = "Im Browser öffnen"
+copy_label = "Kopieren"
+copy_hover = "Link kopieren"
 revoke_label = "Widerrufen"
-link_hover = "Öffne den Editor, kopiere seinen Zugangslink oder widerrufe Sitzung {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Es sind keine Sitzungen zur Editorsynchronisierung aktiv."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7Ablauf=&f{seconds}s &7Veröffentlichung=&f{revision} &7ausstehend=&f{pending}"
-revoked = "&8[&dGloss&8]: &aEditorsynchronisierungssitzung &f{session}&a widerrufen."
-pulled = "&8[&dGloss&8]: &aEditorsynchronisierungssitzung &f{session}&a abgefragt."
-unknown = "&8[&dGloss&8]: &cUnbekannte oder abgelaufene Editorsynchronisierungssitzung &f{session}&c."
-failed = "&8[&dGloss&8]: &cEditorsynchronisierung für &f{session}&c fehlgeschlagen: {reason}"
+revoke_hover = "Diesen Link verwerfen oder den damit gekoppelten Editor trennen"
+details_label = "Details"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cEditor läuft nicht; setze [editor] enabled = true in gloss.toml"
+tokens_empty = "&8[&dGloss&8]: &7Keine Editor-Tokens."
+unknown_token = "&8[&dGloss&8]: &cKein Token &f{token}&c."
+revoked_one = "&8[&dGloss&8]: &a1 Token widerrufen; seine Verbindungen wurden getrennt."
+revoked_many = "&8[&dGloss&8]: &a{count} Tokens widerrufen; ihre Verbindungen wurden getrennt."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7&f{source}&7 wird für eine zerstörungsfreie Migrationsvorschau geprüft..."

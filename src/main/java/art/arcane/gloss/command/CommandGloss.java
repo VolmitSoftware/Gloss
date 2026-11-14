@@ -31,7 +31,7 @@ public class CommandGloss {
     private CommandGlossPanel panel;
     private CommandGlossPreview preview;
     private CommandGlossItem item;
-    private CommandGlossWeb web;
+    private CommandGlossEditor editor;
     private CommandGlossImport legacyImport;
     private CommandGlossDebug debug;
     // --- lane:screen ---
@@ -120,7 +120,7 @@ public class CommandGloss {
         this.panel = new CommandGlossPanel();
         this.preview = new CommandGlossPreview();
         this.item = new CommandGlossItem();
-        this.web = new CommandGlossWeb(plugin);
+        this.editor = new CommandGlossEditor(plugin);
         this.legacyImport = new CommandGlossImport(plugin);
         this.debug = new CommandGlossDebug(plugin);
         // --- lane:screen ---

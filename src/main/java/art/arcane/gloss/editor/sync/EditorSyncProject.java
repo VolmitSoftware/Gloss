@@ -5,13 +5,9 @@ import com.google.gson.JsonObject;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-public record EditorSyncProject(EditorSyncKind kind, String subjectId, String baseRevision,
-                                JsonObject json, int encodedBytes) {
+/** The whole workspace as one JSON project: what a publication is merged onto and validated against. */
+public record EditorSyncProject(String baseRevision, JsonObject json, int encodedBytes) {
   public EditorSyncProject {
-    kind = Objects.requireNonNull(kind, "kind");
-    if (subjectId == null || subjectId.isBlank()) {
-      throw new IllegalArgumentException("subjectId must not be blank");
-    }
     if (baseRevision == null || !baseRevision.matches("sha256:[0-9a-f]{64}")) {
       throw new IllegalArgumentException("baseRevision must be a SHA-256 revision");
     }
@@ -31,19 +27,19 @@ public record EditorSyncProject(EditorSyncKind kind, String subjectId, String ba
     if (!EditorSyncJson.PROJECT_FORMAT.equals(EditorSyncJson.requireString(copy, "format"))) {
       throw new IllegalArgumentException("unsupported sync project format");
     }
-    if (EditorSyncJson.requireInt(copy, "version") != EditorSyncJson.PROTOCOL_VERSION) {
+    if (EditorSyncJson.requireInt(copy, "version") != EditorSyncJson.PROJECT_VERSION) {
       throw new IllegalArgumentException("unsupported sync project version");
     }
-    EditorSyncKind kind = EditorSyncKind.parse(EditorSyncJson.requireString(copy, "kind"));
-    if (kind != EditorSyncKind.WORKSPACE) {
-      EditorSyncDocuments.requireHandledKinds(EditorSyncDocuments.parse(copy));
+    if (!EditorSyncContentSnapshotBuilder.WORKSPACE_KIND.equals(EditorSyncJson.requireString(copy, "kind"))
+        || !EditorSyncContentSnapshotBuilder.WORKSPACE_SUBJECT_ID.equals(EditorSyncJson.requireString(copy, "subjectId"))) {
+      throw new IllegalArgumentException("sync project must be the workspace");
     }
-    String subjectId = EditorSyncJson.requireString(copy, "subjectId");
+    EditorSyncDocuments.parse(copy);
     String baseRevision = EditorSyncJson.requireString(copy, "baseRevision");
     if (!baseRevision.equals(EditorSyncJson.revision(copy))) {
       throw new IllegalArgumentException("sync project baseRevision does not match its content");
     }
-    return new EditorSyncProject(kind, subjectId, baseRevision, copy, encodedBytes);
+    return new EditorSyncProject(baseRevision, copy, encodedBytes);
   }
 
 }

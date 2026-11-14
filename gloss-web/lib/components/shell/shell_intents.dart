@@ -14,16 +14,20 @@ import '../../logic/multi_select.dart';
 import '../../model/model.dart';
 import '../../services/clipboard.dart';
 import '../../config/editing.dart';
+import '../../config/kind_groups.dart';
 import '../../services/file_transfer.dart';
 import '../../state/editor_store.dart';
-import '../../state/workspace.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+
+import 'view_rules.dart';
+import '../../ui/toast.dart';
 
 class ShellIntents {
   ShellIntents({
     required this.store,
-    required this.requestDeleteSelected,
     required this.openPalette,
+    this.onNewDocument,
     this.onOpenImport,
     this.onOpenExport,
     this.onOpenImages,
@@ -32,14 +36,19 @@ class ShellIntents {
     this.onOpenSettings,
     this.onOpenValidation,
     this.onToggleTheme,
+    this.onImportBundle,
+    this.onExportBundle,
+    this.onEraseData,
+    this.onOpenServer,
+    this.onPairServer,
   });
 
   final EditorStore store;
 
-  /// Arms the shell's confirm dialog rather than deleting immediately.
-  final void Function() requestDeleteSelected;
   final void Function() openPalette;
 
+  /// Opens the grouped New dialog.
+  final void Function()? onNewDocument;
   final void Function()? onOpenImport;
   final void Function()? onOpenExport;
   final void Function()? onOpenImages;
@@ -48,6 +57,16 @@ class ShellIntents {
   final void Function()? onOpenSettings;
   final void Function()? onOpenValidation;
   final void Function()? onToggleTheme;
+  final void Function()? onImportBundle;
+  final void Function()? onExportBundle;
+  final void Function()? onEraseData;
+  final void Function()? onOpenServer;
+
+  /// Opens the Pair a server dialog.
+  final void Function()? onPairServer;
+
+  /// The stage view the Code toggle returns to.
+  EditorView _stage = EditorView.visual;
 
   /// Align and distribute resolve the same frame the canvas draws, so they need
   /// the same memos: without them every command re-parses every label and
@@ -60,12 +79,12 @@ class ShellIntents {
 
   void undo() {
     if (!store.canUndo) {
-      ArcaneSonner.info(huiText('Nothing to undo.'));
+      toastInfo(huiText('Nothing to undo.'));
       return;
     }
     final String? label = store.undoLabel;
     store.performUndo();
-    ArcaneSonner.info(
+    toastInfo(
       label == null
           ? huiText('Undone.')
           : huiText('Undid {action}.', <String, Object?>{'action': label}),
@@ -74,12 +93,12 @@ class ShellIntents {
 
   void redo() {
     if (!store.canRedo) {
-      ArcaneSonner.info(huiText('Nothing to redo.'));
+      toastInfo(huiText('Nothing to redo.'));
       return;
     }
     final String? label = store.redoLabel;
     store.performRedo();
-    ArcaneSonner.info(
+    toastInfo(
       label == null
           ? huiText('Redone.')
           : huiText('Redid {action}.', <String, Object?>{'action': label}),
@@ -90,21 +109,21 @@ class ShellIntents {
 
   Future<void> copyJson() async {
     if (!store.canTransferDocument) {
-      ArcaneSonner.info(
+      toastInfo(
         huiText('Menu flow maps are editor-only and are not runtime JSON.'),
       );
       return;
     }
     final bool copied = await copyText(store.exportJson());
     if (copied) {
-      ArcaneSonner.success(
+      toastSuccess(
         huiText(
           "{documentLabel} JSON copied to the clipboard.",
           <String, Object?>{'documentLabel': _documentLabel},
         ),
       );
     } else {
-      ArcaneSonner.error(
+      toastError(
         huiText(
           'The browser refused clipboard access. Use Export to download the '
           'file instead.',
@@ -115,7 +134,7 @@ class ShellIntents {
 
   Future<void> importMenu() async {
     if (!store.canTransferDocument) {
-      ArcaneSonner.info(
+      toastInfo(
         huiText('Open a runtime document before importing replacement JSON.'),
       );
       return;
@@ -132,7 +151,7 @@ class ShellIntents {
 
   void exportMenu() {
     if (!store.canTransferDocument) {
-      ArcaneSonner.info(
+      toastInfo(
         huiText('Menu flow maps are editor-only and are not exported.'),
       );
       return;
@@ -143,7 +162,7 @@ class ShellIntents {
       return;
     }
     downloadText(store.exportFileName, store.exportJson());
-    ArcaneSonner.success(
+    toastSuccess(
       huiText("Saved {exportFileName}.", <String, Object?>{
         'exportFileName': store.exportFileName,
       }),
@@ -158,26 +177,11 @@ class ShellIntents {
 
   // --- documents ------------------------------------------------------------
 
-  void newDocument() {
-    if (store.newDocument()) {
-      ArcaneSonner.success(huiText('Started a new menu.'));
-    }
-  }
+  void newDocument() => onNewDocument?.call();
 
   void openDocument(String docId) {
     if (!store.openDocument(docId)) {
-      ArcaneSonner.error(huiText('That document is no longer available.'));
-    }
-  }
-
-  void deleteActiveDocument() {
-    final WorkspaceDoc? active = store.workspace.active;
-    if (active == null) return;
-    final String name = active.title;
-    if (store.deleteDocument(active.id)) {
-      ArcaneSonner.success(
-        huiText("Deleted {name}.", <String, Object?>{'name': name}),
-      );
+      toastError(huiText('That document is no longer available.'));
     }
   }
 
@@ -186,14 +190,14 @@ class ShellIntents {
   void addComponent(String type) {
     final String? id = store.addComponent(type);
     if (id != null) {
-      ArcaneSonner.success(huiText("Added {id}.", <String, Object?>{'id': id}));
+      toastSuccess(huiText("Added {id}.", <String, Object?>{'id': id}));
     }
   }
 
   void duplicateSelected() {
     final List<String> ids = _selectedIds();
     if (ids.isEmpty) {
-      ArcaneSonner.info(huiText('Select a component first.'));
+      toastInfo(huiText('Select a component first.'));
       return;
     }
     if (ids.length == 1) {
@@ -206,7 +210,7 @@ class ShellIntents {
     // they went or the menu looks unchanged.
     final List<String> created = store.duplicateSelection();
     if (created.isEmpty) return;
-    ArcaneSonner.success(
+    toastSuccess(
       huiPlural(
         'toast.duplicated_components',
         created.length,
@@ -216,13 +220,14 @@ class ShellIntents {
     );
   }
 
-  /// Arms the confirm dialog; the actual delete runs in [deleteSelectedNow].
+  /// Deletes at once: Undo brings the components back, and the toast
+  /// offers it.
   void deleteSelected() {
     if (store.selectionIds.isEmpty) {
-      ArcaneSonner.info(huiText('Select a component first.'));
+      toastInfo(huiText('Select a component first.'));
       return;
     }
-    requestDeleteSelected();
+    deleteSelectedNow();
   }
 
   void deleteSelectedNow() {
@@ -232,7 +237,8 @@ class ShellIntents {
     // replaced left the history reading `delete <first id>` after deleting
     // three, because the drag bracket pushes only the first change.
     store.deleteComponents(ids);
-    ArcaneSonner.success(
+    toastSuccess(
+      action: ToastAction(label: huiText('Undo'), onPressed: undo),
       ids.length == 1
           ? huiText('Deleted {id}.', <String, Object?>{'id': ids.first})
           : huiPlural(
@@ -248,7 +254,7 @@ class ShellIntents {
 
   void selectAll() {
     if (store.components.isEmpty) {
-      ArcaneSonner.info(huiText('This menu has no components yet.'));
+      toastInfo(huiText('This menu has no components yet.'));
       return;
     }
     store.selectAll();
@@ -293,9 +299,7 @@ class ShellIntents {
   void alignSelection(HuiAlign align) {
     final List<String> ids = _selectedIds();
     if (ids.length < 2) {
-      ArcaneSonner.info(
-        huiText('Select at least two components to align them.'),
-      );
+      toastInfo(huiText('Select at least two components to align them.'));
       return;
     }
     final Map<String, Vec3> offsets = alignOffsets(
@@ -305,7 +309,7 @@ class ShellIntents {
     );
     if (offsets.isEmpty) return;
     store.setOffsets(_alignHistoryLabel(align), offsets);
-    ArcaneSonner.success(
+    toastSuccess(
       huiPlural(
         'toast.aligned_components',
         offsets.length,
@@ -321,7 +325,7 @@ class ShellIntents {
   void distributeSelection(HuiAxis axis) {
     final List<String> ids = _selectedIds();
     if (ids.length < 3) {
-      ArcaneSonner.info(
+      toastInfo(
         huiText('Select at least three components to distribute them.'),
       );
       return;
@@ -341,7 +345,7 @@ class ShellIntents {
           : 'distribute vertically',
       offsets,
     );
-    ArcaneSonner.success(
+    toastSuccess(
       huiPlural(
         'toast.spaced_components',
         offsets.length,
@@ -358,7 +362,7 @@ class ShellIntents {
   void reorderDepth(HuiZOrder op) {
     final Set<String> ids = store.selectionIds;
     if (ids.isEmpty) {
-      ArcaneSonner.info(huiText('Select a component first.'));
+      toastInfo(huiText('Select a component first.'));
       return;
     }
     final Map<String, Vec3> offsets = zOrderOffsets(
@@ -368,7 +372,7 @@ class ShellIntents {
       step: huiDepthStep,
     );
     if (offsets.isEmpty) {
-      ArcaneSonner.info(
+      toastInfo(
         ids.length >= store.components.length
             ? huiText(
                 'Every component is selected, so there is nothing to move past.',
@@ -440,13 +444,26 @@ class ShellIntents {
   /// centre pane — switcher, palette, keyboard — comes through here, so the
   /// refusal is worded once.
   void setView(EditorView view) {
-    final String? reason = store.unavailableViewReason(view);
+    // Kinds whose preview draws the same stage have one view for both.
+    final EditorView target =
+        view == EditorView.preview && !hasDistinctPreview(store.docKind)
+        ? EditorView.visual
+        : view;
+    final String? reason = store.unavailableViewReason(target);
     if (reason != null) {
-      ArcaneSonner.info(reason);
+      toastInfo(reason);
       return;
     }
-    store.view = view;
+    if (target == EditorView.visual || target == EditorView.preview) {
+      _stage = target;
+    }
+    store.view = target;
   }
+
+  /// Code on, or back to the stage view it was entered from.
+  void toggleCode() => setView(afterCodeToggle(store.view, _stage));
+
+  void toggleSplit() => setView(afterSplitToggle(store.view));
 
   /// Scopes the library to one document kind, or to the whole workspace when
   /// [mode] is null.
@@ -472,7 +489,7 @@ class ShellIntents {
   void openValidation() {
     final void Function()? panel = onOpenValidation;
     if (panel == null) {
-      ArcaneSonner.info(huiText('The validation panel is not available yet.'));
+      toastInfo(huiText('The validation panel is not available yet.'));
       return;
     }
     panel();
@@ -480,6 +497,16 @@ class ShellIntents {
 
   void openImages() =>
       _openOr(onOpenImages, huiText('The image manager is not available yet.'));
+
+  void importBundle() => onImportBundle?.call();
+
+  void exportBundle() => onExportBundle?.call();
+
+  void eraseData() => onEraseData?.call();
+
+  void openServer() => onOpenServer?.call();
+
+  void pairServer() => onPairServer?.call();
 
   void openTemplates() =>
       _openOr(onOpenTemplates, huiText('Templates are not available yet.'));
@@ -491,7 +518,7 @@ class ShellIntents {
 
   void _openOr(void Function()? open, String unavailableMessage) {
     if (open == null) {
-      ArcaneSonner.info(unavailableMessage);
+      toastInfo(unavailableMessage);
       return;
     }
     open();

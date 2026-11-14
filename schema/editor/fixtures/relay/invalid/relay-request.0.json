@@ -1,0 +1,6 @@
+{
+  "type": "request",
+  "id": 0,
+  "method": "PUT",
+  "path": "/gloss/v1/catalog"
+}

@@ -1,0 +1,23 @@
+{
+  "documents": [
+    {
+      "kind": "hologram",
+      "id": "welcome",
+      "hash": "sha256:7f6869313a34292141a07ccb2e5b8f0ed5562fb513904fea37993aea1d738049",
+      "revision": 1,
+      "json": "{\"schemaVersion\":3,\"revision\":1,\"anchor\":{\"world\":\"world\",\"position\":[0.0,0.0,0.0]},\"lines\":[\"Welcome\"],\"particleLayers\":[],\"style\":{\"billboard\":\"center\",\"seeThrough\":true,\"scaleX\":1.0,\"scaleY\":1.0,\"scaleZ\":1.0},\"box\":{\"enabled\":false,\"padding\":4,\"borderWidth\":1,\"backgroundArgb\":\"#B31B1B22\",\"borderArgb\":\"#FFAAAAAA\"}}\n",
+      "summary": {
+        "name": "welcome"
+      }
+    }
+  ],
+  "errors": [
+    {
+      "kind": "menu",
+      "id": "shop/gone",
+      "code": "not-found",
+      "message": "No menu shop/gone."
+    }
+  ],
+  "remaining": []
+}

@@ -1,0 +1,29 @@
+{
+  "link": "http://127.0.0.1:8800/#/pair/GLS1.eyJ2IjoxLCJkaXJlY3RVcmwiOiJodHRwOi8vMTI3LjAuMC4xOjU1Nzc0IiwiZmluZ2VycHJpbnQiOiJzaGEyNTY6N2FhNTg4ZGNmZDg3MTI0YWM4N2MyZDgzMTc4ODE0NTZhYjg4ZmJjMzcyMzljY2FiM2UwMWU4ZWU5ZDYzMzE2ZCIsInNlcnZlcktleSI6ImZvclZKZWZGZWJtZlBrRmx0cDd1TndvUUVmRmFaR2VvZkZWS3l2VWhUVk0iLCJ0b2tlbklkIjoidG9rX0dOeGpyY3JkZTZ5S2VDSDEiLCJzZWNyZXQiOiI2WG1KZGRmTHpmYnEwVWtKZnM0SVVaQnhhd213UWZodFVxMWhGU3JfLWpBIiwiZXhwaXJlc0F0IjoiMjAyNi0xMS0xM1QxMDoxMDowMFoiLCJsYWJlbCI6ImxhcHRvcCIsInNlcnZlck5hbWUiOiJUd2luIFBlYWtzIiwic2NvcGVzIjpbInJlYWQiLCJoaXN0b3J5IiwicHVibGlzaDpzY3JlZW5zIiwicHVibGlzaDpodWQiLCJwdWJsaXNoOmNoYXQiLCJwdWJsaXNoOndvcmxkIiwicHVibGlzaDpwbGF5ZXJzIiwicHVibGlzaDpzaGFyZWQiLCJwdWJsaXNoOmltYWdlcyJdLCJmb2xkZXJzIjpbInNob3AiXX0",
+  "code": "GLS1.eyJ2IjoxLCJkaXJlY3RVcmwiOiJodHRwOi8vMTI3LjAuMC4xOjU1Nzc0IiwiZmluZ2VycHJpbnQiOiJzaGEyNTY6N2FhNTg4ZGNmZDg3MTI0YWM4N2MyZDgzMTc4ODE0NTZhYjg4ZmJjMzcyMzljY2FiM2UwMWU4ZWU5ZDYzMzE2ZCIsInNlcnZlcktleSI6ImZvclZKZWZGZWJtZlBrRmx0cDd1TndvUUVmRmFaR2VvZkZWS3l2VWhUVk0iLCJ0b2tlbklkIjoidG9rX0dOeGpyY3JkZTZ5S2VDSDEiLCJzZWNyZXQiOiI2WG1KZGRmTHpmYnEwVWtKZnM0SVVaQnhhd213UWZodFVxMWhGU3JfLWpBIiwiZXhwaXJlc0F0IjoiMjAyNi0xMS0xM1QxMDoxMDowMFoiLCJsYWJlbCI6ImxhcHRvcCIsInNlcnZlck5hbWUiOiJUd2luIFBlYWtzIiwic2NvcGVzIjpbInJlYWQiLCJoaXN0b3J5IiwicHVibGlzaDpzY3JlZW5zIiwicHVibGlzaDpodWQiLCJwdWJsaXNoOmNoYXQiLCJwdWJsaXNoOndvcmxkIiwicHVibGlzaDpwbGF5ZXJzIiwicHVibGlzaDpzaGFyZWQiLCJwdWJsaXNoOmltYWdlcyJdLCJmb2xkZXJzIjpbInNob3AiXX0",
+  "payload": {
+    "v": 1,
+    "directUrl": "http://127.0.0.1:55774",
+    "fingerprint": "sha256:7aa588dcfd87124ac87c2d8317881456ab88fbc37239ccab3e01e8ee9d63316d",
+    "serverKey": "forVJefFebmfPkFltp7uNwoQEfFaZGeofFVKyvUhTVM",
+    "tokenId": "tok_GNxjrcrde6yKeCH1",
+    "secret": "6XmJddfLzfbq0UkJfs4IUZBxawmwQfhtUq1hFSr_-jA",
+    "expiresAt": "2026-11-13T10:10:00Z",
+    "label": "laptop",
+    "serverName": "Twin Peaks",
+    "scopes": [
+      "read",
+      "history",
+      "publish:screens",
+      "publish:hud",
+      "publish:chat",
+      "publish:world",
+      "publish:players",
+      "publish:shared",
+      "publish:images"
+    ],
+    "folders": [
+      "shop"
+    ]
+  }
+}

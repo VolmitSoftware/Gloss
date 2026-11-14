@@ -14,4 +14,4 @@ export 'shell_status.dart';
 export 'status_bar.dart';
 export 'store_selector.dart';
 export 'top_bar.dart';
-export 'view_switcher.dart';
+export 'view_rules.dart';

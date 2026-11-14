@@ -51,6 +51,7 @@
 #   {expected}  Išsaugant pakeitimą tikėtasi šios versijos
 #   {experience}  Gautos patirties kiekis
 #   {failed}  Nepavykusių operacijų skaičius
+#   {folders}  Aplankai, kuriuos gali keisti redaktoriaus prieigos raktas
 #   {from}  Pradinė reikšmė arba intervalo pradžia
 #   {fuel}  Talpykloje likęs kuras
 #   {group}  Kalbos redaktoriaus kategorija
@@ -69,6 +70,7 @@
 #   {labels}  Teksto žymų skaičius
 #   {legacy}  Importavimo šaltinio identifikatorius
 #   {level}  Rodomas lygis
+#   {lifetime}  Nenaudojimo laikas, po kurio baigiasi redaktoriaus prieigos rakto galiojimas
 #   {limit}  Leidžiama riba
 #   {line}  Eilutės numeris pranešime
 #   {locale}  Kalbos kodas
@@ -79,6 +81,7 @@
 #   {message}  Atsakymo arba diagnostikos pranešimas
 #   {migrated}  Konvertuotų įrašų skaičius
 #   {minimum}  Mažiausia leidžiama reikšmė
+#   {minutes}  Laikas minutėmis
 #   {mode}  Pasirinktas veikimo arba rodymo režimas
 #   {name}  Objekto pavadinimas
 #   {oldBoard}  Ankstesnės lentelės identifikatorius
@@ -108,9 +111,9 @@
 #   {roll}  Posvyrio kampas laipsniais
 #   {rotation}  Rodomo objekto pasukimas
 #   {scale}  Rodomo objekto arba peržiūros mastelis
+#   {scopes}  Redaktoriaus prieigos rakto leidžiami veiksmai
 #   {seconds}  Laikas sekundėmis
 #   {section}  Kalbų redaktoriaus skiltis
-#   {session}  Redaktoriaus seanso identifikatorius
 #   {severity}  Diagnostikos svarbos lygis
 #   {skipped}  Praleistų įrašų skaičius
 #   {slots}  Daiktų vietų skaičius
@@ -118,12 +121,12 @@
 #   {special}  Specialių rodymo elementų skaičius
 #   {state}  Dabartinė būsena
 #   {style}  Rodymo stilius
-#   {subject}  Žiniatinklio redaktoriaus seanso objektas
 #   {target}  Kalbos pasirinkimą gaunantis papildinys
 #   {temporary}  Laikinų objektų skaičius
 #   {text}  Rodomas tekstas
 #   {title}  Rodomas pavadinimas
 #   {to}  Galinė reikšmė arba intervalo pabaiga
+#   {token}  Redaktoriaus prieigos rakto identifikatorius
 #   {total}  Bendras įrašų skaičius
 #   {type}  Tikėtinas reikšmės arba objekto tipas
 #   {updated}  kalbos atnaujinimo pakeistų pranešimų skaičius
@@ -295,16 +298,11 @@ preview = "Peržiūros dokumentų įrankiai"
 "preview.dump" = "Vieną kartą sukurti peržiūros dokumentą ir parodyti jo elementų skaičius"
 "preview.list" = "Rodyti peržiūros dokumentus ir jų atitikimo taisykles"
 "preview.reset" = "Atkurti numatytuosius peržiūros dokumentus (nepašalina papildomų naudotojo dokumentų, kurie gali juos užgožti)"
-web = "Atidaryti ir valdyti Gloss žiniatinklio redaktorių"
-"web.open" = "Atidaryti tuščią talpinamą Gloss redaktorių"
-"web.edit" = "Atidaryti vieną tiesioginį Gloss dokumentą"
-"web.edit.document" = "Atidaryti šį tiesioginį dokumentą žiniatinklio redaktoriuje"
-"web.workspace" = "Atidaryti visą tiesioginę Gloss darbo sritį"
-"web.sessions" = "Valdyti aktyvias žiniatinklio redaktoriaus sesijas"
-"web.sessions.list" = "Išvardyti aktyvias žiniatinklio redaktoriaus sesijas"
-"web.sessions.pull" = "Patikrinti žiniatinklio redaktoriaus sesiją dabar"
-"web.sessions.revoke" = "Atšaukti žiniatinklio redaktoriaus prieigos nuorodą"
-"web.sessions.status" = "Rodyti vieną žiniatinklio redaktoriaus sesiją"
+editor = "Susieti žiniatinklio redaktorių su šiuo serveriu"
+"editor.pair" = "Sukurti vienkartinę nuorodą naršyklei susieti"
+"editor.status" = "Rodyti redaktoriaus klausytoją, tarpinį serverį ir kontrolinį kodą"
+"editor.tokens" = "Išvardyti susietas naršykles"
+"editor.revoke" = "Nutraukti susiejimą arba atšaukti nuorodą"
 language = "Pasirinkite savo arba numatytąją serverio kalbą"
 
 "import.mode" = "preview arba apply"
@@ -334,7 +332,6 @@ panel_y = "Absoliutus arba ~santykinis Y"
 panel_yaw = "Absoliutus arba ~santykinis posūkis"
 panel_z = "Absoliutus arba ~santykinis Z"
 content_menu = "Įkelto meniu ID"
-web_subject = "Tiesioginio Gloss dokumento identifikatorius"
 hologram_id = "Naujos hologramos ir šakninio meniu ID"
 hologram_text = "Neprivalomas MiniMessage tekstas"
 image_path = "Failas Gloss paveikslėlių aplanke"
@@ -355,7 +352,11 @@ row_x = "Absoliutus arba ~santykinis eilutės X"
 row_y = "Absoliutus arba ~santykinis eilutės Y"
 row_z = "Absoliutus arba ~santykinis eilutės Z"
 source_menu = "Įkelto šaltinio meniu ID"
-web_session = "Žiniatinklio redaktoriaus sesijos identifikatorius"
+editor_label = "Pavadinimas prieigos raktų sąraše"
+editor_scopes = "Ką redaktorius gali daryti, atskirta kableliais"
+editor_folders = "Apriboti šiais aplankais, atskirtais kableliais"
+editor_expires = "Galiojimas nenaudojant, pvz., 7d, 12h arba 30m"
+editor_token = "Prieigos rakto identifikatorius arba all"
 
 [command.error]
 no_permission = "&8[&dGloss&8] &cNeturite leidimo."
@@ -391,6 +392,7 @@ lines = "{count} eil."
 header = "&8[&dGloss&8] &d{id} &7pasaulyje &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
 orientation = " &8mastelis &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+unloaded = "&8[&dGloss&8] &d{id} &7yra pasaulyje &f{world}&7, kuris neįkeltas."
 
 [command.board]
 exists = "&8[&dGloss&8] &cLentelė '&f{id}&c' jau egzistuoja."
@@ -505,13 +507,12 @@ execution_failed = "Nepavyko įvykdyti komandos {command}: {reason}"
 menu_name_required = "Meniu pavadinimas negali būti tuščias"
 hologram_id_required = "Hologramos ID negali būti tuščias"
 panel_id_required = "Skydelio identifikatorius negali būti tuščias"
-web_subject_required = "Žiniatinklio redaktoriaus dokumento identifikatorius negali būti tuščias"
-web_session_required = "Žiniatinklio redaktoriaus sesijos identifikatorius negali būti tuščias"
 panel_player_required = "Tikslinis žaidėjas negali būti tuščias"
 row_icon_type_required = "Piktogramos tipas negali būti tuščias"
 row_style_property_required = "Stiliaus savybė negali būti tuščia"
 import_source_required = "Senųjų duomenų importo šaltinis negali būti tuščias"
 import_source_unknown = "Nežinomas senųjų duomenų importo šaltinis: {source}"
+editor_token_required = "Nurodykite prieigos rakto identifikatorių arba all"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cNeturite leidimo &f{permission}&c."
@@ -549,27 +550,27 @@ failed = "&8[&dGloss&8]: &cMeniu &f{menu}&c turinio operacija nepavyko: {reason}
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cŠi komanda prieinama tik žaidėjams."
 
-[gloss.message.web]
-header = "Žiniatinklio redaktorius"
-open_hover = "Spustelėkite, kad atidarytumėte Gloss žiniatinklio redaktorių."
-open = "&8[&dGloss&8]: &7Žiniatinklio redaktorius: &f{url}"
-preparing = "&8[&dGloss&8]: &7Ruošiama saugi redaktoriaus sinchronizavimo sesija objektui &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cTiesioginis redagavimas žiniatinklyje nepasiekiamas. Patikrinkite sinchronizavimo konfigūraciją ir ryšį su tarpiniu serveriu."
-open_failed = "&8[&dGloss&8]: &cNepavyko atidaryti &f{kind}={subject}&c tiesioginiame žiniatinklio redaktoriuje: {reason}"
-open_console = "&8[&dGloss&8]: &7Redaktoriaus prieigos nuoroda objektui &f{subject}&7: &f{url}"
-capability_warning = "&8[&dGloss&8]: &eŠis URL leidžia skelbti pakeitimus serveryje, kol prieiga atšaukiama arba baigiasi jos galiojimas. Laikykite jį paslaptyje."
+[gloss.message.editor]
+link_ready = "Nuoroda paruošta. Atidarykite ją per {minutes} min."
+link_console = "&8[&dGloss&8]: &aNuoroda paruošta. Atidarykite ją per {minutes} min.: &f{url}"
+link_details = "&8[&dGloss&8]: &7Teisės {scopes}; {folders}; nustoja galioti po {lifetime} nenaudojimo; prieigos raktas {token}"
+all_folders = "visi aplankai"
+some_folders = "aplankai {folders}"
 open_label = "Atidaryti redaktorių"
-copy_label = "Kopijuoti nuorodą"
-revoke_label = "Atšaukti prieigą"
-link_hover = "Atidarykite redaktorių, nukopijuokite prieigos nuorodą arba atšaukite sesiją {session}."
-
-[gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Aktyvių redaktoriaus sinchronizavimo sesijų nėra."
-status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7galioja=&f{seconds}s &7publikacija=&f{revision} &7laukia=&f{pending}"
-revoked = "&8[&dGloss&8]: &aSinchronizavimo sesija &f{session}&a atšaukta."
-pulled = "&8[&dGloss&8]: &aSinchronizavimo sesija &f{session}&a patikrinta."
-unknown = "&8[&dGloss&8]: &cSinchronizavimo sesija &f{session}&c nežinoma arba nebegalioja."
-failed = "&8[&dGloss&8]: &cSesijos &f{session}&c sinchronizavimo operacija nepavyko: {reason}"
+open_hover = "Atidaryti naršyklėje"
+copy_label = "Kopijuoti"
+copy_hover = "Kopijuoti nuorodą"
+revoke_label = "Atšaukti"
+revoke_hover = "Atšaukti šią nuorodą arba atjungti jos susietą redaktorių"
+details_label = "Išsamiau"
+line = "&8[&dGloss&8]: &7{line}"
+notice = "&8[&dGloss&8]: &7{line}"
+failed = "&8[&dGloss&8]: &c{reason}"
+not_running = "&8[&dGloss&8]: &cRedaktorius neveikia; gloss.toml nustatykite [editor] enabled = true"
+tokens_empty = "&8[&dGloss&8]: &7Redaktoriaus prieigos raktų nėra."
+unknown_token = "&8[&dGloss&8]: &cPrieigos rakto &f{token}&c nėra."
+revoked_one = "&8[&dGloss&8]: &aAtšauktas 1 prieigos raktas; jo ryšiai nutraukti."
+revoked_many = "&8[&dGloss&8]: &aAtšaukta prieigos raktų: {count}; jų ryšiai nutraukti."
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Tikrinamas šaltinis &f{source}&7, kad būtų galima peržiūrėti perkėlimą nekeičiant duomenų..."

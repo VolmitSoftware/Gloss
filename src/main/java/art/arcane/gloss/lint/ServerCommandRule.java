@@ -1,8 +1,8 @@
 package art.arcane.gloss.lint;
 
+import art.arcane.gloss.config.action.CommandActions;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.history.HistoryKinds;
-import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,12 +27,7 @@ public final class ServerCommandRule implements LintRule {
                 continue;
             }
             JsonWalk.visit(document.json(), (pointer, element) -> {
-                if (!element.isJsonObject()) {
-                    return;
-                }
-                JsonObject object = element.getAsJsonObject();
-                if (!"command".equals(JsonWalk.string(object, "type"))
-                        || !"server".equals(JsonWalk.string(object, "source"))) {
+                if (!CommandActions.runsAsServer(element)) {
                     return;
                 }
                 diagnostics.add(new Diagnostic(CODE, Severity.WARNING, document.kind(),

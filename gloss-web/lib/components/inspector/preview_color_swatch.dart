@@ -12,7 +12,9 @@ library;
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 
 import '../../logic/preview_doc_validation.dart';
-import '../common/hui_color_field.dart';
+import '../../ui/color_swatch.dart';
+import '../../ui/color_value.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// `#AARRGGBB` for a value that folds to a constant colour, else null.
@@ -33,11 +35,18 @@ Widget? previewColorPicker(
 }) {
   final String? hex = _constantColorHex(raw);
   if (hex == null) return null;
-  return HuiColorSwatch(
-    value: hex,
-    size: 18,
-    label: huiText("Pick a {label}", <String, Object?>{'label': label}),
-    onPicked: (String picked) =>
-        onPicked(huiApplyPickedColor(picked, hex, HuiColorFormat.argb)),
+  final HuiColorParts? parts = huiParseHexColor(hex);
+  final String pickLabel = huiText('Pick a {label}', <String, Object?>{
+    'label': label,
+  });
+  // The kit swatch without its text box: the expression field beside it is
+  // the text.
+  return ColorSwatch(
+    label: pickLabel,
+    rgb: parts?.rgbHex ?? '#000000',
+    fill: parts?.css ?? 'transparent',
+    clear: parts == null || parts.a != 255,
+    onPicked: (String rgb) =>
+        onPicked(huiApplyPickedColor(rgb, hex, HuiColorFormat.argb)),
   );
 }

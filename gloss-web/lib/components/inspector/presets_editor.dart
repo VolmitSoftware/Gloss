@@ -1,32 +1,22 @@
+/// The preset catalog's centre form: one collection at a time, its default
+/// values and its named presets.
+library;
+
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show ListenableBuilder;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../l10n/hui_localizations.dart';
 import '../../logic/document_presets.dart';
 import '../../model/model.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/section.dart';
+import '../../ui/technical_input.dart';
+import 'catalog_form.dart';
 import 'extras_editor.dart';
-import 'inspector_widgets.dart';
-
-class PresetsInspector extends StatelessWidget {
-  const PresetsInspector({required this.store, super.key});
-  final EditorStore store;
-
-  @override
-  Widget build(BuildContext context) {
-    final GlossDoc? doc = store.glossDoc;
-    return dom.div(classes: 'hui-inspector-body', <Widget>[
-      if (doc is GlossPresetsDoc) HuiRevisionRow(revision: doc.revision),
-      Text(
-        huiText(
-          'Edit collection defaults and named presets in the catalog. Documents select a named preset with their preset field.',
-        ),
-      ),
-    ]);
-  }
-}
 
 class PresetsEditor extends StatefulWidget {
   const PresetsEditor({required this.store, super.key});
@@ -104,145 +94,175 @@ class _PresetsEditorState extends State<PresetsEditor> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: component.store,
-    builder: (BuildContext context) => _content(),
-  );
+  void _remove(String name) =>
+      _edit('remove preset', (GlossPresetsDoc doc) {
+        final Map<String, Object?> entries = Map<String, Object?>.of(
+          _object(doc.presets[_collection]),
+        )..remove(name);
+        if (entries.isEmpty) {
+          doc.presets.remove(_collection);
+        } else {
+          doc.presets[_collection] = entries;
+        }
+      });
 
-  Widget _content() {
+  @override
+  Widget build(BuildContext context) =>
+      CatalogFormHost(store: component.store, builder: _content);
+
+  Widget _content(BuildContext context) {
     final GlossDoc? doc = component.store.glossDoc;
-    if (doc is! GlossPresetsDoc) {
-      return const dom.div(<Widget>[]);
-    }
+    if (doc is! GlossPresetsDoc) return const Component.fragment(<Widget>[]);
+    final ComponentSize size = controlSize(DensityScope.of(context));
     final Map<String, Object?> entries = _object(doc.presets[_collection]);
     final String? selected = entries.containsKey(_selected)
         ? _selected
         : entries.keys.firstOrNull;
     final List<String> collections = DocumentPresets.kinds.toList()..sort();
-    return dom.div(classes: 'hui-inspector-body', <Widget>[
-      InspectorSection(
-        title: huiText('Preset catalog'),
-        children: <Widget>[
-          Text(
-            huiText(
-              'Defaults apply to every document in a collection. Named presets add shared values; each document can override them. Objects merge recursively and arrays replace completely.',
-            ),
-          ),
-          HuiField(
-            label: huiText('Collection'),
-            control: ArcaneSelect(
-              value: _collection,
-              options: <ArcaneSelectOption>[
-                for (final String value in collections)
-                  ArcaneSelectOption(value: value, label: value),
-              ],
-              onChanged: (String value) => setState(() {
-                _collection = value;
-                _selected = null;
-                _error = null;
-              }),
-            ),
-          ),
-        ],
+    final bool defaultsBroken =
+        doc.defaults[_collection] != null && doc.defaults[_collection] is! Map;
+    final bool presetsBroken =
+        doc.presets[_collection] != null && doc.presets[_collection] is! Map;
+    return CatalogForm(
+      kind: huiText('Presets'),
+      title: component.store.menuId,
+      revision: doc.revision,
+      kindClass: 'is-presets',
+      tip: huiText(
+        'Defaults apply to every document in a collection. Named presets add shared values; each document can override them. Objects merge recursively and arrays replace completely.',
       ),
-      InspectorSection(
-        title: huiText('Collection defaults'),
-        children: <Widget>[
-          if (doc.defaults[_collection] != null &&
-              doc.defaults[_collection] is! Map)
-            Text(
-              huiText(
-                'This collection must be a JSON object. Repair it in Code view.',
-              ),
-            )
-          else
-            ExtrasEditor(
-              key: ValueKey<String>('defaults:$_collection'),
-              title: huiText('Default values'),
-              extensionKeys: false,
-              extras: _object(doc.defaults[_collection]),
-              onChanged: (String label, Map<String, Object?> values) =>
-                  _edit(label, (GlossPresetsDoc doc) {
-                    if (values.isEmpty) {
-                      doc.defaults.remove(_collection);
-                    } else {
-                      doc.defaults[_collection] = values;
-                    }
-                  }),
-            ),
-        ],
-      ),
-      InspectorSection(
-        title: huiText('Named presets'),
-        children: <Widget>[
-          if (doc.presets[_collection] != null &&
-              doc.presets[_collection] is! Map)
-            Text(
-              huiText(
-                'This collection must be a JSON object. Repair it in Code view.',
-              ),
-            )
-          else ...<Widget>[
-            if (entries.isEmpty)
-              Text(
-                huiText(
-                  'No named presets in this collection. Enter a name to create one.',
-                ),
-              ),
-            if (selected != null) ...<Widget>[
-              HuiField(
-                label: huiText('Preset'),
-                control: ArcaneSelect(
-                  value: selected,
-                  options: <ArcaneSelectOption>[
-                    for (final String name in entries.keys)
-                      ArcaneSelectOption(value: name, label: name),
-                  ],
-                  onChanged: (String value) =>
-                      setState(() => _selected = value),
-                ),
-              ),
-              ..._preset(selected, entries[selected]),
+      children: <Widget>[
+        Field(
+          label: huiText('Collection'),
+          forId: 'presets-collection',
+          child: ArcaneSelect(
+            id: 'presets-collection',
+            value: _collection,
+            size: size,
+            fullWidth: true,
+            options: <ArcaneSelectOption>[
+              for (final String value in collections)
+                ArcaneSelectOption(value: value, label: value),
             ],
-            HuiField(
-              label: huiText('New preset name'),
-              error: _error,
-              control: TextInput(
-                value: _newName,
-                attributes: const <String, String>{
-                  'aria-label': 'New preset name',
-                },
-                onChanged: (String value) => _newName = value,
+            onChanged: (String value) => setState(() {
+              _collection = value;
+              _selected = null;
+              _error = null;
+            }),
+          ),
+        ),
+        if (defaultsBroken)
+          _note(
+            huiText(
+              'This collection must be a JSON object. Repair it in Code view.',
+            ),
+          )
+        else
+          ExtrasEditor(
+            key: ValueKey<String>('defaults:$_collection'),
+            title: huiText('Default values'),
+            extensionKeys: false,
+            extras: _object(doc.defaults[_collection]),
+            onChanged: (String label, Map<String, Object?> values) =>
+                _edit(label, (GlossPresetsDoc doc) {
+                  if (values.isEmpty) {
+                    doc.defaults.remove(_collection);
+                  } else {
+                    doc.defaults[_collection] = values;
+                  }
+                }),
+          ),
+        AppSection(
+          title: huiText('Named presets'),
+          memoryKey: 'presets.named',
+          count: entries.length,
+          children: <Widget>[
+            if (presetsBroken)
+              _note(
+                huiText(
+                  'This collection must be a JSON object. Repair it in Code view.',
+                ),
+              )
+            else ...<Widget>[
+              if (entries.isEmpty)
+                _note(
+                  huiText(
+                    'No named presets in this collection. Enter a name to create one.',
+                  ),
+                ),
+              if (selected != null) ...<Widget>[
+                Field(
+                  label: huiText('Preset'),
+                  forId: 'presets-selected',
+                  child: ArcaneSelect(
+                    id: 'presets-selected',
+                    value: selected,
+                    size: size,
+                    fullWidth: true,
+                    options: <ArcaneSelectOption>[
+                      for (final String name in entries.keys)
+                        ArcaneSelectOption(value: name, label: name),
+                    ],
+                    onChanged: (String value) =>
+                        setState(() => _selected = value),
+                  ),
+                ),
+                ..._preset(selected, entries[selected], size),
+              ],
+              Field(
+                label: huiText('New preset name'),
+                forId: 'presets-new-name',
+                error: _error,
+                child: TextInput(
+                  id: 'presets-new-name',
+                  value: _newName,
+                  size: size,
+                  fullWidth: true,
+                  attributes: technicalInputAttributes,
+                  onChanged: (String value) => _newName = value,
+                ),
               ),
-            ),
-            Button(
-              label: huiText('Add preset'),
-              variant: ButtonVariant.outline,
-              onPressed: () => _add(doc),
-            ),
+              ActionRow(
+                dense: true,
+                secondary: <RowAction>[
+                  RowAction(
+                    huiText('Add preset'),
+                    () => _add(doc),
+                    icon: ArcaneIcon.plus(),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
-      ),
-    ]);
+        ),
+      ],
+    );
   }
 
-  List<Widget> _preset(String name, Object? raw) {
+  Widget _note(String text) => dom.p(
+    classes: 'ui-section-description',
+    <Widget>[Component.text(text)],
+  );
+
+  List<Widget> _preset(String name, Object? raw, ComponentSize size) {
     final Map<String, Object?> definition = _object(raw);
+    final Object? parent = definition['extends'];
     return <Widget>[
       if (raw is! Map)
-        Text(
+        _note(
           huiText('This preset must be a JSON object. Repair it in Code view.'),
         )
       else ...<Widget>[
-        HuiField(
+        Field(
           label: huiText('Extends'),
-          help: huiText('Optional parent preset name in this collection.'),
-          control: TextInput(
-            value: definition['extends'] is String
-                ? definition['extends'] as String
-                : '',
-            attributes: const <String, String>{'aria-label': 'Parent preset'},
+          forId: 'presets-extends',
+          tip: huiText('Optional parent preset name in this collection.'),
+          child: TextInput(
+            id: 'presets-extends',
+            value: parent is String ? parent : '',
+            size: size,
+            fullWidth: true,
+            attributes: technicalInputAttributes,
             onChanged: (String value) => _definition(name, 'preset parent', (
               Map<String, Object?> definition,
             ) {
@@ -255,7 +275,7 @@ class _PresetsEditorState extends State<PresetsEditor> {
           ),
         ),
         if (definition['values'] != null && definition['values'] is! Map)
-          Text(
+          _note(
             huiText(
               'Preset values must be a JSON object. Repair them in Code view.',
             ),
@@ -275,19 +295,16 @@ class _PresetsEditorState extends State<PresetsEditor> {
                 ),
           ),
       ],
-      Button(
-        label: huiText('Remove preset'),
-        variant: ButtonVariant.outline,
-        onPressed: () => _edit('remove preset', (GlossPresetsDoc doc) {
-          final Map<String, Object?> entries = Map<String, Object?>.of(
-            _object(doc.presets[_collection]),
-          )..remove(name);
-          if (entries.isEmpty) {
-            doc.presets.remove(_collection);
-          } else {
-            doc.presets[_collection] = entries;
-          }
-        }),
+      ActionRow(
+        dense: true,
+        secondary: <RowAction>[
+          RowAction(
+            huiText('Remove preset'),
+            () => _remove(name),
+            icon: ArcaneIcon.trash(),
+            destructive: true,
+          ),
+        ],
       ),
     ];
   }

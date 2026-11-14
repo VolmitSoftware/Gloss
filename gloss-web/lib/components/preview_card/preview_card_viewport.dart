@@ -1,5 +1,5 @@
-/// The container-preview card surface: a DPR-aware HTML5 canvas plus its
-/// control strip.
+/// The container-preview card surface: a DPR-aware HTML5 canvas in a
+/// [StageFrame].
 ///
 /// Structurally the twin of [CanvasViewport](../canvas/canvas_viewport.dart),
 /// and for the same reasons: rendering is driven by one dirty flag and an
@@ -21,13 +21,14 @@ import 'dart:math' as math;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show Component, ListenableBuilder;
+import 'package:jaspr/jaspr.dart' show Component;
 import 'package:web/web.dart' as web;
 
 import '../../logic/preview_card_edit.dart';
 import '../../logic/preview_card_scene.dart';
 import '../../logic/preview_sim.dart';
 import '../../logic/preview_sim_controls.dart';
+import '../../logic/stage_fit.dart';
 import '../../logic/viewport_math.dart'
     show canBeginCanvasGesture, shouldPanCanvasGesture;
 import '../../model/preview_doc.dart';
@@ -40,6 +41,8 @@ import '../render/canvas_brush.dart';
 import '../render/icon_renderers.dart';
 import '../shell/key_listener.dart' show huiMobilePaneOpen;
 import '../shell/shell_status.dart';
+import '../shell/store_selector.dart';
+import '../../ui/stage_frame.dart';
 import 'preview_card_painter.dart';
 import 'preview_card_toolbar.dart';
 import 'package:gloss_editor/l10n/hui_localizations.dart';
@@ -99,7 +102,6 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
   String get _stageId => '$_uid-stage';
   String get _readoutId => '$_uid-readout';
   String get _issuesId => '$_uid-issues';
-  String get _zoomLabelId => '$_uid-zoom';
 
   final McFontMetrics _metrics = McFontMetrics();
   late final CanvasAssets _assets;
@@ -141,9 +143,17 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
   bool _framePending = false;
   bool _postFramePending = false;
   bool _disposed = false;
-  bool _needsInitialFit = true;
-  int _lastFitRequest = 0;
   bool _fontRequested = false;
+
+  /// Fits each card until its camera is moved by hand; the hand-set cameras
+  /// live in the store, per document.
+  late final StageFitMemory<PreviewCardView> _camera =
+      StageFitMemory<PreviewCardView>(cameras: component.store.cardCameras);
+
+  /// The label widths the last fit framed. Labels are measured against the
+  /// game font only when they are painted, so a fit made before that paint is
+  /// redone once with the real widths.
+  List<double>? _fittedLabelWidths;
   bool _statusDirty = true;
 
   Timer? _simTimer;
@@ -164,10 +174,20 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
   int? _hoveredItem;
   String? _hint;
 
+  /// The last `data-content-box` written on the surface.
+  String? _contentBox;
+
+  /// The game font is drawable (see [_ensureMinecraftFont]).
+  bool _fontReady = false;
+
+  /// When painting started waiting for assets ([_holdsPaint]); null while
+  /// nothing is loading.
+  DateTime? _holdSince;
+  Timer? _holdTimer;
+
   @override
   void initState() {
     super.initState();
-    _lastFitRequest = component.store.canvasFitRequest;
     _assets = CanvasAssets(onReady: _markDirty);
     _painter = PreviewCardPainter(metrics: _metrics, assets: _assets);
     component.store.addListener(_onStoreChanged);
@@ -196,6 +216,7 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
     component.store.endDrag();
     _simTimer?.cancel();
     _simTimer = null;
+    _holdTimer?.cancel();
     _detachListeners();
     _resizeObserver?.disconnect();
     _resizeObserver = null;
@@ -216,6 +237,7 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
         tag: 'canvas',
         id: _canvasId,
         classes: 'hui-canvas-surface',
+        attributes: const <String, String>{'data-game-drawn': ''},
       ),
       dom.div(
         id: _issuesId,
@@ -238,77 +260,84 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
       );
     }
     return dom.div(classes: 'hui-canvas hui-preview-card', <Widget>[
-      ListenableBuilder(
+      StoreSelector<PreviewCardToolbarState>(
         listenable: store,
-        builder: (BuildContext inner) => PreviewCardToolbar(
-          store: store,
-          zoomLabelId: _zoomLabelId,
-          zoomLabel: _zoomLabelText,
-          simCategory: store.previewSim.category,
-          onZoomIn: () =>
-              _commitView(_view.zoomedAtCenter(previewZoomIn(_view.zoom))),
-          onZoomOut: () =>
-              _commitView(_view.zoomedAtCenter(previewZoomOut(_view.zoom))),
-          onZoomReset: _resetView,
-          onFit: _fitToContent,
-          onStepSim: _stepSim,
-          onResetSim: _resetSim,
+        selector: () => previewCardToolbarState(store),
+        builder: (BuildContext _, PreviewCardToolbarState state) => StageFrame(
+          title: huiText('Card'),
+          fit: StageFit.free,
+          actions: previewCardActions(
+            store: store,
+            state: state,
+            onZoomIn: () => _commitHandView(
+              _view.zoomedAtCenter(previewZoomIn(_view.zoom)),
+            ),
+            onZoomOut: () => _commitHandView(
+              _view.zoomedAtCenter(previewZoomOut(_view.zoom)),
+            ),
+            onStepSim: _stepSim,
+          ),
+          more: previewCardMoreEntries(onResetSim: _resetSim),
+          onReset: _resetView,
+          status: _coarsePointer
+              ? huiText('Drag empty canvas to pan')
+              : huiText(
+                  'Space or middle-drag pans · scroll zooms · 0 resets '
+                  '· F fits',
+                ),
+          statusTip: _coarsePointer
+              ? huiText('Drag elements to move')
+              : huiText(
+                  'Click selects · drag moves · corner handles resize · '
+                  'arrows nudge',
+                ),
+          child: _stageTree,
         ),
       ),
-      _stageTree,
-      dom.div(classes: 'hui-canvas-hint hui-canvas-hint-desktop', <Widget>[
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(
-            huiText(
-              'Space or middle-drag pans - scroll zooms - 0 resets '
-              '- F fits',
-            ),
-          ),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(
-            huiText(
-              'Click selects - drag moves - corner handles resize - '
-              'arrows nudge',
-            ),
-          ),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item hui-canvas-hint-note', <Widget>[
-          Component.text(
-            huiText(
-              'Positions are whole pixels from the card centre, y '
-              'up. Expression-driven fields are edited in the inspector.',
-            ),
-          ),
-        ]),
-      ]),
-      dom.div(classes: 'hui-canvas-hint hui-canvas-hint-touch', <Widget>[
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(huiText('Drag empty canvas to pan')),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(huiText('Use the zoom controls')),
-        ]),
-        dom.span(classes: 'hui-canvas-hint-item', <Widget>[
-          Component.text(huiText('Drag elements to move')),
-        ]),
-      ]),
     ]);
   }
+
+  /// Hints differ by pointer: a touch screen has no Space, wheel or arrows.
+  late final bool _coarsePointer = web.window
+      .matchMedia('(pointer: coarse)')
+      .matches;
 
   // --- frame loop -----------------------------------------------------------
 
   void _onStoreChanged() {
-    final int fitRequest = component.store.canvasFitRequest;
-    if (_lastFitRequest != fitRequest) {
-      _lastFitRequest = fitRequest;
-      if (component.store.isPreviewDoc) {
-        _needsInitialFit = true;
-        _syncCanvasSize();
-      }
-    }
+    _frameCamera();
     _statusDirty = true;
     _markDirty();
+  }
+
+  /// Fits the open card, or brings back the camera it was given by hand,
+  /// when the document changes, is imported or the surface changes size
+  /// ([resized]). Waits while the surface has no box.
+  void _frameCamera({bool resized = false}) {
+    final EditorStore store = component.store;
+    if (!_hasArea || !_view.hasArea || !store.isPreviewDoc) return;
+    final StageCamera next = _camera.next(
+      docId: store.workspace.activeId,
+      fitRequest: store.canvasFitRequest,
+      resized: resized,
+    );
+    switch (next) {
+      case StageCamera.fit:
+        _fitToContent();
+      case StageCamera.restore:
+        final PreviewCardView hand = _camera.handView!;
+        _commitView(
+          PreviewCardView(
+            widthPx: _view.widthPx,
+            heightPx: _view.heightPx,
+            zoom: hand.zoom,
+            panX: hand.panX,
+            panY: hand.panY,
+          ),
+        );
+      case StageCamera.keep:
+        break;
+    }
   }
 
   void _markDirty() {
@@ -374,7 +403,6 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
       if (_disposed) return;
       _attachToDom();
       _syncStageAriaLabel();
-      _syncZoomReadout();
       _syncCanvasSize();
       _markDirty();
     });
@@ -478,16 +506,51 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
     if (_fontRequested) return;
     _fontRequested = true;
     try {
+      _fontReady = web.document.fonts.check('16px "Minecraftia"');
       web.document.fonts.load('16px "Minecraftia"').toDart.then<void>((
         JSArray<web.FontFace> _,
       ) {
         if (_disposed) return;
+        _fontReady = true;
         _metrics.invalidate();
         _markDirty();
-      }, onError: (Object _) {});
+      }, onError: (Object _) {
+        _fontReady = true;
+        _markDirty();
+      });
     } catch (_) {
       // Font Loading API unavailable: the fallback metric still renders.
+      _fontReady = true;
     }
+  }
+
+  /// True while the card should not be painted yet: the game font, the
+  /// catalogs or an item sprite it draws is still loading, so slots would
+  /// flash as initials and labels in a fallback font. Holds [stageAssetHold]
+  /// at most; the stage is `aria-busy` meanwhile.
+  bool _holdsPaint(PreviewCardScene scene, HuiCatalogs catalogs) {
+    bool loading = !_fontReady || !catalogs.loaded;
+    for (final CardItem item in scene.items) {
+      if (item is! CardSlot) continue;
+      final String? material = item.item?.material;
+      final String? texture = material == null
+          ? null
+          : catalogs.textureFor(material.toLowerCase());
+      if (texture != null) _assets.image(texture);
+    }
+    loading = loading || _assets.hasPending;
+    final DateTime now = DateTime.now();
+    final DateTime? since = _holdSince;
+    final bool hold =
+        loading && (since == null || now.difference(since) < stageAssetHold);
+    if (!loading) _holdSince = null;
+    if (hold && since == null) {
+      _holdSince = now;
+      _holdTimer?.cancel();
+      _holdTimer = Timer(stageAssetHold, _markDirty);
+    }
+    _stage?.setAttribute('aria-busy', '$hold');
+    return hold;
   }
 
   void _syncCanvasSize() {
@@ -509,12 +572,10 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
     final int backingHeight = (height * ratio).round();
     if (canvas.width != backingWidth) canvas.width = backingWidth;
     if (canvas.height != backingHeight) canvas.height = backingHeight;
+    final bool resized =
+        !hadArea || width != _view.widthPx || height != _view.heightPx;
     _view = _view.resized(width, height);
-    if (_needsInitialFit) {
-      _needsInitialFit = false;
-      _fitToContent();
-      return;
-    }
+    _frameCamera(resized: resized);
     _markDirty();
   }
 
@@ -533,6 +594,7 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
       component.catalogs,
     );
     final PreviewCardScene scene = _buildScene();
+    if (_holdsPaint(scene, catalogs)) return;
     _labelWidths = _painter.paint(
       ctx: ctx,
       view: _view,
@@ -560,8 +622,53 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
               particleTick: component.store.previewSim.sim.time.round(),
             ),
     );
+    _refitMeasuredLabels();
+    _publishContentBox(scene);
     _syncIssues();
     _reconcileTimers();
+  }
+
+  /// Redoes a fit made before the labels were measured, once.
+  void _refitMeasuredLabels() {
+    final List<double>? fitted = _fittedLabelWidths;
+    if (fitted == null) return;
+    _fittedLabelWidths = null;
+    if (_camera.handSet || !component.store.isPreviewDoc) return;
+    final List<double> measured = _labelWidths;
+    bool same = fitted.length == measured.length;
+    for (int i = 0; same && i < measured.length; i++) {
+      same = fitted[i] == measured[i];
+    }
+    if (!same) _fitToContent();
+  }
+
+  /// Writes where the card's elements landed on the surface
+  /// (`data-content-box`), so the browser check can tell a fitted card from a
+  /// cropped one.
+  void _publishContentBox(PreviewCardScene scene) {
+    final web.HTMLCanvasElement? canvas = _canvas;
+    if (canvas == null) return;
+    final PreviewBox? bounds = previewSceneBounds(
+      scene,
+      labelWidths: _labelWidths,
+    );
+    final String? box = bounds == null
+        ? null
+        : stageContentBox(
+            left: _view.toScreenX(bounds.left),
+            top: _view.toScreenY(bounds.top),
+            right: _view.toScreenX(bounds.right),
+            bottom: _view.toScreenY(bounds.bottom),
+            width: _view.widthPx,
+            height: _view.heightPx,
+          );
+    if (box == _contentBox) return;
+    _contentBox = box;
+    if (box == null) {
+      canvas.removeAttribute('data-content-box');
+    } else {
+      canvas.setAttribute('data-content-box', box);
+    }
   }
 
   /// Resolves the active document against the simulation. Never throws: every
@@ -713,5 +820,4 @@ class _PreviewCardViewportState extends State<PreviewCardViewport> {
     return root != null && root.classList.contains('light');
   }
 
-  String get _zoomLabelText => '${_view.zoom * 100}%';
 }

@@ -2,12 +2,17 @@ library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component;
 
 import '../../logic/real_drop_labels.dart';
 import '../../logic/validation.dart';
-import '../common/common.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
+import '../../ui/action_row.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/info_tip.dart';
+import '../../ui/technical_input.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 /// `labels.names`: one row per material, in file order, each holding the
@@ -39,6 +44,8 @@ class RealDropLabelNamesEditor extends StatefulWidget {
 }
 
 class _RealDropLabelNamesEditorState extends State<RealDropLabelNamesEditor> {
+  static const String _newId = 'real-drops-label-names-new';
+
   String _newMaterial = '';
   String Function()? _newMaterialError;
 
@@ -81,85 +88,69 @@ class _RealDropLabelNamesEditorState extends State<RealDropLabelNamesEditor> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      dom.div(classes: 'hui-drop-subgroup', <Widget>[
-        dom.div(classes: 'hui-drop-subhead', <Widget>[
-          Text(huiText('Names')),
-          const HuiFieldHelp('realDrops.labels.names'),
-        ]),
-        HuiInlineIssues(
-          component.issues
-              .where((HuiIssue issue) => issue.path.endsWith('.names'))
-              .toList(),
+  Widget build(BuildContext context) {
+    final List<HuiIssue> listIssues = distinctIssues(<HuiIssue>[
+      for (final HuiIssue issue in component.issues)
+        if (issue.path.endsWith('.names')) issue,
+    ]);
+    return Component.fragment(<Widget>[
+      dom.h3(classes: 'ui-section-title', <Widget>[
+        TipLabel(
+          label: Text(huiText('Names')),
+          docKey: 'realDrops.labels.names',
         ),
-        if (component.names.isEmpty)
-          dom.p(classes: 'hui-drop-empty', <Widget>[
-            Text(
-              huiText(
-                'No names. Every material shows its own name in Title Case.',
-              ),
-            ),
-          ])
-        else
-          for (final String material in component.names.keys.toList())
-            _row(material),
-        _addRow(),
-      ]);
+      ]),
+      for (final HuiIssue issue in listIssues) issueNote(issue),
+      if (component.names.isEmpty)
+        ArcaneFieldDescription(
+          huiText('No names. Every material shows its own name in Title Case.'),
+        )
+      else
+        for (final String material in component.names.keys.toList())
+          _row(material),
+      _addRow(),
+    ]);
+  }
 
-  Widget _row(String material) => HuiField(
+  Widget _row(String material) => Field(
     label: material,
-    trailing: Button(
-      variant: ButtonVariant.ghost,
-      size: ButtonSize.iconSm,
+    problems: <HuiIssue>[
+      for (final HuiIssue issue in component.issues)
+        if (issue.path.endsWith('.names.$material')) issue,
+    ],
+    trailing: AppIconButton(
+      icon: ArcaneIcon.trash2(),
+      label: huiText('Remove {key}', <String, Object?>{'key': material}),
+      tipAtEnd: true,
       onPressed: () => _remove(material),
+    ),
+    child: TextInput(
+      value: component.names[material] ?? '',
+      size: controlSize(Density.dense),
+      fullWidth: true,
+      placeholder: '&7Cobble',
+      styles: technicalInputStyles,
       attributes: <String, String>{
-        'aria-label': huiText('Remove {key}', <String, Object?>{
+        ...technicalInputAttributes,
+        'aria-label': huiText('Name for {key}', <String, Object?>{
           'key': material,
         }),
-        'title': huiText('Remove {key}', <String, Object?>{'key': material}),
       },
-      icon: ArcaneIcon.trash2(size: IconSize.sm),
+      onChanged: (String value) => _edit(material, value),
     ),
-    control: dom.div(<Widget>[
-      TextInput(
-        value: component.names[material] ?? '',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: '&7Cobble',
-        styles: huiTechnicalInputStyles,
-        attributes: <String, String>{
-          ...huiTechnicalInputAttributes,
-          'aria-label': huiText('Name for {key}', <String, Object?>{
-            'key': material,
-          }),
-        },
-        onChanged: (String value) => _edit(material, value),
-      ),
-      HuiInlineIssues(
-        component.issues
-            .where((HuiIssue issue) => issue.path.endsWith('.names.$material'))
-            .toList(),
-      ),
-    ]),
   );
 
-  Widget _addRow() => HuiField(
+  Widget _addRow() => Field(
     label: huiText('Add material'),
+    forId: _newId,
     error: _newMaterialError?.call(),
-    control: dom.div(
-      styles: const dom.Styles(
-        raw: <String, String>{
-          'display': 'grid',
-          'grid-template-columns': 'minmax(0, 1fr) auto',
-          'align-items': 'center',
-          'gap': '8px',
-          'min-width': '0',
-        },
-      ),
-      <Widget>[
+    child: ActionRow(
+      dense: true,
+      leading: <Widget>[
         TextInput(
+          id: _newId,
           value: _newMaterial,
-          size: ComponentSize.sm,
+          size: controlSize(Density.dense),
           fullWidth: true,
           placeholder: 'COBBLESTONE',
           onChanged: (String value) {
@@ -168,19 +159,12 @@ class _RealDropLabelNamesEditorState extends State<RealDropLabelNamesEditor> {
               setState(() => _newMaterialError = null);
             }
           },
-          styles: huiTechnicalInputStyles,
-          attributes: <String, String>{
-            ...huiTechnicalInputAttributes,
-            'aria-label': huiText('Material'),
-          },
+          styles: technicalInputStyles,
+          attributes: technicalInputAttributes,
         ),
-        Button(
-          variant: ButtonVariant.outline,
-          size: ButtonSize.sm,
-          icon: ArcaneIcon.plus(size: IconSize.sm),
-          onPressed: _add,
-          label: huiText('Add'),
-        ),
+      ],
+      secondary: <RowAction>[
+        RowAction(huiText('Add'), _add, icon: ArcaneIcon.plus()),
       ],
     ),
   );

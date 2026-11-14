@@ -14,3 +14,12 @@ void Function() installPaneSplitter({
   required void Function() onReset,
   required void Function(String key, bool shift) onKey,
 }) => () {};
+
+bool mediaMatches(String query) => false;
+
+void Function() watchMedia(
+  String query,
+  void Function(bool matches) onChange,
+) => () {};
+
+void scrollPaneToTop(String pane) {}

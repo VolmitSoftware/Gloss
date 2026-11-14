@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -111,11 +113,38 @@ public final class HistoryService implements GlossService {
 
     /** Every stored copy of one document, newest first, including the editor-sync backups. */
     public List<HistoryEntry> versions(String kind, String id) {
-        List<HistoryEntry> versions = new ArrayList<>(store.list(kind, id));
-        versions.addAll(transactionVersions(kind, id));
-        versions.sort(Comparator.comparingLong(HistoryEntry::epochMillis).reversed()
-                .thenComparing(HistoryEntry::source));
-        return List.copyOf(versions);
+        return timeline().versions(kind, id);
+    }
+
+    /** Stored copies of many documents, as {@link #versions}. */
+    @FunctionalInterface
+    public interface Timeline {
+        List<HistoryEntry> versions(String kind, String id);
+    }
+
+    /**
+     * A timeline that read the editor-sync backups once, for asking about many documents. A backup whose source the
+     * store also holds for that document is the same copy and is listed once.
+     */
+    public Timeline timeline() {
+        Map<String, List<HistoryEntry>> backups = new HashMap<>();
+        for (HistoryEntry entry : transactionEntries()) {
+            backups.computeIfAbsent(key(entry.kind(), entry.id()), (String ignored) -> new ArrayList<>()).add(entry);
+        }
+        return (String kind, String id) -> {
+            List<HistoryEntry> stored = store.list(kind, id);
+            Set<String> sources = new HashSet<>();
+            stored.forEach((HistoryEntry entry) -> sources.add(entry.source()));
+            List<HistoryEntry> versions = new ArrayList<>(stored);
+            for (HistoryEntry backup : backups.getOrDefault(key(kind, id), List.of())) {
+                if (!sources.contains(backup.source())) {
+                    versions.add(backup);
+                }
+            }
+            versions.sort(Comparator.comparingLong(HistoryEntry::epochMillis).reversed()
+                    .thenComparing(HistoryEntry::source));
+            return List.copyOf(versions);
+        };
     }
 
     public HistoryEntry version(String kind, String id, long epochMillis) {
@@ -207,12 +236,11 @@ public final class HistoryService implements GlossService {
         }
     }
 
-    private List<HistoryEntry> transactionVersions(String kind, String id) {
+    private List<HistoryEntry> transactionEntries() {
         List<HistoryEntry> entries = new ArrayList<>();
         boolean read = plugin.getPersistenceCoordinator().tryRead(() -> {
             try {
-                entries.addAll(TransactionRecords.of(
-                        plugin.getProjectTransaction().committedTransactions(), kind, id));
+                entries.addAll(TransactionRecords.of(plugin.getProjectTransaction().committedTransactions()));
             } catch (IOException failure) {
                 Gloss.logExceptionStack(false, failure,
                         "History could not read the editor sync backups.");

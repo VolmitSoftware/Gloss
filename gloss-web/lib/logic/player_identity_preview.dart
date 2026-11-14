@@ -111,8 +111,21 @@ GlossNameplatePresentation? resolveNameplatePreview(
   return presentation;
 }
 
-String nametagPreviewText(GlossNametagPresentation presentation) =>
-    '${presentation.prefix}&r${glossTeamColors[presentation.color] ?? '&f'}{{ subject.name }}${presentation.suffix}&r';
+String _teamColor(GlossNametagPresentation presentation) =>
+    glossTeamColors[presentation.color] ?? '&f';
+
+/// The tag above the head. The client draws the prefix, the name and the
+/// suffix inside one component in the team colour, so an uncoloured prefix or
+/// suffix takes the team colour, and a prefix's formats stop at the name.
+String nametagPreviewText(GlossNametagPresentation presentation) {
+  final String color = _teamColor(presentation);
+  return '$color${presentation.prefix}&r$color{{ subject.name }}${presentation.suffix}&r';
+}
+
+/// The legacy display name nameplates show (`NametagService.formatName`): the
+/// prefix stands on its own, then the name in the team colour.
+String nametagDisplayNameText(GlossNametagPresentation presentation) =>
+    '${presentation.prefix}&r${_teamColor(presentation)}{{ subject.name }}${presentation.suffix}&r';
 
 String resolveIdentityPreviewName(
   Iterable<({String id, GlossNametagDoc doc})> documents,
@@ -134,7 +147,7 @@ String resolveIdentityPreviewName(
     }
   }
   if (presentation == null) return context.variable('subject.name') as String;
-  return renderGlossLine(nametagPreviewText(presentation),
+  return renderGlossLine(nametagDisplayNameText(presentation),
     animations: animations, emoji: emoji, nowMs: nowMs, richText: true,
     expressionSamples: GlossTextExpressionSamples(values: <String, Object>{
       for (final MapEntry<String, Object?> entry in context.variables.entries)

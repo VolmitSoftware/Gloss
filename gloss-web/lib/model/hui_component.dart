@@ -102,10 +102,13 @@ class HuiHitbox {
 
   bool get hasCustomSize => width != null && height != null;
 
+  /// True when the hitbox writes nothing, so the edits that drop a default
+  /// hitbox never drop the unknown keys it carries.
   bool get isDefault =>
       !hasCustomSize &&
       offset == Vec3.zero() &&
-      anchor == HuiHitboxAnchor.button;
+      anchor == HuiHitboxAnchor.button &&
+      extras.isEmpty;
 
   Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
     if (width != null) 'width': width,

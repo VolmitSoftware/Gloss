@@ -121,7 +121,7 @@ String _randomized(DocumentTypeAdapter type, int seed) {
     isTrue,
     reason: '${type.noun} seed $seed',
   );
-  return type.formattedJson(store);
+  return type.snapshot(store);
 }
 
 void _expectMenuBudget(HuiMenu menu, String reason) {
@@ -206,7 +206,7 @@ void main() {
           reason: '${type.noun} seed $seed',
         );
         final String reason = '${type.noun} seed $seed';
-        final String encoded = type.formattedJson(store);
+        final String encoded = type.snapshot(store);
         expect(
           utf8.encode(encoded).length,
           lessThanOrEqualTo(64 * 1024),

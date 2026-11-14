@@ -172,7 +172,6 @@ class HoloUiDataImporterTest {
         assertFalse(Files.exists(root.resolve("editor-sync-transactions/txn.json")));
         assertFalse(Files.exists(root.resolve("custom-items.json")));
         assertEquals(HoloUiImportDisposition.SKIPPED_SECRET, disposition(result, "settings.json:editorSyncCreateToken"));
-        assertEquals("", loader.loadForReload().editor.sync.createToken);
         assertFalse(Files.readString(root.resolve(GlossConfigLoader.FILE_NAME)).contains("synthetic-private-credential"));
         assertFalse(Files.readString(root.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)).contains("synthetic-private-credential"));
     }
@@ -188,11 +187,12 @@ class HoloUiDataImporterTest {
         assertFalse(prior.debug.hitbox);
         assertTrue(updated.debug.hitbox);
         assertTrue(updated.debug.position);
-        assertEquals("https://editor.example.com", updated.editor.builderUrl);
-        assertFalse(updated.editor.sync.enabled);
-        assertEquals(120, updated.editor.sync.sessionMinutes);
-        assertEquals(7, updated.editor.sync.pollSeconds);
-        assertEquals(16, updated.editor.sync.maxProjectMiB);
+        assertEquals("https://editor.example.com", updated.editor.editorUrl);
+        assertTrue(updated.editor.enabled);
+        assertTrue(result.entries().stream()
+            .noneMatch(entry -> entry.path().equals("settings.json:editorSyncPollSeconds")));
+        assertFalse(Files.readString(root.resolve(GlossConfigLoader.FILE_NAME)).contains("pollSeconds"));
+        assertEquals(16, updated.editor.maxProjectMiB);
         assertFalse(updated.features.previews);
         assertEquals(2.0D, updated.menus.uiScale);
         assertFalse(updated.items.customItems);

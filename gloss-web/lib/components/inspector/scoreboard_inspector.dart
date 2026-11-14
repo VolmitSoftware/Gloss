@@ -1,22 +1,40 @@
+/// Inspector body for a Gloss scoreboard document: which board a viewer
+/// gets, the default sidebar and its lines, the conditional variants that
+/// replace it, and in Advanced the layout and native objectives.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
 import 'package:jaspr/dom.dart' as dom;
 
+import '../../logic/gloss_show.dart';
 import '../../logic/gloss_text.dart';
 import '../../logic/validation.dart';
 import '../../model/model.dart';
 import '../../services/catalogs.dart';
 import '../../state/editor_store.dart';
-import '../common/common.dart';
+import '../../ui/badge.dart';
+import '../../ui/density.dart';
+import '../../ui/field.dart';
+import '../../ui/icon_button.dart';
+import '../../ui/mode.dart';
+import '../../ui/number_field.dart';
+import '../../ui/pane_header.dart';
+import '../../ui/reorder_list.dart';
+import '../../ui/section.dart';
+import '../../ui/switch_field.dart';
+import '../../ui/technical_input.dart';
+import '../../ui/toggle_choice.dart';
 import '../gloss/gloss_text_line.dart';
-import 'field_help.dart';
-import 'inspector_widgets.dart';
 import 'gloss_visibility_editor.dart';
-import '../../logic/gloss_show.dart';
 import 'line_list_section.dart';
 import 'scoreboard_advanced_editor.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
+
+typedef _PresentationEdit = void Function(
+  void Function(GlossScoreboardPresentation),
+);
+typedef _RowsEdit = void Function(void Function(List<GlossScoreboardLine>));
 
 class ScoreboardInspector extends StatefulWidget {
   const ScoreboardInspector({
@@ -39,73 +57,102 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
       .where((HuiIssue issue) => issue.path.startsWith(path))
       .toList();
 
+  /// Control size, read under the inspector's dense scope in [_build].
+  ComponentSize _size = ComponentSize.sm;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      DensityScope.dense(child: Builder(builder: _build));
+
+  Widget _build(BuildContext context) {
+    _size = controlSize(DensityScope.of(context));
     final GlossScoreboardDoc? doc = _store.scoreboardDoc;
     if (doc == null) return const dom.div(<Widget>[]);
-    return dom.div(classes: 'hui-inspector-body is-scoreboard', <Widget>[
-      _header(doc),
-      GlossVisibilityEditor(
-        raw: doc.extras['show'],
-        sectionKey: 'scoreboard.visibility',
-        issues: _store.issues
-            .where((HuiIssue issue) => issue.path == r'$.show')
-            .toList(),
-        onChanged: (Object? value) => _store.mutateScoreboard(
-          'visibility',
-          (GlossScoreboardDoc edited) => setGlossShow(edited.extras, value),
-        ),
-      ),
-      _selection(doc),
-      _presentation(
-        doc.presentation,
-        r'$.presentation',
-        huiText('Default presentation'),
-        (void Function(GlossScoreboardPresentation) mutate) =>
-            _store.mutateScoreboard(
-              'scoreboard default presentation',
-              (GlossScoreboardDoc edited) => mutate(edited.presentation),
+    void mutateDefault(void Function(GlossScoreboardPresentation) mutate) =>
+        _store.mutateScoreboard(
+          'scoreboard default presentation',
+          (GlossScoreboardDoc edited) => mutate(edited.presentation),
+        );
+    return DenseBox(
+      classes: 'hui-inspector-body is-scoreboard',
+      children: <Widget>[
+        PaneHeader(
+          kind: huiText('Scoreboard'),
+          title: _store.menuId,
+          tip: huiText(
+            'The highest-priority eligible board is selected per viewer; '
+            'its highest-priority matching variant supplies the complete sidebar.',
+          ),
+          status: AdvancedOnly(
+            child: StatusBadge(
+              huiText('revision {revision}', <String, Object?>{
+                'revision': doc.revision,
+              }),
             ),
-      ),
-      _variants(doc),
-      ScoreboardObjectivesEditor(
-        raw: doc.extras['objectives'],
-        onChanged: (Map<String, Object?> value) => _store.mutateScoreboard(
-          'scoreboard native objectives',
-          (GlossScoreboardDoc edited) => edited.extras['objectives'] = value,
+          ),
         ),
-      ),
-    ]);
+        GlossVisibilityEditor(
+          raw: doc.extras['show'],
+          sectionKey: 'scoreboard.visibility',
+          issues: _store.issues
+              .where((HuiIssue issue) => issue.path == r'$.show')
+              .toList(),
+          onChanged: (Object? value) => _store.mutateScoreboard(
+            'visibility',
+            (GlossScoreboardDoc edited) => setGlossShow(edited.extras, value),
+          ),
+        ),
+        _selection(doc),
+        AppSection(
+          title: huiText('Default presentation'),
+          memoryKey: 'scoreboard.presentation',
+          children: _presentationFields(
+            doc.presentation,
+            r'$.presentation',
+            mutateDefault,
+          ),
+        ),
+        _linesSection(
+          doc.presentation.lines,
+          r'$.presentation',
+          (void Function(List<GlossScoreboardLine>) change) =>
+              mutateDefault((GlossScoreboardPresentation edited) {
+                change(edited.lines);
+              }),
+        ),
+        AdvancedOnly(
+          child: ScoreboardLayoutEditor(
+            presentation: doc.presentation,
+            path: r'$.presentation',
+            mutate: mutateDefault,
+            rowsBuilder: _linesField,
+          ),
+        ),
+        _variants(doc),
+        AdvancedOnly(
+          child: ScoreboardObjectivesEditor(
+            raw: doc.extras['objectives'],
+            onChanged: (Map<String, Object?> value) => _store.mutateScoreboard(
+              'scoreboard native objectives',
+              (GlossScoreboardDoc edited) =>
+                  edited.extras['objectives'] = value,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _header(
-    GlossScoreboardDoc doc,
-  ) => dom.div(classes: 'hui-inspector-headgroup', <Widget>[
-    dom.div(classes: 'hui-inspector-header is-scoreboard', <Widget>[
-      HuiEyebrow(huiText('Scoreboard')),
-      dom.div(classes: 'hui-inspector-title-row', <Widget>[
-        dom.h2(classes: 'hui-inspector-title hui-ltr', <Widget>[
-          Text(_store.menuId),
-        ]),
-        const HuiFieldHelp('scoreboard.id'),
-      ]),
-    ]),
-    dom.p(classes: 'hui-inspector-lede', <Widget>[
-      Text(
-        huiText(
-          'The highest-priority eligible board is selected per viewer; '
-          'its highest-priority matching variant supplies the complete sidebar.',
-        ),
-      ),
-    ]),
-    HuiRevisionRow(revision: doc.revision),
-  ]);
-
-  Widget _selection(GlossScoreboardDoc doc) => InspectorSection(
+  Widget _selection(GlossScoreboardDoc doc) => AppSection(
     title: huiText('Board selection'),
+    memoryKey: 'scoreboard.selection',
+    tip: huiText(
+      'Highest priority wins; equal priorities use the smaller board id. '
+      'A condition error fails closed.',
+    ),
     children: <Widget>[
-      _integerField(
-        label: huiText('Priority'),
+      _priorityField(
+        id: 'scoreboard-priority',
         value: doc.select.priority,
         path: r'$.select.priority',
         onChanged: (int value) => _store.mutateScoreboard(
@@ -114,7 +161,7 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
         ),
       ),
       _conditionField(
-        label: huiText('When'),
+        id: 'scoreboard-when',
         value: doc.select.when,
         path: r'$.select.when',
         onChanged: (String value) => _store.mutateScoreboard(
@@ -122,24 +169,21 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
           (GlossScoreboardDoc edited) => edited.select.when = value,
         ),
       ),
-      HuiNote(
-        huiText(
-          'Highest priority wins; equal priorities use the smaller board id. '
-          'A condition error fails closed.',
-        ),
-      ),
     ],
   );
 
-  Widget _variants(GlossScoreboardDoc doc) => InspectorSection(
+  Widget _variants(GlossScoreboardDoc doc) => AppSection(
     title: huiText('Conditional variants'),
-    children: <Widget>[
-      for (int index = 0; index < doc.variants.length; index++)
-        _variant(doc, index),
-      Button(
-        variant: ButtonVariant.outline,
-        size: ButtonSize.sm,
-        icon: ArcaneIcon.plus(size: IconSize.sm),
+    memoryKey: 'scoreboard.variants',
+    count: doc.variants.length,
+    tip: huiText(
+      'Variants are complete presentations. Matching variants never merge; '
+      'the highest priority wins and the default is the fallback.',
+    ),
+    actions: <Widget>[
+      AppIconButton(
+        icon: ArcaneIcon.plus(),
+        label: huiText('Add variant'),
         onPressed: () => _store.mutateScoreboard(
           'add scoreboard variant',
           (GlossScoreboardDoc edited) => edited.variants.add(
@@ -150,103 +194,134 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
             ),
           ),
         ),
-        label: huiText('Add variant'),
       ),
-      HuiNote(
-        huiText(
-          'Variants are complete presentations. Matching variants never merge; '
-          'the highest priority wins and the default is the fallback.',
+    ],
+    children: <Widget>[
+      if (doc.variants.isEmpty)
+        ArcaneFieldDescription(
+          huiText('No variants. Every viewer sees the default presentation.'),
         ),
-      ),
+      for (int index = 0; index < doc.variants.length; index++)
+        _variant(doc, index),
     ],
   );
 
+  /// One variant: its heading carries the delete, its id and priority are
+  /// Advanced only, and its complete presentation follows as plain fields.
   Widget _variant(GlossScoreboardDoc doc, int index) {
     final GlossScoreboardVariant variant = doc.variants[index];
     final String path =
         r'$.variants['
         '$index]';
-    return dom.div(classes: 'hui-scoreboard-variant', <Widget>[
-      dom.div(classes: 'hui-inspector-title-row', <Widget>[
-        HuiEyebrow(
-          huiText('Variant {id}', <String, Object?>{
-            'id': variant.id.isEmpty ? index + 1 : variant.id,
-          }),
-        ),
-        HuiIconButton(
+    final String id = scoreboardDomId(path);
+    void mutate(void Function(GlossScoreboardPresentation) change) =>
+        _store.mutateScoreboard(
+          'scoreboard variant presentation',
+          (GlossScoreboardDoc edited) =>
+              change(edited.variants[index].presentation),
+        );
+    return AppSection(
+      title: huiText('Variant {id}', <String, Object?>{
+        'id': variant.id.isEmpty ? index + 1 : variant.id,
+      }),
+      classes: 'hui-scoreboard-variant',
+      actions: <Widget>[
+        AppIconButton(
+          icon: ArcaneIcon.trash2(),
           label: huiText('Delete variant'),
-          icon: ArcaneIcon.trash2(size: IconSize.sm),
           onPressed: () => _store.mutateScoreboard(
             'delete scoreboard variant',
             (GlossScoreboardDoc edited) => edited.variants.removeAt(index),
           ),
         ),
-      ]),
-      HuiField(
-        label: huiText('Id'),
-        control: dom.div(<Widget>[
-          TextInput(
-            value: variant.id,
-            size: ComponentSize.sm,
-            fullWidth: true,
-            onChanged: (String value) => _store.mutateScoreboard(
-              'scoreboard variant id',
-              (GlossScoreboardDoc edited) => edited.variants[index].id = value,
+      ],
+      children: <Widget>[
+        AdvancedOnly(
+          child: Field(
+            label: huiText('Id'),
+            forId: '$id-id',
+            problems: _issuesFor('$path.id'),
+            child: TextInput(
+              id: '$id-id',
+              value: variant.id,
+              size: _size,
+              fullWidth: true,
+              onChanged: (String value) => _store.mutateScoreboard(
+                'scoreboard variant id',
+                (GlossScoreboardDoc edited) =>
+                    edited.variants[index].id = value,
+              ),
+              styles: technicalInputStyles,
+              attributes: technicalInputAttributes,
             ),
-            styles: huiTechnicalInputStyles,
-            attributes: huiTechnicalInputAttributes,
           ),
-          HuiInlineIssues(_issuesFor('$path.id')),
-        ]),
-      ),
-      _integerField(
-        label: huiText('Priority'),
-        value: variant.priority,
-        path: '$path.priority',
-        onChanged: (int value) => _store.mutateScoreboard(
-          'scoreboard variant priority',
-          (GlossScoreboardDoc edited) =>
-              edited.variants[index].priority = value,
         ),
-      ),
-      _conditionField(
-        label: huiText('When'),
-        value: variant.when,
-        path: '$path.when',
-        onChanged: (String value) => _store.mutateScoreboard(
-          'scoreboard variant condition',
-          (GlossScoreboardDoc edited) => edited.variants[index].when = value,
-        ),
-      ),
-      _presentation(
-        variant.presentation,
-        '$path.presentation',
-        huiText('Variant presentation'),
-        (void Function(GlossScoreboardPresentation) mutate) =>
-            _store.mutateScoreboard(
-              'scoreboard variant presentation',
+        AdvancedOnly(
+          child: _priorityField(
+            id: '$id-priority',
+            value: variant.priority,
+            path: '$path.priority',
+            onChanged: (int value) => _store.mutateScoreboard(
+              'scoreboard variant priority',
               (GlossScoreboardDoc edited) =>
-                  mutate(edited.variants[index].presentation),
+                  edited.variants[index].priority = value,
             ),
-      ),
-    ]);
+          ),
+        ),
+        _conditionField(
+          id: '$id-when',
+          value: variant.when,
+          path: '$path.when',
+          onChanged: (String value) => _store.mutateScoreboard(
+            'scoreboard variant condition',
+            (GlossScoreboardDoc edited) => edited.variants[index].when = value,
+          ),
+        ),
+        ..._presentationFields(
+          variant.presentation,
+          '$path.presentation',
+          mutate,
+        ),
+        _linesField(
+          variant.presentation.lines,
+          '$path.presentation',
+          (void Function(List<GlossScoreboardLine>) change) =>
+              mutate((GlossScoreboardPresentation edited) {
+                change(edited.lines);
+              }),
+        ),
+        AdvancedOnly(
+          child: ScoreboardLayoutEditor(
+            presentation: variant.presentation,
+            path: '$path.presentation',
+            mutate: mutate,
+            rowsBuilder: _linesField,
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _presentation(
+  /// The title (with its rendered preview) and the score-number switch of
+  /// one presentation; its lines are drawn by the caller.
+  List<Widget> _presentationFields(
     GlossScoreboardPresentation presentation,
     String path,
-    String title,
-    void Function(void Function(GlossScoreboardPresentation)) mutate,
-  ) => InspectorSection(
-    title: title,
-    children: <Widget>[
-      HuiField(
+    _PresentationEdit mutate,
+  ) {
+    final String id = scoreboardDomId(path);
+    return <Widget>[
+      Field(
         label: huiText('Title'),
-        trailing: const HuiFieldHelp('scoreboard.presentation.title'),
-        control: dom.div(<Widget>[
+        forId: '$id-title',
+        docKey: 'scoreboard.presentation.title',
+        problems: _issuesFor('$path.title'),
+        // The same input-over-game-sample pair as a line row.
+        child: dom.div(classes: 'hui-line-row', <Widget>[
           TextInput(
+            id: '$id-title',
             value: presentation.title,
-            size: ComponentSize.sm,
+            size: _size,
             fullWidth: true,
             placeholder: huiText('&d&lGloss'),
             onChanged: (String value) =>
@@ -258,7 +333,7 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
               'spellcheck': 'false',
             },
           ),
-          dom.div(classes: 'hui-hologram-line-preview', <Widget>[
+          dom.div(classes: 'hui-line-row-preview', <Widget>[
             GlossTextLine(
               render: renderGlossScoreboardTitle(
                 presentation.title,
@@ -267,40 +342,29 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
               ),
             ),
           ]),
-          HuiInlineIssues(_issuesFor('$path.title')),
         ]),
       ),
-      HuiSwitchRow(
+      SwitchField(
+        id: '$id-hide-numbers',
         label: huiText('Hide score numbers'),
-        trailing: const HuiFieldHelp('scoreboard.presentation.hideNumbers'),
+        docKey: 'scoreboard.presentation.hideNumbers',
         value: presentation.hideNumbers,
         onChanged: (bool value) => mutate((GlossScoreboardPresentation edited) {
           edited.hideNumbers = value;
         }),
       ),
-      _rows(
-        presentation.lines,
-        path,
-        (void Function(List<GlossScoreboardLine>) change) => mutate(
-          (GlossScoreboardPresentation edited) => change(edited.lines),
-        ),
-      ),
-      ScoreboardLayoutEditor(
-        presentation: presentation,
-        path: path,
-        mutate: mutate,
-        rowsBuilder: _rows,
-      ),
-    ],
-  );
+    ];
+  }
 
-  Widget _rows(
+  /// The default presentation's lines: their own section in the pane.
+  Widget _linesSection(
     List<GlossScoreboardLine> rows,
     String path,
-    void Function(void Function(List<GlossScoreboardLine>)) mutate,
-  ) => HuiLineListSection(
+    _RowsEdit mutate,
+  ) => LineListSection(
     title: huiText('Lines'),
     docKey: 'scoreboard.presentation.lines',
+    sectionKey: 'scoreboard.lines',
     addLabel: huiText('Add line'),
     itemCount: rows.length,
     issues: _issuesFor('$path.lines'),
@@ -311,62 +375,94 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
     onReorder: (int from, int to) => mutate((List<GlossScoreboardLine> edited) {
       edited.insert(to, edited.removeAt(from));
     }),
-    itemBuilder: (int index) => _line(
-      rows[index],
-      index,
-      (void Function(GlossScoreboardLine) change) =>
-          mutate((List<GlossScoreboardLine> edited) => change(edited[index])),
-      () =>
-          mutate((List<GlossScoreboardLine> edited) => edited.removeAt(index)),
-    ),
+    itemBuilder: (int index) => _rowAt(rows, index, path, mutate),
   );
 
-  Widget _integerField({
-    required String label,
+  /// Lines inside an item (a variant, a reusable section, a page): one field
+  /// of that item, so the pane never nests a section in a section's item.
+  Widget _linesField(
+    List<GlossScoreboardLine> rows,
+    String path,
+    _RowsEdit mutate,
+  ) => Field(
+    label: huiText('Lines'),
+    docKey: 'scoreboard.presentation.lines',
+    problems: _issuesFor('$path.lines'),
+    trailing: AppIconButton(
+      icon: ArcaneIcon.plus(),
+      label: huiText('Add line'),
+      onPressed: () => mutate(
+        (List<GlossScoreboardLine> edited) => edited.add(GlossScoreboardLine()),
+      ),
+    ),
+    child: rows.isEmpty
+        ? ArcaneFieldDescription(
+            huiText('Add a line to put content under the title.'),
+          )
+        : ReorderList(
+            label: huiText('Lines'),
+            itemCount: rows.length,
+            onReorder: (int from, int to) =>
+                mutate((List<GlossScoreboardLine> edited) {
+                  edited.insert(to, edited.removeAt(from));
+                }),
+            itemBuilder: (int index) => _rowAt(rows, index, path, mutate),
+            inlineTools: true,
+          ),
+  );
+
+  Widget _rowAt(
+    List<GlossScoreboardLine> rows,
+    int index,
+    String path,
+    _RowsEdit mutate,
+  ) => _line(
+    rows[index],
+    index,
+    '${scoreboardDomId('$path.lines')}-$index',
+    (void Function(GlossScoreboardLine) change) =>
+        mutate((List<GlossScoreboardLine> edited) => change(edited[index])),
+    () => mutate((List<GlossScoreboardLine> edited) => edited.removeAt(index)),
+  );
+
+  Widget _priorityField({
+    required String id,
     required int value,
     required String path,
     required void Function(int) onChanged,
-  }) => HuiField(
-    label: label,
-    control: dom.div(<Widget>[
-      TextInput(
-        value: '$value',
-        size: ComponentSize.sm,
-        fullWidth: true,
-        onChanged: (String raw) {
-          final int? parsed = int.tryParse(raw);
-          if (parsed != null) onChanged(parsed);
-        },
-        styles: huiTechnicalInputStyles,
-        attributes: <String, String>{
-          ...huiTechnicalInputAttributes,
-          'inputmode': 'numeric',
-        },
-      ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
+  }) => Field(
+    label: huiText('Priority'),
+    forId: id,
+    problems: _issuesFor(path),
+    child: NumberField(
+      id: id,
+      value: value.toDouble(),
+      integer: true,
+      step: 1,
+      onChanged: (double next) => onChanged(next.round()),
+    ),
   );
 
   Widget _conditionField({
-    required String label,
+    required String id,
     required String value,
     required String path,
     required void Function(String) onChanged,
-  }) => HuiField(
-    label: label,
-    trailing: const HuiFieldHelp('condition.when'),
-    control: dom.div(<Widget>[
-      TextInput(
-        value: value,
-        size: ComponentSize.sm,
-        fullWidth: true,
-        placeholder: huiText("viewer.world == 'world'"),
-        onChanged: onChanged,
-        styles: huiTechnicalInputStyles,
-        attributes: huiTechnicalInputAttributes,
-      ),
-      HuiInlineIssues(_issuesFor(path)),
-    ]),
+  }) => Field(
+    label: huiText('When'),
+    forId: id,
+    docKey: 'condition.when',
+    problems: _issuesFor(path),
+    child: TextInput(
+      id: id,
+      value: value,
+      size: _size,
+      fullWidth: true,
+      placeholder: huiText("viewer.world == 'world'"),
+      onChanged: onChanged,
+      styles: technicalInputStyles,
+      attributes: technicalInputAttributes,
+    ),
   );
 
   String _nextVariantId(GlossScoreboardDoc doc) {
@@ -379,138 +475,174 @@ class _ScoreboardInspectorState extends State<ScoreboardInspector> {
     return id;
   }
 
+  /// One row: the text (or section name) with its preview, then in
+  /// Advanced the row's own keys in a closed "Row settings" group.
   Widget _line(
     GlossScoreboardLine line,
     int index,
+    String id,
     void Function(void Function(GlossScoreboardLine)) mutate,
     void Function() remove,
-  ) => dom.div(<Widget>[
-    HuiLineRow(
-      value: line.section ?? line.text,
-      placeholder: line.section == null
-          ? huiText('&fText or {{ expression }}')
-          : huiText('Section name'),
-      removeLabel: huiText('Delete line {number}', <String, Object?>{
-        'number': index + 1,
-      }),
-      onChanged: (String value) => mutate((GlossScoreboardLine edited) {
-        if (edited.section == null) {
-          edited.text = value;
-        } else {
-          edited.section = value;
-        }
-      }),
-      preview: line.section == null
-          ? GlossTextLine(
-              render: renderGlossScoreboardLine(
-                line.text,
-                animations: _store.workspaceAnimations,
-                emoji: _store.workspaceEmoji,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    spacing: 8,
+    children: <Widget>[
+      LineRow(
+        value: line.section ?? line.text,
+        placeholder: line.section == null
+            ? huiText('&fText or {{ expression }}')
+            : huiText('Section name'),
+        label: huiText('Line {number}', <String, Object?>{'number': index + 1}),
+        removeLabel: huiText('Delete line {number}', <String, Object?>{
+          'number': index + 1,
+        }),
+        onChanged: (String value) => mutate((GlossScoreboardLine edited) {
+          if (edited.section == null) {
+            edited.text = value;
+          } else {
+            edited.section = value;
+          }
+        }),
+        preview: line.section == null
+            ? GlossTextLine(
+                render: renderGlossScoreboardLine(
+                  line.text,
+                  animations: _store.workspaceAnimations,
+                  emoji: _store.workspaceEmoji,
+                ),
+              )
+            : Text(
+                huiText('Reusable section: {name}', <String, Object?>{
+                  'name': line.section,
+                }),
               ),
-            )
-          : Text(
-              huiText('Reusable section: {name}', <String, Object?>{
-                'name': line.section,
-              }),
-            ),
-      onRemove: remove,
-    ),
-    dom.details(<Widget>[
-      dom.summary(<Widget>[Text(huiText('Row settings'))]),
-      HuiField(
-        label: huiText('Row type'),
-        control: ArcaneSelect(
-          value: line.section == null ? 'text' : 'section',
-          options: <ArcaneSelectOption>[
-            ArcaneSelectOption(value: 'text', label: huiText('Text')),
-            ArcaneSelectOption(
-              value: 'section',
-              label: huiText('Section reference'),
-            ),
-          ],
-          onChanged: (String value) => mutate((GlossScoreboardLine edited) {
-            edited.section = value == 'section' ? '' : null;
-            if (value == 'section') {
-              edited.text = '';
-              edited.value = null;
-              edited.format = null;
-              edited.id = null;
-            }
-          }),
-        ),
+        onRemove: remove,
       ),
-      if (line.section == null) ...<Widget>[
-        _lineField(
-          'Row ID',
-          line.id ?? '',
-          index,
-          (String value) => mutate(
-            (GlossScoreboardLine edited) =>
-                edited.id = value.isEmpty ? null : value,
-          ),
-        ),
-        _lineField(
-          'Value',
-          line.value ?? '',
-          index,
-          (String value) => mutate(
-            (GlossScoreboardLine edited) =>
-                edited.value = value.isEmpty ? null : value,
-          ),
-        ),
-        HuiField(
-          label: huiText('Score format'),
-          control: ArcaneSelect(
-            value: line.format ?? '',
-            options: <ArcaneSelectOption>[
-              ArcaneSelectOption(value: '', label: huiText('Automatic')),
-              for (final String format in <String>[
-                'number',
-                'blank',
-                'fixed',
-                'styled',
-              ])
-                ArcaneSelectOption(value: format, label: format),
+      // The next line starts below the open settings, not against them.
+      AdvancedOnly(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: MoreFields(
+            label: huiText('Row settings'),
+            children: <Widget>[
+              Field(
+                label: huiText('Row type'),
+                child: ToggleChoice<String>(
+                  label: huiText('Row type'),
+                  value: line.section == null ? 'text' : 'section',
+                  options: <ChoiceOption<String>>[
+                    ChoiceOption<String>('text', huiText('Text')),
+                    ChoiceOption<String>(
+                      'section',
+                      huiText('Section reference'),
+                    ),
+                  ],
+                  onChanged: (String value) =>
+                      mutate((GlossScoreboardLine edited) {
+                        edited.section = value == 'section' ? '' : null;
+                        if (value == 'section') {
+                          edited.text = '';
+                          edited.value = null;
+                          edited.format = null;
+                          edited.id = null;
+                        }
+                      }),
+                ),
+              ),
+              if (line.section == null) ...<Widget>[
+                _rowText(
+                  id: '$id-id',
+                  label: huiText('Row ID'),
+                  value: line.id ?? '',
+                  onChanged: (String value) => mutate(
+                    (GlossScoreboardLine edited) =>
+                        edited.id = value.isEmpty ? null : value,
+                  ),
+                ),
+                _rowText(
+                  id: '$id-value',
+                  label: huiText('Value'),
+                  value: line.value ?? '',
+                  onChanged: (String value) => mutate(
+                    (GlossScoreboardLine edited) =>
+                        edited.value = value.isEmpty ? null : value,
+                  ),
+                ),
+                Field(
+                  label: huiText('Score format'),
+                  forId: '$id-format',
+                  child: ArcaneSelect(
+                    id: '$id-format',
+                    value: line.format ?? '',
+                    size: _size,
+                    fullWidth: true,
+                    options: <ArcaneSelectOption>[
+                      ArcaneSelectOption(
+                        value: '',
+                        label: huiText('Automatic'),
+                      ),
+                      ArcaneSelectOption(
+                        value: 'number',
+                        label: huiText('Number'),
+                      ),
+                      ArcaneSelectOption(
+                        value: 'blank',
+                        label: huiText('Blank'),
+                      ),
+                      ArcaneSelectOption(
+                        value: 'fixed',
+                        label: huiText('Fixed'),
+                      ),
+                      ArcaneSelectOption(
+                        value: 'styled',
+                        label: huiText('Styled'),
+                      ),
+                    ],
+                    onChanged: (String value) => mutate(
+                      (GlossScoreboardLine edited) =>
+                          edited.format = value.isEmpty ? null : value,
+                    ),
+                  ),
+                ),
+              ],
+              _rowText(
+                id: '$id-show',
+                label: huiText('Show condition'),
+                value: line.show.toString(),
+                onChanged: (String value) => mutate(
+                  (GlossScoreboardLine edited) =>
+                      edited.show = value.isEmpty || value == 'true'
+                      ? true
+                      : value == 'false'
+                      ? false
+                      : value,
+                ),
+              ),
             ],
-            onChanged: (String value) => mutate(
-              (GlossScoreboardLine edited) =>
-                  edited.format = value.isEmpty ? null : value,
-            ),
           ),
         ),
-      ],
-      _lineField(
-        'Show condition',
-        line.show.toString(),
-        index,
-        (String value) => mutate(
-          (GlossScoreboardLine edited) =>
-              edited.show = value.isEmpty || value == 'true'
-              ? true
-              : value == 'false'
-              ? false
-              : value,
-        ),
       ),
-    ]),
-  ]);
+    ],
+  );
 
-  Widget _lineField(
-    String label,
-    String value,
-    int index,
-    void Function(String) onChanged,
-  ) => HuiField(
-    label: huiText(label),
-    control: TextInput(
+  /// A row key: ids, values and conditions are all code, so left to right.
+  Widget _rowText({
+    required String id,
+    required String label,
+    required String value,
+    required void Function(String) onChanged,
+  }) => Field(
+    label: label,
+    forId: id,
+    child: TextInput(
+      id: id,
       value: value,
-      size: ComponentSize.sm,
+      size: _size,
       fullWidth: true,
       onChanged: onChanged,
-      attributes: <String, String>{
-        'aria-label': '${huiText(label)} ${index + 1}',
-        'spellcheck': 'false',
-      },
+      styles: technicalInputStyles,
+      attributes: technicalInputAttributes,
     ),
   );
 }

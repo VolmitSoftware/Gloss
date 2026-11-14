@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "source": {
+    "type": "statistic",
+    "statistic": "PLAY_ONE_MINUTE"
+  },
+  "size": 10,
+  "order": "desc",
+  "reset": "monthly",
+  "includeOffline": true,
+  "format": {
+    "value": "{{ fixed(value / 72000, 1) }}h",
+    "name": "{{ name }}"
+  },
+  "sample": {
+    "playersPerTick": 8
+  }
+}

@@ -4,11 +4,9 @@ import com.google.gson.JsonObject;
 
 import java.util.Objects;
 
-record EditorSyncPublication(long revision, String baseRevision, JsonObject snapshot) {
+/** A merged workspace project to validate, and the base revision it was merged onto. */
+record EditorSyncPublication(String baseRevision, JsonObject snapshot) {
   EditorSyncPublication {
-    if (revision < 1L) {
-      throw new IllegalArgumentException("publication revision must be positive");
-    }
     if (baseRevision == null || baseRevision.isBlank()) {
       throw new IllegalArgumentException("publication baseRevision must not be blank");
     }

@@ -186,6 +186,8 @@ void main() {
     addTearDown(store.dispose);
     store.importJson('advanced.json', _fixture);
     final Object? original = jsonDecode(store.exportJson());
+    final Map<String, dynamic> presentation = store.scoreboardDoc!.presentation
+        .toJson();
     store.mutateScoreboard('advanced settings', (GlossScoreboardDoc doc) {
       final GlossScoreboardLayout layout = GlossScoreboardLayout.fromJson(
         doc.variants.single.presentation.extras['layout'],
@@ -207,10 +209,8 @@ void main() {
     });
     final Object? edited = jsonDecode(store.exportJson());
     expect(edited, isNot(original));
-    expect(
-      store.scoreboardDoc!.presentation.toJson(),
-      (original as Map)['presentation'],
-    );
+    expect(store.scoreboardDoc!.presentation.toJson(), presentation);
+    expect((edited! as Map)['presentation'], (original! as Map)['presentation']);
     expect(store.performUndo(), isTrue);
     expect(jsonDecode(store.exportJson()), original);
     expect(store.performRedo(), isTrue);

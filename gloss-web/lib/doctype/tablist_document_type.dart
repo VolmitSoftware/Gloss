@@ -25,8 +25,6 @@ final class TablistDocumentType extends GlossDocumentTypeAdapter {
   @override
   String get noun => huiText('tablist');
 
-  @override
-  String get createLabel => huiText('New tablist');
 
   @override
   String get pluralLabel => huiText('Tab lists');

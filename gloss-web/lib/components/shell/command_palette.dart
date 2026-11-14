@@ -1,22 +1,17 @@
-/// Cmd/Ctrl+K command palette.
-///
-/// Hand-built rather than `ArcaneCommand`: that component's renderer wires no
-/// Dart callbacks at all (items only get `data-arcane-action` strings for href
-/// navigation and closing), so `CommandItem.onSelect` never fires and every
-/// editor command would be dead. The shape below deliberately mirrors the
-/// framework component — groups, headings, shortcut chips, keyword search — so
-/// it can be swapped back if the renderer gains callback support.
+/// Search (Mod+K): every command the editor can run now, and every document,
+/// on shadcn's command palette. Each keystroke filters here over the
+/// command's label, keywords and group ([paletteMatches]); the first row is
+/// highlighted on open and after each search, as in cmdk; Enter or a click
+/// runs the highlighted row and closes.
 library;
 
 import 'package:arcane_jaspr/arcane_jaspr.dart';
-import 'package:arcane_jaspr/core/dom_value.dart';
-import 'package:jaspr/dom.dart' as dom;
-import 'package:jaspr/jaspr.dart' show EventCallback;
 import 'package:web/web.dart' as web;
 
-import '../common/class_names.dart';
 import 'shell_actions.dart';
+import 'palette_filter.dart';
 import 'shell_keys.dart';
+
 import 'package:gloss_editor/l10n/hui_localizations.dart';
 
 class ShellCommandPalette extends StatefulWidget {
@@ -30,7 +25,7 @@ class ShellCommandPalette extends StatefulWidget {
   final List<ShellAction> actions;
   final void Function() onClose;
 
-  /// Renders shortcut chips with Apple glyphs.
+  /// Shortcut hints with Apple glyphs.
   final bool apple;
 
   @override
@@ -38,197 +33,84 @@ class ShellCommandPalette extends StatefulWidget {
 }
 
 class _ShellCommandPaletteState extends State<ShellCommandPalette> {
-  static const String _inputId = 'hui-cmd-input';
+  static const String _id = 'hui-command-palette';
 
   String _query = '';
-  int _index = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    // The `autofocus` attribute is not enough. The palette is inserted long
-    // after the document loaded, and whatever opened it — an Arcane button
-    // whose feedback script `preventDefault`s mousedown, or the runtime's own
-    // hidden ⌘K trigger — leaves focus on `body`. Measured with autofocus
-    // alone: typing went nowhere, arrows did not move the selection and
-    // Escape did not close, because every one of those is a keydown handler
-    // on this input.
-    context.binding.addPostFrameCallback(() {
-      final web.Element? input = web.document.getElementById(_inputId);
-      (input as web.HTMLElement?)?.focus();
-    });
-  }
+  /// The search the first row was last highlighted for.
+  String? _highlighted;
 
-  List<ShellAction> get _matches {
-    final List<ShellAction> enabled = component.actions
-        .where((ShellAction action) => action.enabled)
-        .toList();
-    final String query = _query.trim().toLowerCase();
-    if (query.isEmpty) return enabled;
-    final List<String> terms = query.split(RegExp(r'\s+'));
-    return enabled.where((ShellAction action) {
-      final String haystack = action.haystack;
-      return terms.every(haystack.contains);
-    }).toList();
-  }
-
-  void _move(int delta) {
-    final int count = _matches.length;
-    if (count == 0) return;
-    setState(() {
-      _index = (_index + delta) % count;
-      if (_index < 0) _index += count;
-    });
-  }
-
-  void _run(ShellAction action) {
-    component.onClose();
-    action.run();
-  }
-
-  void _runSelected() {
-    final List<ShellAction> matches = _matches;
-    if (matches.isEmpty) return;
-    _run(matches[_index.clamp(0, matches.length - 1)]);
-  }
-
-  void _onKeyDown(Object? event) {
-    switch (domEventKey(event)) {
-      case 'ArrowDown':
-        domPreventDefault(event);
-        domStopPropagation(event);
-        _move(1);
-      case 'ArrowUp':
-        domPreventDefault(event);
-        domStopPropagation(event);
-        _move(-1);
-      case 'Enter':
-        domPreventDefault(event);
-        domStopPropagation(event);
-        _runSelected();
-      case 'Escape':
-        domPreventDefault(event);
-        domStopPropagation(event);
-        component.onClose();
-      case 'Tab':
-        domPreventDefault(event);
+  /// Marks the first row active the way the runtime's arrow keys do, so the
+  /// highlight, Enter and the arrows start from it.
+  void _highlightFirst() {
+    final web.NodeList rows = web.document.querySelectorAll(
+      '[data-arcane-command="$_id"] [role="option"]:not([aria-disabled="true"])',
+    );
+    for (int index = 0; index < rows.length; index++) {
+      final web.Element row = rows.item(index)! as web.Element;
+      row.setAttribute('data-arcane-state', index == 0 ? 'active' : 'visible');
+      row.setAttribute('aria-selected', '${index == 0}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<ShellAction> matches = _matches;
-    final int selected = matches.isEmpty
-        ? -1
-        : _index.clamp(0, matches.length - 1);
-    return dom.div(
-      classes: 'hui-cmd-scrim',
-      events: dom.events<Null>(onClick: component.onClose),
-      <Widget>[
-        dom.div(
-          classes: 'hui-cmd-dialog',
-          attributes: <String, String>{
-            'role': 'dialog',
-            'aria-modal': 'true',
-            'aria-label': huiText('Command palette'),
-          },
-          events: <String, EventCallback>{
-            'click': (Object? event) => domStopPropagation(event),
-          },
-          <Widget>[_searchRow(), _list(matches, selected), _footer()],
-        ),
-      ],
-    );
-  }
-
-  Widget _searchRow() => dom.div(classes: 'hui-cmd-search', <Widget>[
-    ArcaneIcon.search(size: IconSize.sm),
-    dom.input<String>(
-      type: dom.InputType.text,
-      id: _inputId,
-      classes: 'hui-cmd-input',
-      attributes: <String, String>{
-        'placeholder': huiText('Search commands'),
-        'aria-label': huiText('Search commands'),
-        'autofocus': '',
-        'autocomplete': 'off',
-        'spellcheck': 'false',
-      },
-      onInput: (String value) => setState(() {
-        _query = value;
-        _index = 0;
-      }),
-      events: <String, EventCallback>{'keydown': _onKeyDown},
-    ),
-    ArcaneKbd.combo(
-      shortcutKeys('Esc', apple: component.apple),
-      size: ComponentSize.sm,
-    ),
-  ]);
-
-  Widget _list(List<ShellAction> matches, int selected) {
-    if (matches.isEmpty) {
-      return dom.div(classes: 'hui-cmd-list', <Widget>[
-        dom.p(classes: 'hui-cmd-empty', <Widget>[
-          Text(
-            huiText("No commands match \"{trim}\".", <String, Object?>{
-              'trim': _query.trim(),
-            }),
-          ),
-        ]),
-      ]);
-    }
-    final List<Widget> rows = <Widget>[];
+    final List<String> terms = paletteTerms(_query);
+    final List<CommandGroup> groups = <CommandGroup>[];
     String? group;
-    for (int i = 0; i < matches.length; i++) {
-      final ShellAction action = matches[i];
+    final bool touch = web.window.matchMedia('(pointer: coarse)').matches;
+    for (final ShellAction action in component.actions) {
+      if (!action.enabled) continue;
+      if (!paletteMatches(
+        '${action.haystack} ${shellGroupLabel(action.group)}',
+        terms,
+      )) {
+        continue;
+      }
+      final CommandItem item = CommandItem(
+        label: action.label,
+        icon: action.icon,
+        // A touch screen has no keys to show.
+        shortcut: action.shortcut == null || touch
+            ? null
+            : shortcutLabel(action.shortcut!, apple: component.apple),
+        keywords: <String>[...action.keywords, shellGroupLabel(action.group)],
+        onSelect: () {
+          component.onClose();
+          action.run();
+        },
+      );
       if (action.group != group) {
         group = action.group;
-        rows.add(
-          dom.div(classes: 'hui-cmd-heading', <Widget>[
-            Text(shellGroupLabel(group)),
-          ]),
-        );
-      }
-      rows.add(_row(action, i == selected));
-    }
-    return dom.div(
-      classes: 'hui-cmd-list',
-      attributes: const <String, String>{'role': 'listbox'},
-      rows,
-    );
-  }
-
-  Widget _row(ShellAction action, bool active) {
-    final String? shortcut = action.shortcut;
-    return dom.div(
-      classes: classNames(<String?>[
-        'hui-cmd-item',
-        active ? 'is-active' : null,
-      ]),
-      attributes: <String, String>{
-        'role': 'option',
-        'aria-selected': active ? 'true' : 'false',
-        'tabindex': '-1',
-      },
-      events: dom.events<Null>(onClick: () => _run(action)),
-      <Widget>[
-        dom.span(classes: 'hui-cmd-icon', <Widget>[
-          if (action.icon != null) action.icon!,
-        ]),
-        dom.span(classes: 'hui-cmd-label', <Widget>[Text(action.label)]),
-        if (shortcut != null)
-          ArcaneKbd.combo(
-            shortcutKeys(shortcut, apple: component.apple),
-            size: ComponentSize.sm,
+        groups.add(
+          CommandGroup(
+            heading: shellGroupLabel(action.group),
+            items: <CommandItem>[item],
           ),
-      ],
+        );
+      } else {
+        groups.last.items.add(item);
+      }
+    }
+    if (_highlighted != _query) {
+      _highlighted = _query;
+      context.binding.addPostFrameCallback(_highlightFirst);
+    }
+    return ArcaneCommand(
+      id: _id,
+      isOpen: true,
+      animate: false,
+      // The search row at the regular control height, like the dialogs.
+      compact: true,
+      // Stock shadcn: the dialog ends at the list, with no row of key names
+      // (which a touch screen has no keys for).
+      keyHints: false,
+      externalFilter: true,
+      onSearch: (String query) => setState(() => _query = query),
+      placeholder: huiText('Search commands and documents'),
+      emptyMessage: huiText('No matches'),
+      groups: groups,
+      onClose: component.onClose,
     );
   }
-
-  Widget _footer() => dom.div(classes: 'hui-cmd-footer', <Widget>[
-    dom.span(<Widget>[Text(huiText('Up / Down to browse'))]),
-    dom.span(<Widget>[Text(huiText('Enter to run'))]),
-    dom.span(<Widget>[Text(huiText('Esc to close'))]),
-  ]);
 }

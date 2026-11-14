@@ -1,0 +1,86 @@
+{
+  "description": "Relay frame fixtures, read by gloss-web/sync-relay tests. path is relative to schema/editor/fixtures; valid says whether the relay must accept the frame on the side that sends it.",
+  "schemaVersion": 1,
+  "messages": [
+    {
+      "path": "relay/relay-request.0.json",
+      "definition": "relay-request",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-response.0.json",
+      "definition": "relay-response",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-event.0.json",
+      "definition": "relay-event",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-close.0.json",
+      "definition": "relay-close",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-challenge.0.json",
+      "definition": "relay-challenge",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-register.0.json",
+      "definition": "relay-register",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-registered.0.json",
+      "definition": "relay-registered",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-subscribe.0.json",
+      "definition": "relay-subscribe",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-subscribed.0.json",
+      "definition": "relay-subscribed",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-status.0.json",
+      "definition": "relay-status",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-error.0.json",
+      "definition": "relay-error",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-response.1.json",
+      "definition": "relay-response",
+      "valid": true
+    },
+    {
+      "path": "relay/relay-request.1.json",
+      "definition": "relay-request",
+      "valid": true
+    },
+    {
+      "path": "relay/invalid/relay-event.0.json",
+      "definition": "relay-event",
+      "valid": false
+    },
+    {
+      "path": "relay/invalid/relay-request.0.json",
+      "definition": "relay-request",
+      "valid": false
+    },
+    {
+      "path": "relay/invalid/relay-register.0.json",
+      "definition": "relay-register",
+      "valid": false
+    }
+  ]
+}
