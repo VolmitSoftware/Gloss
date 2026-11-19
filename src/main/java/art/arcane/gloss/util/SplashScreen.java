@@ -58,31 +58,9 @@ public final class SplashScreen {
 
         StringBuilder splash = new StringBuilder("\n");
         for (int row = 0; row < ART.length; row++) {
-            splash.append(colorize(ART[row], fill, edge)).append(column[row]).append('\n');
+            splash.append(SplashScreenSupport.colorizeArt(ART[row], fill.toString(), edge.toString())).append(column[row]).append('\n');
         }
 
         Gloss.log(Level.INFO, splash.toString());
-    }
-
-    private static String colorize(String row, ChatColor fill, ChatColor edge) {
-        StringBuilder out = new StringBuilder(row.length() * 2);
-        boolean inFill = false;
-        boolean inEdge = false;
-        for (int i = 0; i < row.length(); i++) {
-            char glyph = row.charAt(i);
-            if (glyph == '█') {
-                if (!inFill) {
-                    out.append(fill);
-                    inFill = true;
-                    inEdge = false;
-                }
-            } else if (glyph != ' ' && !inEdge) {
-                out.append(edge);
-                inEdge = true;
-                inFill = false;
-            }
-            out.append(glyph);
-        }
-        return out.toString();
     }
 }
