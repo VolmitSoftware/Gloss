@@ -1,5 +1,6 @@
 package art.arcane.gloss.editor;
 
+import art.arcane.volmlib.util.editor.EditorRefusal;
 import com.google.gson.JsonObject;
 
 import java.util.Objects;
@@ -16,6 +17,8 @@ public final class EditorError extends Exception {
     COUNTER_REPLAYED("counter-replayed", 409),
     CONFIRM_DELETES("confirm-deletes", 428),
     PAIRING_INVALID("pairing-invalid", 401),
+    PAIRING_USED("pairing-used", 401),
+    PAIRING_REVOKED("pairing-revoked", 401),
     PAIRING_EXPIRED("pairing-expired", 410),
     NOT_FOUND("not-found", 404),
     INVALID_REQUEST("invalid-request", 400),
@@ -58,6 +61,16 @@ public final class EditorError extends Exception {
     this.code = Objects.requireNonNull(code);
     this.retryAfterMillis = retryAfterMillis;
     this.extra = extra == null ? null : extra.deepCopy();
+  }
+
+  /** The same refusal from the shared editor link, which uses a subset of these codes. */
+  public static EditorError of(EditorRefusal refusal) {
+    for (Code code : Code.values()) {
+      if (code.wireName().equals(refusal.code().wireName())) {
+        return new EditorError(code, refusal.getMessage(), refusal.retryAfterMillis(), refusal.extra());
+      }
+    }
+    throw new IllegalArgumentException("no Gloss error code " + refusal.code().wireName());
   }
 
   public Code code() {

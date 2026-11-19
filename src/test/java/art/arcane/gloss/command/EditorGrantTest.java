@@ -1,7 +1,7 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.editor.EditorScope;
-import art.arcane.gloss.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.EditorTokens;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -18,7 +18,7 @@ class EditorGrantTest {
 
   @Test
   void blankOptionsTakeTheDefaults() {
-    EditorTokens.Grant grant = CommandGlossEditor.grant(PLAYER, false, "", "", "", "", 7);
+    EditorTokens.Grant<EditorScope> grant = CommandGlossEditor.grant(PLAYER, false, "", "", "", "", 7);
 
     assertEquals(EditorScope.DEFAULT_PAIRING, grant.scopes());
     assertEquals(List.of(), grant.folders());
@@ -27,7 +27,7 @@ class EditorGrantTest {
 
   @Test
   void keyedOptionsNarrowTheGrant() {
-    EditorTokens.Grant grant = CommandGlossEditor.grant(PLAYER, false, " laptop ", "read,publish:world",
+    EditorTokens.Grant<EditorScope> grant = CommandGlossEditor.grant(PLAYER, false, " laptop ", "read,publish:world",
         "shop, lobby/hall", "12h", 7);
 
     assertEquals("laptop", grant.label());
@@ -55,7 +55,7 @@ class EditorGrantTest {
 
   @Test
   void theConsoleMayPairPublishCommands() {
-    EditorTokens.Grant grant = CommandGlossEditor.grant(Optional.empty(), true, "", "read,publish:commands", "", "", 7);
+    EditorTokens.Grant<EditorScope> grant = CommandGlossEditor.grant(Optional.empty(), true, "", "read,publish:commands", "", "", 7);
 
     assertTrue(grant.scopes().contains(EditorScope.PUBLISH_COMMANDS));
     assertEquals("7d", CommandGlossEditor.describe(Duration.ofDays(7)));

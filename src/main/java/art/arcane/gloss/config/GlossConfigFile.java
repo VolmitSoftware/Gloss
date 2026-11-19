@@ -2,6 +2,7 @@ package art.arcane.gloss.config;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.editor.EditorSettings;
+import art.arcane.volmlib.util.editor.EditorAddresses;
 import art.arcane.gloss.util.common.PacketTeamAllocator;
 import java.util.HashMap;
 import art.arcane.gloss.condition.ShowCondition;
@@ -1204,7 +1205,7 @@ public final class GlossConfigFile {
             if (value.isBlank()) {
                 continue;
             }
-            Optional<InetAddress> address = EditorSettings.literal(value);
+            Optional<InetAddress> address = EditorAddresses.literal(value);
             if (address.isEmpty()) {
                 Gloss.log(Level.WARNING, "editor.trustedProxies entry " + value.strip()
                     + " is not an IP address; it is ignored.");

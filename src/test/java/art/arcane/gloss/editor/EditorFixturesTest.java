@@ -2,6 +2,8 @@ package art.arcane.gloss.editor;
 
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.editor.sync.EditorWorkspaceFixtures;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.PairingCode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -76,11 +78,11 @@ class EditorFixturesTest {
     Files.write(data.resolve("images/shop/coin.png"), EditorWorkspaceFixtures.png(1));
     try (EditorTestServer server = new EditorTestServer(data)) {
       messages.put("hello-response", server.get("/v1/hello", null).body());
-      EditorTokens.Grant grant = new EditorTokens.Grant("laptop", Optional.empty(), EditorScope.DEFAULT_PAIRING,
+      EditorTokens.Grant<EditorScope> grant = new EditorTokens.Grant<>("laptop", Optional.empty(), EditorScope.DEFAULT_PAIRING,
           List.of("shop"), Duration.ofDays(7));
       String link = server.service.pair(grant).link();
       String encoded = link.substring(link.indexOf("#/pair/") + 7);
-      PairingCode code = PairingCode.decode(encoded);
+      PairingCode code = PairingCode.decode(EditorLink.PRODUCT, encoded);
       JsonObject pairing = new JsonObject();
       pairing.addProperty("link", link);
       pairing.addProperty("code", encoded);

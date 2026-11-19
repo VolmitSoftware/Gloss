@@ -1,10 +1,10 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.editor.EditorLink;
 import art.arcane.gloss.editor.EditorPermissions;
 import art.arcane.gloss.editor.EditorScope;
 import art.arcane.gloss.editor.EditorService;
-import art.arcane.gloss.editor.EditorTokens;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.collection.KList;
@@ -13,6 +13,7 @@ import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.director.exceptions.DirectorParsingException;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
+import art.arcane.volmlib.util.editor.EditorTokens;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.TextKey;
 import org.bukkit.command.CommandSender;
@@ -56,7 +57,7 @@ public final class CommandGlossEditor {
     if (editor == null) {
       return;
     }
-    EditorTokens.Grant grant;
+    EditorTokens.Grant<EditorScope> grant;
     try {
       grant = grant(sender instanceof Player player ? Optional.of(player.getUniqueId()) : Optional.empty(),
           sender.hasPermission(EditorPermissions.COMMANDS) || !(sender instanceof Player), label, scopes, folders,
@@ -130,14 +131,14 @@ public final class CommandGlossEditor {
     if (editor == null || editor.api().isEmpty()) {
       return;
     }
-    List<EditorTokens.Token> tokens = editor.api().get().parts().tokens().list();
+    List<EditorTokens.Token<EditorScope>> tokens = editor.api().get().parts().tokens().list();
     if (tokens.isEmpty()) {
       send(sender, GlossMessages.EDITOR_TOKENS_EMPTY, MessageArgs.empty());
       return;
     }
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
     List<String> entries = new ArrayList<>();
-    for (EditorTokens.Token token : tokens) {
+    for (EditorTokens.Token<EditorScope> token : tokens) {
       String details = (token.label().isEmpty() ? "" : "\"" + token.label() + "\" | ")
           + String.join(" ", token.scopes().stream().map(EditorScope::wireName).toList())
           + (token.folders().isEmpty() ? "" : " | folders " + String.join(",", token.folders()))
@@ -177,7 +178,7 @@ public final class CommandGlossEditor {
   }
 
   /** Reads the pairing options; a blank option keeps its default. */
-  static EditorTokens.Grant grant(Optional<UUID> admin, boolean mayRunCommands, String label, String scopes,
+  static EditorTokens.Grant<EditorScope> grant(Optional<UUID> admin, boolean mayRunCommands, String label, String scopes,
                                   String folders, String expires, int tokenDays) {
     List<EditorScope> granted = EditorScope.DEFAULT_PAIRING;
     if (!scopes.isBlank()) {
@@ -201,13 +202,13 @@ public final class CommandGlossEditor {
     List<String> limited = Arrays.stream(folders.split(",")).map(String::strip)
         .filter((String folder) -> !folder.isEmpty()).distinct().toList();
     for (String folder : limited) {
-      if (!EditorTokens.validFolder(folder)) {
+      if (!EditorLink.validFolder(folder)) {
         throw new IllegalArgumentException("folders take folder names such as shop or shop/sub; " + folder
             + " is not one");
       }
     }
     Duration lifetime = expires.isBlank() ? Duration.ofDays(tokenDays) : duration(expires.strip());
-    return new EditorTokens.Grant(label.strip(), admin, granted, limited, lifetime);
+    return new EditorTokens.Grant<>(label.strip(), admin, granted, limited, lifetime);
   }
 
   static Duration duration(String text) {
@@ -305,7 +306,7 @@ public final class CommandGlossEditor {
       Gloss plugin = Gloss.instance;
       if (plugin != null && plugin.getEditorService() != null && plugin.getEditorService().api().isPresent()) {
         plugin.getEditorService().api().get().parts().tokens().list()
-            .forEach((EditorTokens.Token token) -> options.add(token.id()));
+            .forEach((EditorTokens.Token<EditorScope> token) -> options.add(token.id()));
       }
       return options;
     }

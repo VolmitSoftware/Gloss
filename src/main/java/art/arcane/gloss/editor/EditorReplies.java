@@ -1,12 +1,10 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import java.net.Inet6Address;
-import java.net.InetAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -16,7 +14,7 @@ import java.util.Optional;
 /** Error bodies with retry hints, header merging, the query string and the caller's address. */
 public final class EditorReplies {
   /** Set by the direct listener from the socket; any copy a client sends is dropped first. */
-  public static final String PEER_HEADER = "X-Gloss-Peer";
+  public static final String PEER_HEADER = EditorLink.PRODUCT.peerHeader();
 
   private EditorReplies() {
   }
@@ -82,23 +80,5 @@ public final class EditorReplies {
         ? request.header(PEER_HEADER).orElse("unknown")
         : request.header("X-Forwarded-For").map((String list) -> list.split(",")[0].strip()).orElse("relay");
     return EditorNotices.printable(value.length() > 64 ? value.substring(0, 64) : value);
-  }
-
-  /** What rate windows and connection counts key an address by; anything but an IP literal stays as it is. */
-  static String addressKey(String address) {
-    return EditorSettings.literal(address).map(EditorReplies::addressKey).orElse(address);
-  }
-
-  /** An IPv4 address itself, an IPv6 address by its /64, since one host can usually use any address in it. */
-  static String addressKey(InetAddress address) {
-    if (!(address instanceof Inet6Address)) {
-      return address.getHostAddress();
-    }
-    byte[] bytes = address.getAddress();
-    StringBuilder prefix = new StringBuilder();
-    for (int index = 0; index < 8; index += 2) {
-      prefix.append(Integer.toHexString(((bytes[index] & 0xff) << 8) | (bytes[index + 1] & 0xff))).append(':');
-    }
-    return prefix.append(":/64").toString();
   }
 }

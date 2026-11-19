@@ -1,9 +1,11 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.transport.EditorEventSink;
-import art.arcane.gloss.editor.transport.EditorEventStream;
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.PairingCode;
+import art.arcane.volmlib.util.editor.transport.EditorEventSink;
+import art.arcane.volmlib.util.editor.transport.EditorEventStream;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.AfterEach;
@@ -91,7 +93,7 @@ class EditorRefusalsTest {
 
   @Test
   void refusedOriginsTellThePlayerWhoMadeTheLinkOnceAMinute() throws Exception {
-    server.link(new EditorTokens.Grant("", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING, List.of(),
+    server.link(new EditorTokens.Grant<>("", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING, List.of(),
         Duration.ofDays(7)));
     for (int index = 0; index < 3; index++) {
       server.send(HttpRequest.newBuilder(URI.create(server.base() + "/v1/hello"))

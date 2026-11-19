@@ -1,5 +1,6 @@
 package art.arcane.gloss.editor;
 
+import art.arcane.volmlib.util.editor.EditorTokens;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,14 +38,14 @@ final class EditorNotices {
     return admin.map(host::playerName).orElse("Console");
   }
 
-  void paired(EditorTokens.Token token) {
+  void paired(EditorTokens.Token<EditorScope> token) {
     String line = who(token.admin()) + "'s editor paired as " + name(token.id(), token.label())
         + token.client().map((String client) -> " from " + client).orElse("");
     host.log("Editor " + line);
     host.notice(token.admin(), line);
   }
 
-  void published(EditorTokens.Token token, String message) {
+  void published(EditorTokens.Token<EditorScope> token, String message) {
     host.log("Web editor publish by " + name(token.id(), token.label()) + ": " + message);
     host.notice(Optional.empty(), who(token.admin()) + "'s editor: " + message);
   }
@@ -54,7 +55,7 @@ final class EditorNotices {
   }
 
   /** Tells the player who made a link, in game, that a browser could not use it. */
-  void refused(EditorTokens.Open pairing, String why) {
+  void refused(EditorTokens.Open<EditorScope> pairing, String why) {
     host.notice(pairing.grant().admin(), who(pairing.grant().admin()) + "'s editor could not pair: " + why);
   }
 }

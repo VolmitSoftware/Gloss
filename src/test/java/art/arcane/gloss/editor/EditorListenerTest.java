@@ -1,10 +1,12 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.transport.EditorEventSink;
-import art.arcane.gloss.editor.transport.EditorEventStream;
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorRequestHandler;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.EditorListener;
+import art.arcane.volmlib.util.editor.PairingCode;
+import art.arcane.volmlib.util.editor.transport.EditorEventSink;
+import art.arcane.volmlib.util.editor.transport.EditorEventStream;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorRequestHandler;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -70,6 +72,34 @@ class EditorListenerTest {
       }
 
       assertEquals("rate-limited", pairFrom(server, "203.0.113.6").code());
+    }
+  }
+
+  @Test
+  void aBodyThatRepeatsAKeyIsRefusedAsInvalid() throws Exception {
+    try (EditorTestServer server = new EditorTestServer(data)) {
+      EditorTestServer.Answer repeated = pairWith(server, "{\"tokenId\":\"tok_aaaaaaaaaaaa\",\"tokenId\":\"tok_bbbbbbbbbbbb\","
+          + "\"secret\":\"" + "A".repeat(43) + "\"}");
+
+      assertEquals("400 invalid-request", repeated.status() + " " + repeated.code());
+    }
+  }
+
+  @Test
+  void aBodyInLenientJsonIsRefusedAsInvalid() throws Exception {
+    String secret = "A".repeat(43);
+    List<String> bodies = List.of(
+        "{tokenId:\"tok_aaaaaaaaaaaa\",secret:\"" + secret + "\"}",
+        "{'tokenId':'tok_aaaaaaaaaaaa','secret':'" + secret + "'}",
+        "{\"tokenId\":\"tok_aaaaaaaaaaaa\",/* note */\"secret\":\"" + secret + "\"}");
+    try (EditorTestServer server = new EditorTestServer(data)) {
+      List<String> answers = new ArrayList<>();
+      for (String body : bodies) {
+        EditorTestServer.Answer answer = pairWith(server, body);
+        answers.add(answer.status() + " " + answer.code());
+      }
+
+      assertEquals(List.of("400 invalid-request", "400 invalid-request", "400 invalid-request"), answers);
     }
   }
 
@@ -160,7 +190,7 @@ class EditorListenerTest {
 
   @Test
   void theAuthFrameMustArriveWithinItsDeadlineHoweverOftenTheBrowserPings() throws Exception {
-    EditorListener listener = new EditorListener(settings("127.0.0.1", List.of(), "", "", 8), data, HELLO,
+    EditorListener listener = new EditorListener(EditorLink.PRODUCT, EditorLink.listener(settings("127.0.0.1", List.of(), "", "", 8)), data, HELLO,
         (String line) -> { });
     listener.start();
     try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), listener.port())) {
@@ -195,8 +225,8 @@ class EditorListenerTest {
 
   private EditorListener tlsListener(int connections) throws Exception {
     certificate();
-    EditorListener listener = new EditorListener(settings("127.0.0.1", List.of(), "cert.pem", "key.pem", connections),
-        data, HELLO, (String line) -> { });
+    EditorListener listener = new EditorListener(EditorLink.PRODUCT,
+        EditorLink.listener(settings("127.0.0.1", List.of(), "cert.pem", "key.pem", connections)), data, HELLO, (String line) -> { });
     listener.start();
     return listener;
   }
@@ -245,6 +275,12 @@ class EditorListenerTest {
     return server.send(HttpRequest.newBuilder(URI.create(server.base() + "/v1/pair"))
         .POST(HttpRequest.BodyPublishers.ofString(body.toString())).header("Origin", EditorTestServer.ORIGIN)
         .header("Content-Type", "application/json").header("X-Forwarded-For", client).build());
+  }
+
+  private static EditorTestServer.Answer pairWith(EditorTestServer server, String body) throws Exception {
+    return server.send(HttpRequest.newBuilder(URI.create(server.base() + "/v1/pair"))
+        .POST(HttpRequest.BodyPublishers.ofString(body)).header("Origin", EditorTestServer.ORIGIN)
+        .header("Content-Type", "application/json").build());
   }
 
   /** When the peer closes the socket: the end of its stream or a reset. */

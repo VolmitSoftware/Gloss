@@ -105,11 +105,16 @@ final class FakeRelay implements AutoCloseable {
 
   /** Waits for the connection and sends one text frame. */
   void send(JsonObject frame) throws Exception {
+    send(frame.toString());
+  }
+
+  /** Waits for the connection and sends one text frame as written, which need not be valid JSON. */
+  void send(String text) throws Exception {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     while (output == null && System.nanoTime() < deadline) {
       Thread.sleep(10L);
     }
-    byte[] payload = frame.toString().getBytes(StandardCharsets.UTF_8);
+    byte[] payload = text.getBytes(StandardCharsets.UTF_8);
     ByteArrayOutputStream encoded = new ByteArrayOutputStream();
     encoded.write(0x81);
     if (payload.length < 126) {

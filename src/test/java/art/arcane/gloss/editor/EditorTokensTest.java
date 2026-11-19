@@ -1,6 +1,8 @@
 package art.arcane.gloss.editor;
 
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
+import art.arcane.volmlib.util.editor.EditorRefusal;
+import art.arcane.volmlib.util.editor.EditorTokens;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
@@ -33,25 +35,25 @@ class EditorTokensTest {
 
   private final List<String> warnings = new CopyOnWriteArrayList<>();
 
-  private EditorTokens tokens() throws IOException {
-    return new EditorTokens(data, clock, warnings::add);
+  private EditorTokens<EditorScope> tokens() throws IOException {
+    return EditorLink.tokens(data, clock, warnings::add);
   }
 
-  private EditorTokens.Grant grant(List<String> folders, Duration lifetime) {
-    return new EditorTokens.Grant("laptop", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING, folders, lifetime);
+  private EditorTokens.Grant<EditorScope> grant(List<String> folders, Duration lifetime) {
+    return new EditorTokens.Grant<>("laptop", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING, folders, lifetime);
   }
 
   @Test
   void aSecretIsGoodOnceAndOnlyTheHashIsStored() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
 
-    Map.Entry<String, EditorTokens.Token> issued = tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.of("Firefox"));
-    EditorError again = assertThrows(EditorError.class,
+    Map.Entry<String, EditorTokens.Token<EditorScope>> issued = tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.of("Firefox"));
+    EditorRefusal again = assertThrows(EditorRefusal.class,
         () -> tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty()));
-    String stored = Files.readString(data.resolve(EditorTokens.PATH));
+    String stored = Files.readString(data.resolve(EditorLink.TOKENS_PATH));
 
-    assertEquals(EditorError.Code.PAIRING_INVALID, again.code());
+    assertEquals(EditorRefusal.Code.PAIRING_USED, again.code());
     assertTrue(issued.getKey().startsWith("gls_" + pairing.tokenId() + "."));
     assertFalse(stored.contains(issued.getKey()));
     assertFalse(stored.contains(pairing.secret()));
@@ -60,72 +62,72 @@ class EditorTokensTest {
 
   @Test
   void aWrongSecretIsUnknownAndALateOneExpired() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
 
-    EditorError wrong = assertThrows(EditorError.class,
+    EditorRefusal wrong = assertThrows(EditorRefusal.class,
         () -> tokens.exchange(pairing.tokenId(), "A".repeat(43), Optional.empty()));
     clock.advance(EditorTokens.PAIRING_LIFETIME.plusSeconds(1));
-    EditorError late = assertThrows(EditorError.class,
+    EditorRefusal late = assertThrows(EditorRefusal.class,
         () -> tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty()));
 
-    assertEquals(EditorError.Code.PAIRING_INVALID, wrong.code());
-    assertEquals(EditorError.Code.PAIRING_EXPIRED, late.code());
+    assertEquals(EditorRefusal.Code.PAIRING_INVALID, wrong.code());
+    assertEquals(EditorRefusal.Code.PAIRING_EXPIRED, late.code());
   }
 
   @Test
   void expirySlidesWithUseAndEndsAfterALifetimeUnused() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofHours(12)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofHours(12)));
     String bearer = tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty()).getKey();
 
     clock.advance(Duration.ofHours(11));
-    EditorTokens.Token used = tokens.authenticate(bearer);
+    EditorTokens.Token<EditorScope> used = tokens.authenticate(bearer);
     clock.advance(Duration.ofHours(11));
     tokens.authenticate(bearer);
     clock.advance(Duration.ofHours(13));
-    EditorError expired = assertThrows(EditorError.class, () -> tokens.authenticate(bearer));
+    EditorRefusal expired = assertThrows(EditorRefusal.class, () -> tokens.authenticate(bearer));
 
     assertEquals(clock.instant().minus(Duration.ofHours(13)).minus(Duration.ofHours(11)).plus(Duration.ofHours(12)),
         used.expires());
-    assertEquals(EditorError.Code.TOKEN_EXPIRED, expired.code());
+    assertEquals(EditorRefusal.Code.TOKEN_EXPIRED, expired.code());
     assertEquals(List.of(pairing.tokenId()), tokens.expire());
-    assertEquals(EditorError.Code.TOKEN_EXPIRED,
-        assertThrows(EditorError.class, () -> tokens().authenticate(bearer)).code());
+    assertEquals(EditorRefusal.Code.TOKEN_EXPIRED,
+        assertThrows(EditorRefusal.class, () -> tokens().authenticate(bearer)).code());
   }
 
   @Test
   void revokedTokensAndLinksAreRefusedAndTheStoreSurvivesARestart() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing kept = tokens.pair(grant(List.of("shop"), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> kept = tokens.pair(grant(List.of("shop"), Duration.ofDays(7)));
     String keptBearer = tokens.exchange(kept.tokenId(), kept.secret(), Optional.empty()).getKey();
-    EditorTokens.Pairing gone = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens.Pairing<EditorScope> gone = tokens.pair(grant(List.of(), Duration.ofDays(7)));
     String goneBearer = tokens.exchange(gone.tokenId(), gone.secret(), Optional.empty()).getKey();
-    EditorTokens.Pairing link = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens.Pairing<EditorScope> link = tokens.pair(grant(List.of(), Duration.ofDays(7)));
 
     assertEquals(List.of(gone.tokenId()), tokens.revoke(gone.tokenId()));
     assertEquals(List.of(link.tokenId()), tokens.revoke(link.tokenId()));
-    EditorTokens reloaded = tokens();
+    EditorTokens<EditorScope> reloaded = tokens();
 
-    assertEquals(EditorError.Code.TOKEN_REVOKED,
-        assertThrows(EditorError.class, () -> reloaded.authenticate(goneBearer)).code());
+    assertEquals(EditorRefusal.Code.TOKEN_REVOKED,
+        assertThrows(EditorRefusal.class, () -> reloaded.authenticate(goneBearer)).code());
     assertEquals(List.of("shop"), reloaded.authenticate(keptBearer).folders());
     assertTrue(reloaded.openPairings().isEmpty());
   }
 
   @Test
   void aDamagedStoreIsMovedAsideAndTheEditorStartsWithNoTokens() throws Exception {
-    Path store = data.resolve(EditorTokens.PATH);
+    Path store = data.resolve(EditorLink.TOKENS_PATH);
     Files.createDirectories(store.getParent());
     String torn = "{\"schemaVersion\":1,\"tokens\":[{\"id\":\"tok_";
     Files.writeString(store, torn);
 
-    EditorTokens tokens = tokens();
+    EditorTokens<EditorScope> tokens = tokens();
     List<Path> aside;
     try (Stream<Path> files = Files.list(store.getParent())) {
       aside = files.filter((Path file) -> file.getFileName().toString().startsWith("tokens.damaged-")).toList();
     }
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
     tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty());
 
     assertEquals(1, aside.size());
@@ -137,42 +139,42 @@ class EditorTokensTest {
 
   @Test
   void aRevokeThatCannotBeSavedHoldsAndIsSavedOnceTheFolderTakesWritesAgain() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
     String bearer = tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty()).getKey();
-    Path folder = data.resolve(EditorTokens.PATH).getParent();
+    Path folder = data.resolve(EditorLink.TOKENS_PATH).getParent();
     Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("r-xr-xr-x"));
     try {
       assumeFalse(Files.isWritable(folder), "this user writes into read-only folders");
       assertThrows(IOException.class, () -> tokens.revoke(pairing.tokenId()));
-      assertEquals(EditorError.Code.TOKEN_REVOKED,
-          assertThrows(EditorError.class, () -> tokens.authenticate(bearer)).code());
+      assertEquals(EditorRefusal.Code.TOKEN_REVOKED,
+          assertThrows(EditorRefusal.class, () -> tokens.authenticate(bearer)).code());
     } finally {
       Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
     }
 
     tokens.expire();
 
-    assertEquals(EditorError.Code.TOKEN_REVOKED,
-        assertThrows(EditorError.class, () -> tokens().authenticate(bearer)).code());
+    assertEquals(EditorRefusal.Code.TOKEN_REVOKED,
+        assertThrows(EditorRefusal.class, () -> tokens().authenticate(bearer)).code());
   }
 
   @Test
   void aShortLifetimeSavesItsSlidExpiry() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofMinutes(20)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofMinutes(20)));
     String bearer = tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty()).getKey();
 
     clock.advance(Duration.ofMinutes(6));
-    EditorTokens.Token used = tokens.authenticate(bearer);
+    EditorTokens.Token<EditorScope> used = tokens.authenticate(bearer);
 
     assertEquals(used.expires(), tokens().find(pairing.tokenId()).orElseThrow().expires());
   }
 
   @Test
   void steadyUseSavesTheSlidExpiryAtLeastHourly() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
     String bearer = tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty()).getKey();
 
     for (int use = 0; use < 6; use++) {
@@ -186,22 +188,22 @@ class EditorTokensTest {
 
   @Test
   void countersOnlyGoUp() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
     tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty());
 
     tokens.advance(pairing.tokenId(), 3L);
-    EditorError replayed = assertThrows(EditorError.class, () -> tokens.advance(pairing.tokenId(), 3L));
+    EditorRefusal replayed = assertThrows(EditorRefusal.class, () -> tokens.advance(pairing.tokenId(), 3L));
 
-    assertEquals(EditorError.Code.COUNTER_REPLAYED, replayed.code());
+    assertEquals(EditorRefusal.Code.COUNTER_REPLAYED, replayed.code());
     assertEquals(3L, replayed.extra().get("counter").getAsLong());
     assertEquals(3L, tokens().find(pairing.tokenId()).orElseThrow().counter());
   }
 
   @Test
   void droppingPublishCommandsKeepsTheRest() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(new EditorTokens.Grant("", Optional.empty(),
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(new EditorTokens.Grant<>("", Optional.empty(),
         List.of(EditorScope.READ, EditorScope.PUBLISH_COMMANDS), List.of(), Duration.ofDays(7)));
     tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty());
 
@@ -211,10 +213,10 @@ class EditorTokensTest {
 
   @Test
   void foldersReachThemselvesAndWhatIsInsideOnly() {
-    EditorTokens.Token token = new EditorTokens.Token("tok_x", "h", "", Optional.empty(), List.of(EditorScope.READ),
+    EditorTokens.Token<EditorScope> token = new EditorTokens.Token<>("tok_x", "h", "", Optional.empty(), List.of(EditorScope.READ),
         List.of("shop"), clock.instant(), clock.instant(), Duration.ofDays(1), Optional.empty(), 0L, Optional.empty(),
         clock.instant());
-    EditorTokens.Token open = new EditorTokens.Token("tok_y", "h", "", Optional.empty(), List.of(EditorScope.READ),
+    EditorTokens.Token<EditorScope> open = new EditorTokens.Token<>("tok_y", "h", "", Optional.empty(), List.of(EditorScope.READ),
         List.of(), clock.instant(), clock.instant(), Duration.ofDays(1), Optional.empty(), 0L, Optional.empty(),
         clock.instant());
 
@@ -223,14 +225,14 @@ class EditorTokensTest {
     assertFalse(token.reaches("shopping"));
     assertFalse(token.reaches(""));
     assertTrue(open.reaches(""));
-    assertFalse(EditorTokens.validFolder("Shop"));
-    assertFalse(EditorTokens.validFolder("shop/"));
-    assertTrue(EditorTokens.validFolder("shop/sub-2"));
+    assertFalse(EditorLink.validFolder("Shop"));
+    assertFalse(EditorLink.validFolder("shop/"));
+    assertTrue(EditorLink.validFolder("shop/sub-2"));
   }
 
   @Test
   void theWaitingLinkAndTokenLimitsAreEnforced() throws Exception {
-    EditorTokens tokens = tokens();
+    EditorTokens<EditorScope> tokens = tokens();
     for (int index = 0; index < EditorTokens.MAXIMUM_PAIRINGS; index++) {
       tokens.pair(grant(List.of(), Duration.ofDays(7)));
     }
@@ -242,11 +244,11 @@ class EditorTokensTest {
 
   @Test
   void theStoreIsReadableJson() throws Exception {
-    EditorTokens tokens = tokens();
-    EditorTokens.Pairing pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
+    EditorTokens<EditorScope> tokens = tokens();
+    EditorTokens.Pairing<EditorScope> pairing = tokens.pair(grant(List.of(), Duration.ofDays(7)));
     tokens.exchange(pairing.tokenId(), pairing.secret(), Optional.empty());
 
-    JsonObject stored = JsonParser.parseString(Files.readString(data.resolve(EditorTokens.PATH))).getAsJsonObject();
+    JsonObject stored = JsonParser.parseString(Files.readString(data.resolve(EditorLink.TOKENS_PATH))).getAsJsonObject();
 
     assertEquals(1, stored.getAsJsonArray("tokens").size());
     assertEquals(604800L, stored.getAsJsonArray("tokens").get(0).getAsJsonObject().get("lifetimeSeconds").getAsLong());

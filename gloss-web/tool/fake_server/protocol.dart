@@ -41,6 +41,8 @@ const int maxWaitingLinks = 64;
 /// HTTP status of every error code in contract section 13.
 const Map<String, int> errorStatuses = <String, int>{
   'pairing-invalid': 401,
+  'pairing-used': 401,
+  'pairing-revoked': 401,
   'pairing-expired': 410,
   'origin-not-allowed': 403,
   'server-offline': 503,

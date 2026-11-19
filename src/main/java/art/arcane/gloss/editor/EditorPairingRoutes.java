@@ -1,7 +1,10 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.EditorRefusal;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.PairingRate;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -12,7 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -20,15 +22,14 @@ import java.util.regex.Pattern;
  * failed pairing tells the console and the player who made the link.
  */
 final class EditorPairingRoutes {
-  private static final int PAIR_WINDOW_ADDRESSES = 4096;
-  private static final String SHARED_PAIR_WINDOW = "";
   private static final Pattern TOKEN_ID = Pattern.compile("tok_[A-Za-z0-9_-]{8,60}");
   private static final Pattern SECRET = Pattern.compile("[A-Za-z0-9_-]{43}");
   private final EditorApi api;
-  private final Map<String, long[]> pairWindows = new ConcurrentHashMap<>();
+  private final PairingRate rate;
 
   EditorPairingRoutes(EditorApi api) {
     this.api = api;
+    this.rate = new PairingRate(api.parts().clock(), () -> api.parts().settings().pairAttemptsPerMinute());
   }
 
   JsonObject hello() {
@@ -70,25 +71,31 @@ final class EditorPairingRoutes {
       client = clientValue.getAsString().isBlank() ? Optional.empty()
           : Optional.of(EditorNotices.printable(clientValue.getAsString().strip()));
     }
-    Optional<EditorTokens.Open> waiting = parts.tokens().pairing(tokenId);
-    Map.Entry<String, EditorTokens.Token> issued;
+    Optional<EditorTokens.Open<EditorScope>> waiting = parts.tokens().pairing(tokenId);
+    Map.Entry<String, EditorTokens.Token<EditorScope>> issued;
     try {
       issued = parts.tokens().exchange(tokenId, secret, client);
     } catch (IOException failure) {
       throw new EditorError(EditorError.Code.INTERNAL, "The token store could not be written.");
-    } catch (EditorError refused) {
+    } catch (EditorRefusal refusal) {
+      EditorError refused = EditorError.of(refusal);
       String address = EditorReplies.address(request);
       if (refused.code() == EditorError.Code.PAIRING_EXPIRED) {
         parts.warnings().once("pair " + tokenId, Duration.ofHours(1), "Editor pairing " + tokenId
             + " failed: the link expired before it was opened; run /gloss editor pair again");
-        waiting.ifPresent((EditorTokens.Open open) -> parts.notices().refused(open, "the link expired; make a new one"));
+        waiting.ifPresent((EditorTokens.Open<EditorScope> open) -> parts.notices().refused(open, "the link expired; make a new one"));
       } else {
+        String why = switch (refused.code()) {
+          case PAIRING_USED -> "the link was already used";
+          case PAIRING_REVOKED -> "the link was revoked";
+          default -> "the link is unknown";
+        };
         parts.warnings().once("pair unknown " + address, Duration.ofMinutes(1), "Editor pairing from " + address
-            + " failed: the link is unknown, used or revoked");
+            + " failed: " + why);
       }
       throw refused;
     }
-    EditorTokens.Token token = issued.getValue();
+    EditorTokens.Token<EditorScope> token = issued.getValue();
     parts.notices().paired(token);
     JsonObject response = new JsonObject();
     response.addProperty("token", issued.getKey());
@@ -110,71 +117,24 @@ final class EditorPairingRoutes {
 
   /** Counts a pairing attempt against the address's window and refuses it past {@code pairAttemptsPerMinute}. */
   void rate(String address) throws EditorError {
-    long[] window = window(address, true);
-    synchronized (window) {
-      if (++window[1] > api.parts().settings().pairAttemptsPerMinute()) {
-        throw limited();
-      }
+    try {
+      rate.pairing(address);
+    } catch (EditorRefusal refused) {
+      throw EditorError.of(refused);
     }
   }
 
   /** Refuses an event stream from an address whose window is used up, before its token is checked. */
   void guard(String address) throws EditorError {
-    long[] window = window(address, false);
-    if (window == null) {
-      return;
-    }
-    synchronized (window) {
-      if (window[1] >= api.parts().settings().pairAttemptsPerMinute()) {
-        throw limited();
-      }
+    try {
+      rate.guard(address);
+    } catch (EditorRefusal refused) {
+      throw EditorError.of(refused);
     }
   }
 
   /** Counts an event stream whose token was refused against the address's window. */
   void failed(String address) {
-    long[] window = window(address, false);
-    if (window == null) {
-      return;
-    }
-    synchronized (window) {
-      window[1]++;
-    }
-  }
-
-  /**
-   * This minute's window of the address, IPv6 by its /64. Past {@link #PAIR_WINDOW_ADDRESSES} addresses a new one
-   * shares one window when {@code shared} allows; event streams never do, so pairing floods cannot lock them out.
-   */
-  private long[] window(String address, boolean shared) {
-    String key = EditorReplies.addressKey(address);
-    long minute = api.parts().clock().millis() / 60_000L;
-    long[] window = pairWindows.get(key);
-    if (window == null) {
-      if (pairWindows.size() >= PAIR_WINDOW_ADDRESSES) {
-        pairWindows.entrySet().removeIf((Map.Entry<String, long[]> entry) -> entry.getValue()[0] != minute);
-      }
-      if (pairWindows.size() >= PAIR_WINDOW_ADDRESSES) {
-        if (!shared) {
-          return null;
-        }
-        key = SHARED_PAIR_WINDOW;
-      }
-      window = pairWindows.computeIfAbsent(key, (String unused) -> new long[] {minute, 0L});
-    }
-    synchronized (window) {
-      if (window[0] != minute) {
-        window[0] = minute;
-        window[1] = 0L;
-      }
-    }
-    return window;
-  }
-
-  /** Attempts count per clock minute, so the wait is what is left of this one; the message states it. */
-  private EditorError limited() {
-    long wait = 60_000L - api.parts().clock().millis() % 60_000L;
-    return new EditorError(EditorError.Code.RATE_LIMITED, "Too many pairing attempts from this address. Try again in "
-        + (wait + 999L) / 1000L + " s.", wait, null);
+    rate.failed(address);
   }
 }

@@ -1,7 +1,8 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.relay.EditorRelayClient;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
+import art.arcane.volmlib.util.editor.EditorListener;
+import art.arcane.volmlib.util.editor.EditorTokens;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -56,7 +57,7 @@ class EditorEndpointsTableTest {
     JsonObject limits = table.getAsJsonObject("limits");
     JsonObject relay = table.getAsJsonObject("relay");
 
-    assertEquals(PairingCode.PREFIX, pairing.get("prefix").getAsString());
+    assertEquals(EditorLink.PRODUCT.pairingPrefix(), pairing.get("prefix").getAsString());
     assertEquals(EditorTokens.PAIRING_LIFETIME.toMinutes(), pairing.get("secretMinutes").getAsLong());
     assertEquals(EditorSettings.DEFAULT.tokenDays(), pairing.get("defaultTokenDays").getAsInt());
     assertEquals(EditorTokens.MAXIMUM_PAIRINGS, pairing.get("maximumWaitingLinks").getAsInt());
@@ -80,11 +81,11 @@ class EditorEndpointsTableTest {
     assertEquals(EditorEvents.QUEUE_LIMIT, limits.get("eventQueueFrames").getAsInt());
     assertEquals(EditorListener.CONNECTIONS_PER_ADDRESS, limits.get("connectionsPerAddress").getAsInt());
     assertEquals(EditorPublishRoutes.IDEMPOTENCY.toHours(), limits.get("idempotencyHours").getAsLong());
-    assertEquals(EditorRelayClient.CHALLENGE_PREFIX, relay.get("challengePrefix").getAsString());
-    assertEquals(EditorRelayClient.PROOF_PREFIX, relay.get("proofPrefix").getAsString());
+    assertEquals(EditorLink.PRODUCT.relayChallengePrefix(), relay.get("challengePrefix").getAsString());
+    assertEquals(EditorLink.PRODUCT.proofPrefix(), relay.get("proofPrefix").getAsString());
     assertEquals(EditorSettings.DEFAULT.relayFrameBytes(), relay.get("frameBytes").getAsInt());
     assertEquals(EditorApi.PROTOCOL, table.get("protocol").getAsInt());
-    assertEquals(EditorListener.BASE, table.get("basePath").getAsString());
+    assertEquals(EditorLink.PRODUCT.basePath(), table.get("basePath").getAsString());
     assertEquals(EditorApi.COUNTER_HEADER, table.getAsJsonObject("headers").get("counter").getAsString());
   }
 

@@ -1,5 +1,7 @@
 package art.arcane.gloss.editor;
 
+import art.arcane.volmlib.util.editor.EditorIdentity;
+import art.arcane.volmlib.util.editor.PairingCode;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
@@ -31,13 +33,13 @@ class PairingCodeTest {
   @Test
   void aCodeRoundTripsWithItsFieldsInOrder() {
     EditorIdentity identity = EditorIdentity.generate();
-    PairingCode code = new PairingCode(Optional.of("http://127.0.0.1:9799"), Optional.of("wss://relay.example.com"),
+    PairingCode code = new PairingCode(EditorLink.PRODUCT, Optional.of("http://127.0.0.1:9799"), Optional.of("wss://relay.example.com"),
         identity.fingerprint(), identity.serverKey(), "tok_Ab3dEf6hIj9kLm2n", "A".repeat(43),
         Instant.parse("2026-11-13T10:10:00Z"), Optional.of("laptop"), Optional.of("Twin Peaks"),
         List.of("read", "publish:world"), List.of("shop"));
 
     String encoded = code.encode();
-    PairingCode decoded = PairingCode.decode(encoded);
+    PairingCode decoded = PairingCode.decode(EditorLink.PRODUCT, encoded);
 
     assertTrue(encoded.startsWith("GLS1."));
     assertEquals(code, decoded);
@@ -51,25 +53,40 @@ class PairingCodeTest {
     EditorIdentity identity = EditorIdentity.generate();
     EditorIdentity other = EditorIdentity.generate();
 
-    assertThrows(IllegalArgumentException.class, () -> new PairingCode(Optional.of("http://example.com:9799"),
+    assertThrows(IllegalArgumentException.class, () -> new PairingCode(EditorLink.PRODUCT, Optional.of("http://example.com:9799"),
         Optional.empty(), identity.fingerprint(), identity.serverKey(), "tok_Ab3dEf6hIj9kLm2n", "A".repeat(43),
         Instant.now(), Optional.empty(), Optional.empty(), List.of("read"), List.of()));
-    assertThrows(IllegalArgumentException.class, () -> new PairingCode(Optional.empty(), Optional.of("ws://example.com"),
+    assertThrows(IllegalArgumentException.class, () -> new PairingCode(EditorLink.PRODUCT, Optional.empty(), Optional.of("ws://example.com"),
         identity.fingerprint(), identity.serverKey(), "tok_Ab3dEf6hIj9kLm2n", "A".repeat(43), Instant.now(),
         Optional.empty(), Optional.empty(), List.of("read"), List.of()));
-    assertThrows(IllegalArgumentException.class, () -> new PairingCode(Optional.of("https://example.com"),
+    assertThrows(IllegalArgumentException.class, () -> new PairingCode(EditorLink.PRODUCT, Optional.of("https://example.com"),
         Optional.empty(), other.fingerprint(), identity.serverKey(), "tok_Ab3dEf6hIj9kLm2n", "A".repeat(43),
         Instant.now(), Optional.empty(), Optional.empty(), List.of("read"), List.of()));
-    assertThrows(IllegalArgumentException.class, () -> PairingCode.decode("ANM1.e30"));
+    assertThrows(IllegalArgumentException.class, () -> PairingCode.decode(EditorLink.PRODUCT, "ANM1.e30"));
+  }
+
+  @Test
+  void aCodeWhosePayloadRepeatsAKeyIsRefused() {
+    EditorIdentity identity = EditorIdentity.generate();
+    String encoded = new PairingCode(EditorLink.PRODUCT, Optional.of("http://127.0.0.1:9799"), Optional.empty(), identity.fingerprint(),
+        identity.serverKey(), "tok_Ab3dEf6hIj9kLm2n", "A".repeat(43), Instant.parse("2026-11-13T10:10:00Z"),
+        Optional.empty(), Optional.empty(), List.of("read"), List.of()).encode();
+    String payload = new String(Base64.getUrlDecoder().decode(encoded.substring(EditorLink.PRODUCT.pairingPrefix().length())),
+        StandardCharsets.UTF_8);
+    String repeated = "{\"tokenId\":\"tok_Zz9yXw8vUt7sRq6p\"," + payload.substring(1);
+    String code = EditorLink.PRODUCT.pairingPrefix() + Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(repeated.getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(IllegalArgumentException.class, () -> PairingCode.decode(EditorLink.PRODUCT, code));
   }
 
   @Test
   void theIdentityPersistsAndADamagedFileNamesTheFix() throws Exception {
-    EditorIdentity created = EditorIdentity.loadOrCreate(data);
-    EditorIdentity loaded = EditorIdentity.loadOrCreate(data);
-    Files.writeString(data.resolve(EditorIdentity.RELATIVE_PATH), "{\"v\":1}");
+    EditorIdentity created = EditorLink.identity(data);
+    EditorIdentity loaded = EditorLink.identity(data);
+    Files.writeString(data.resolve(EditorLink.IDENTITY_PATH), "{\"v\":1}");
 
-    java.io.IOException damaged = assertThrows(java.io.IOException.class, () -> EditorIdentity.loadOrCreate(data));
+    java.io.IOException damaged = assertThrows(java.io.IOException.class, () -> EditorLink.identity(data));
 
     assertEquals(created.fingerprint(), loaded.fingerprint());
     assertTrue(damaged.getMessage().startsWith("editor/identity.json is damaged"));
@@ -89,7 +106,7 @@ class PairingCodeTest {
     assertEquals(golden.get("serverKey").getAsString(), identity.serverKey());
     assertEquals(golden.get("fingerprint").getAsString(), identity.fingerprint());
     assertEquals(golden.get("signature").getAsString(),
-        identity.sign(art.arcane.gloss.editor.relay.EditorRelayClient.CHALLENGE_PREFIX + golden.get("nonce").getAsString()));
+        identity.sign(EditorLink.PRODUCT.relayChallengePrefix() + golden.get("nonce").getAsString()));
   }
 
   @Test
@@ -97,7 +114,7 @@ class PairingCodeTest {
     EditorIdentity identity = EditorIdentity.generate();
     String challenge = "B".repeat(43);
     byte[] signature = Base64.getUrlDecoder().decode(identity.sign(
-        art.arcane.gloss.editor.relay.EditorRelayClient.PROOF_PREFIX + challenge));
+        EditorLink.PRODUCT.proofPrefix() + challenge));
     byte[] raw = Base64.getUrlDecoder().decode(identity.serverKey());
     byte[] spki = HexFormat.of().parseHex("302a300506032b6570032100");
     byte[] encoded = new byte[spki.length + raw.length];

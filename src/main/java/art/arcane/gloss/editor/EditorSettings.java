@@ -1,6 +1,5 @@
 package art.arcane.gloss.editor;
 
-import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -51,32 +50,9 @@ public record EditorSettings(boolean enabled, String serverName, String editorUr
     return !tlsCertificate.isEmpty() && !tlsPrivateKey.isEmpty();
   }
 
-  /** True when {@code peer} is one of {@code trustedProxies}. */
-  public boolean trustsProxy(InetAddress peer) {
-    for (String proxy : trustedProxies) {
-      if (literal(proxy).filter(peer::equals).isPresent()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /** True when {@code origin} is one of {@code allowedOrigins}; scheme and host compare without case. */
   public boolean allowsOrigin(String origin) {
     return origin(origin).filter(allowedOrigins::contains).isPresent();
-  }
-
-  /** The address an IP literal names, never looked up in DNS; brackets around IPv6 are allowed. */
-  public static Optional<InetAddress> literal(String text) {
-    String bare = text.strip();
-    if (bare.startsWith("[") && bare.endsWith("]")) {
-      bare = bare.substring(1, bare.length() - 1);
-    }
-    try {
-      return Optional.of(InetAddress.ofLiteral(bare));
-    } catch (IllegalArgumentException notLiteral) {
-      return Optional.empty();
-    }
   }
 
   /** {@code scheme://host[:port]} with scheme and host in lower case and a default port left out; empty for others. */

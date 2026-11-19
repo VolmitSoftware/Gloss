@@ -117,6 +117,8 @@
     "counter-replayed": 409,
     "confirm-deletes": 428,
     "pairing-invalid": 401,
+    "pairing-used": 401,
+    "pairing-revoked": 401,
     "pairing-expired": 410,
     "not-found": 404,
     "invalid-request": 400,

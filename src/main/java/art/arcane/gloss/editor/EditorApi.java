@@ -1,11 +1,14 @@
 package art.arcane.gloss.editor;
 
 import art.arcane.gloss.editor.sync.EditorWorkspace;
-import art.arcane.gloss.editor.transport.EditorEventSink;
-import art.arcane.gloss.editor.transport.EditorEventStream;
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorRequestHandler;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.EditorIdentity;
+import art.arcane.volmlib.util.editor.EditorRefusal;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.transport.EditorEventSink;
+import art.arcane.volmlib.util.editor.transport.EditorEventStream;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorRequestHandler;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -40,7 +43,7 @@ public final class EditorApi implements EditorRequestHandler {
   public static final int PROTOCOL = 1;
   /** How long a token keeps working while the server cannot tell whether its player still holds the node. */
   public static final Duration UNCONFIRMED_ADMIN = Duration.ofDays(7);
-  public static final String COUNTER_HEADER = "X-Gloss-Counter";
+  public static final String COUNTER_HEADER = EditorLink.PRODUCT.counterHeader();
   private static final Map<String, String> CORS = Map.of(
       "Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers", "Authorization, Content-Type, X-Gloss-Counter, X-Gloss-Challenge, If-None-Match",
@@ -50,7 +53,7 @@ public final class EditorApi implements EditorRequestHandler {
       "Vary", "Origin");
 
   /** What the API holds. */
-  public record Parts(EditorSettings settings, EditorHost host, EditorIdentity identity, EditorTokens tokens,
+  public record Parts(EditorSettings settings, EditorHost host, EditorIdentity identity, EditorTokens<EditorScope> tokens,
                       EditorEvents events, EditorWorkspace workspace, EditorWarnings warnings, EditorNotices notices,
                       EditorUploads uploads, Executor files, Clock clock) {
     public Parts with(EditorSettings next) {
@@ -62,12 +65,13 @@ public final class EditorApi implements EditorRequestHandler {
   private volatile Parts parts;
   private final Map<String, AtomicInteger> inFlight = new ConcurrentHashMap<>();
   private final Map<String, double[]> buckets = new ConcurrentHashMap<>();
-  private final EditorPairingRoutes pairing = new EditorPairingRoutes(this);
+  private final EditorPairingRoutes pairing;
   private final EditorDocumentRoutes documents = new EditorDocumentRoutes(this);
   private final EditorPublishRoutes publish = new EditorPublishRoutes(this);
 
   public EditorApi(Parts parts) {
     this.parts = Objects.requireNonNull(parts);
+    this.pairing = new EditorPairingRoutes(this);
   }
 
   public Parts parts() {
@@ -119,7 +123,7 @@ public final class EditorApi implements EditorRequestHandler {
       if (path.equals("/v1/hello") || path.equals("/v1/pair")) {
         return Admission.OPEN;
       }
-      EditorTokens.Token token = parts.tokens().authenticate(bearer(head));
+      EditorTokens.Token<EditorScope> token = authenticate(bearer(head));
       Optional<Route> route = match(method, path.substring(4).split("/", -1));
       if (route.isPresent() && route.get().scope() != null && !token.has(route.get().scope())) {
         throw missing(route.get().scope());
@@ -163,7 +167,7 @@ public final class EditorApi implements EditorRequestHandler {
     String shown = EditorNotices.printable(origin.get().length() > 128 ? origin.get().substring(0, 128) : origin.get());
     parts.warnings().once("origin " + shown, Duration.ofHours(1), "origins", EditorWarnings.MINUTE,
         "Editor refused origin " + shown + ": it is not in [editor] allowedOrigins");
-    for (EditorTokens.Open open : parts.tokens().openPairings()) {
+    for (EditorTokens.Open<EditorScope> open : parts.tokens().openPairings()) {
       if (parts.warnings().due("origin notice " + shown + " " + open.tokenId(), Duration.ofHours(1),
           "origin notices " + open.tokenId(), EditorWarnings.MINUTE)) {
         parts.notices().refused(open, "origin " + shown + " is not in allowedOrigins");
@@ -186,7 +190,7 @@ public final class EditorApi implements EditorRequestHandler {
     if (method.equals("POST") && path.equals("/v1/pair")) {
       return done(pairing.pair(request));
     }
-    EditorTokens.Token token = parts.tokens().authenticate(bearer(request));
+    EditorTokens.Token<EditorScope> token = authenticate(bearer(request));
     Route route = match(method, segments).orElseThrow(() -> new EditorError(EditorError.Code.NOT_FOUND,
         "No endpoint " + method + " " + path + "."));
     if (route.scope() != null && !token.has(route.scope())) {
@@ -215,7 +219,7 @@ public final class EditorApi implements EditorRequestHandler {
 
   @FunctionalInterface
   interface Endpoint {
-    CompletionStage<EditorResponse> handle(EditorRequest request, EditorTokens.Token token, String[] segments)
+    CompletionStage<EditorResponse> handle(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
         throws EditorError;
   }
 
@@ -250,7 +254,7 @@ public final class EditorApi implements EditorRequestHandler {
     return Optional.ofNullable(route);
   }
 
-  private CompletionStage<EditorResponse> token(EditorRequest request, EditorTokens.Token token, String[] segments) {
+  private CompletionStage<EditorResponse> token(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments) {
     JsonObject body = new JsonObject();
     body.addProperty("tokenId", token.id());
     body.addProperty("label", token.label());
@@ -271,7 +275,7 @@ public final class EditorApi implements EditorRequestHandler {
     return new EditorError(EditorError.Code.SCOPE_MISSING, "This token lacks " + scope.wireName() + ".", -1L, extra);
   }
 
-  static EditorError folderDenied(EditorTokens.Token token, String what) {
+  static EditorError folderDenied(EditorTokens.Token<EditorScope> token, String what) {
     JsonObject extra = new JsonObject();
     extra.add("folders", strings(token.folders()));
     return new EditorError(EditorError.Code.FOLDER_DENIED, "This token cannot reach " + what + "; it is limited to folders "
@@ -287,7 +291,7 @@ public final class EditorApi implements EditorRequestHandler {
     return header.substring(7).strip();
   }
 
-  private void counter(EditorRequest request, EditorTokens.Token token) throws EditorError {
+  private void counter(EditorRequest request, EditorTokens.Token<EditorScope> token) throws EditorError {
     String header = request.header(COUNTER_HEADER).orElseThrow(() -> new EditorError(EditorError.Code.INVALID_REQUEST,
         COUNTER_HEADER + " is required on this request."));
     long value;
@@ -298,13 +302,24 @@ public final class EditorApi implements EditorRequestHandler {
     }
     try {
       parts.tokens().advance(token.id(), value);
+    } catch (EditorRefusal refused) {
+      throw EditorError.of(refused);
     } catch (IOException failure) {
       throw new EditorError(EditorError.Code.INTERNAL, "The token store could not be written.");
     }
   }
 
+  /** The token a bearer value names, or why it is refused. */
+  private EditorTokens.Token<EditorScope> authenticate(String bearer) throws EditorError {
+    try {
+      return parts.tokens().authenticate(bearer);
+    } catch (EditorRefusal refused) {
+      throw EditorError.of(refused);
+    }
+  }
+
   /** Token bucket: requestsPerSecond, bursting to twice that. */
-  private void rate(EditorTokens.Token token) throws EditorError {
+  private void rate(EditorTokens.Token<EditorScope> token) throws EditorError {
     double perSecond = parts.settings().requestsPerSecond();
     double capacity = perSecond * 2;
     double[] bucket = buckets.computeIfAbsent(token.id(), (String id) -> new double[] {capacity, System.nanoTime()});
@@ -339,13 +354,15 @@ public final class EditorApi implements EditorRequestHandler {
    * Runs on the file lane; a full lane answers busy at once. The token is checked again as the work starts, so a
    * token revoked or expired while its request waited neither reads nor writes.
    */
-  CompletionStage<EditorResponse> files(EditorTokens.Token token, FileWork work) throws EditorError {
+  CompletionStage<EditorResponse> files(EditorTokens.Token<EditorScope> token, FileWork work) throws EditorError {
     CompletableFuture<EditorResponse> result = new CompletableFuture<>();
     try {
       parts.files().execute(() -> {
         try {
           parts.tokens().stillValid(token.id());
           result.complete(work.run());
+        } catch (EditorRefusal refused) {
+          result.complete(EditorReplies.error(EditorError.of(refused)));
         } catch (EditorError refused) {
           result.complete(EditorReplies.error(refused));
         } catch (IOException | RuntimeException failure) {
@@ -368,9 +385,9 @@ public final class EditorApi implements EditorRequestHandler {
     try {
       origin(request);
       pairing.guard(address);
-      EditorTokens.Token token;
+      EditorTokens.Token<EditorScope> token;
       try {
-        token = parts.tokens().authenticate(bearer(request));
+        token = authenticate(bearer(request));
       } catch (EditorError refused) {
         pairing.failed(address);
         throw refused;
@@ -411,8 +428,8 @@ public final class EditorApi implements EditorRequestHandler {
    * not write still ends the streams, then throws to say it is lost if the server stops before a later write.
    */
   public List<String> revoke(String idOrAll, String reason, String cause) throws IOException {
-    Map<String, EditorTokens.Token> known = new HashMap<>();
-    for (EditorTokens.Token token : parts.tokens().list()) {
+    Map<String, EditorTokens.Token<EditorScope>> known = new HashMap<>();
+    for (EditorTokens.Token<EditorScope> token : parts.tokens().list()) {
       known.put(token.id(), token);
     }
     List<String> ids;
@@ -425,7 +442,7 @@ public final class EditorApi implements EditorRequestHandler {
     }
     for (String id : ids) {
       parts.events().close(id, reason);
-      EditorTokens.Token token = known.get(id);
+      EditorTokens.Token<EditorScope> token = known.get(id);
       if (token != null) {
         parts.notices().revoked(id, token.label(), token.admin(), cause);
       }
@@ -450,7 +467,7 @@ public final class EditorApi implements EditorRequestHandler {
    * A token with {@code publish:commands} also needs {@code gloss.editor.commands}: losing it drops only that scope.
    */
   public void recheckAdmins() {
-    for (EditorTokens.Token token : parts.tokens().list()) {
+    for (EditorTokens.Token<EditorScope> token : parts.tokens().list()) {
       token.admin().ifPresent((UUID admin) -> parts.host().permission(admin, EditorPermissions.PAIR,
           (EditorHost.Admin status) -> {
             boolean stale = !token.adminChecked().plus(UNCONFIRMED_ADMIN).isAfter(parts.clock().instant());

@@ -1,8 +1,9 @@
 package art.arcane.gloss.editor;
 
 import art.arcane.gloss.editor.sync.EditorWorkspace;
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -58,7 +59,7 @@ final class EditorDocumentRoutes {
   }
 
   /** Runs {@code work} at once once the workspace was read, else after the first read on the file lane. */
-  private CompletionStage<EditorResponse> read(EditorTokens.Token token, EditorApi.FileWork work) throws EditorError {
+  private CompletionStage<EditorResponse> read(EditorTokens.Token<EditorScope> token, EditorApi.FileWork work) throws EditorError {
     if (api.parts().workspace().read()) {
       try {
         return EditorApi.done(work.run());
@@ -69,7 +70,7 @@ final class EditorDocumentRoutes {
     return api.files(token, work);
   }
 
-  CompletionStage<EditorResponse> catalog(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> catalog(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     Map<String, String> query = EditorReplies.query(request);
     unknown(query, Set.of("after"));
@@ -133,7 +134,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> page(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> page(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     Map<String, String> query = EditorReplies.query(request);
     unknown(query, Set.of("after", "maxBytes"));
@@ -183,7 +184,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> read(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> read(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     JsonObject body = EditorApi.body(request);
     EditorApi.fields(body, Set.of("refs"));
@@ -252,7 +253,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> document(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> document(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     String kind = segments[1];
     StringBuilder id = new StringBuilder();
@@ -280,7 +281,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> images(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> images(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     JsonObject body = EditorApi.body(request);
     EditorApi.fields(body, Set.of("hashes"));
@@ -333,7 +334,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> image(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> image(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     String hex = segments[1];
     if (!HEX.matcher(hex).matches()) {
@@ -355,7 +356,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> meta(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> meta(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     return read(token, () -> {
       String hash = api.parts().workspace().metaHash();
@@ -363,7 +364,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> notes(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> notes(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     return api.files(token, () -> {
       JsonObject notes = api.parts().workspace().notes();
@@ -375,7 +376,7 @@ final class EditorDocumentRoutes {
     });
   }
 
-  CompletionStage<EditorResponse> history(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> history(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     Map<String, String> query = EditorReplies.query(request);
     unknown(query, Set.of("kind", "id", "version"));
@@ -421,7 +422,7 @@ final class EditorDocumentRoutes {
     return new EditorResponse(200, headers, Optional.of(body));
   }
 
-  private static JsonObject filterNotes(JsonObject notes, EditorTokens.Token token) {
+  private static JsonObject filterNotes(JsonObject notes, EditorTokens.Token<EditorScope> token) {
     JsonObject filtered = notes.deepCopy();
     JsonArray warnings = new JsonArray();
     for (JsonElement warning : notes.getAsJsonArray("warnings")) {
@@ -446,7 +447,7 @@ final class EditorDocumentRoutes {
    * The image hashes the token sees in this catalog: every image without folders, else the set built once per
    * catalog and folder list, so image requests do not walk the catalog each time.
    */
-  private Set<String> visibleImageHashes(EditorWorkspace.View view, EditorTokens.Token token) {
+  private Set<String> visibleImageHashes(EditorWorkspace.View view, EditorTokens.Token<EditorScope> token) {
     if (token.folders().isEmpty()) {
       return view.blobs().keySet();
     }

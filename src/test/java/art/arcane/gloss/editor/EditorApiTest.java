@@ -2,6 +2,7 @@ package art.arcane.gloss.editor;
 
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.editor.sync.EditorWorkspaceFixtures;
+import art.arcane.volmlib.util.editor.PairingCode;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -81,7 +82,7 @@ class EditorApiTest {
     assertEquals(604800L, first.body().get("lifetimeSeconds").getAsLong());
     assertEquals(List.of("shop"), strings(first.body().getAsJsonArray("folders")));
     assertEquals(401, second.status());
-    assertEquals("pairing-invalid", second.code());
+    assertEquals("pairing-used", second.code());
   }
 
   @Test
@@ -96,9 +97,42 @@ class EditorApiTest {
 
     assertEquals(410, expired.status());
     assertEquals("pairing-expired", expired.code());
-    assertEquals(401, revoked.status());
-    assertEquals("pairing-invalid", revoked.code());
+    assertEquals(410, revoked.status());
+    assertEquals("pairing-expired", revoked.code());
     assertTrue(server.host.warnings.stream().anyMatch((String line) -> line.contains("the link expired before it was opened")));
+  }
+
+  @Test
+  void aUsedLinkIsToldApartFromAWrongSecret() throws Exception {
+    PairingCode code = server.link(EditorTestServer.grant(EditorScope.DEFAULT_PAIRING, List.of()));
+    JsonObject wrongSecret = exchange(code);
+    wrongSecret.addProperty("secret", "B".repeat(43));
+
+    EditorTestServer.Answer first = server.post("/v1/pair", null, exchange(code), false);
+    EditorTestServer.Answer again = server.post("/v1/pair", null, exchange(code), false);
+    EditorTestServer.Answer wrong = server.post("/v1/pair", null, wrongSecret, false);
+
+    assertEquals(200, first.status());
+    assertEquals(401, wrong.status());
+    assertEquals("pairing-invalid", wrong.code());
+    assertEquals(401, again.status());
+    assertEquals("pairing-used", again.code());
+  }
+
+  @Test
+  void aRevokedLinkIsToldApartFromAWrongSecret() throws Exception {
+    PairingCode code = server.link(EditorTestServer.grant(EditorScope.DEFAULT_PAIRING, List.of()));
+    JsonObject wrongSecret = exchange(code);
+    wrongSecret.addProperty("secret", "B".repeat(43));
+    server.service.revoke(code.tokenId());
+
+    EditorTestServer.Answer revoked = server.post("/v1/pair", null, exchange(code), false);
+    EditorTestServer.Answer wrong = server.post("/v1/pair", null, wrongSecret, false);
+
+    assertEquals(401, wrong.status());
+    assertEquals("pairing-invalid", wrong.code());
+    assertEquals(401, revoked.status());
+    assertEquals("pairing-revoked", revoked.code());
   }
 
   @Test

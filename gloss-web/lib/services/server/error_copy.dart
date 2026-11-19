@@ -63,7 +63,7 @@ ErrorCopy? knownServerCopy(
 }) {
   final Object? message = error?['message'];
   switch (code) {
-    case 'pairing-invalid':
+    case 'pairing-invalid' || 'pairing-used' || 'pairing-revoked':
       return ErrorCopy(
         code!,
         huiText('This link was already used or is not a pairing link.'),
@@ -413,8 +413,12 @@ enum PairingFailure {
   final String code;
 
   /// The failure a refusal [code] stands for: [other] for any code not listed.
-  static PairingFailure of(String code) => values.firstWhere(
-    (PairingFailure failure) => failure.code == code,
-    orElse: () => other,
-  );
+  /// A used or revoked link reads as [used].
+  static PairingFailure of(String code) => switch (code) {
+    'pairing-used' || 'pairing-revoked' => used,
+    _ => values.firstWhere(
+      (PairingFailure failure) => failure.code == code,
+      orElse: () => other,
+    ),
+  };
 }

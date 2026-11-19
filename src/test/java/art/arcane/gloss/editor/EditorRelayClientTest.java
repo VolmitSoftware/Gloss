@@ -1,11 +1,14 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.relay.EditorRelayClient;
-import art.arcane.gloss.editor.transport.EditorEventSink;
-import art.arcane.gloss.editor.transport.EditorEventStream;
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorRequestHandler;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.PairingCode;
+import art.arcane.volmlib.util.editor.EditorIdentity;
+import art.arcane.volmlib.util.editor.EditorLog;
+import art.arcane.volmlib.util.editor.relay.EditorRelayClient;
+import art.arcane.volmlib.util.editor.transport.EditorEventSink;
+import art.arcane.volmlib.util.editor.transport.EditorEventStream;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorRequestHandler;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import art.arcane.gloss.editor.sync.EditorWorkspaceFixtures;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
@@ -60,7 +63,7 @@ class EditorRelayClientTest {
       assertTrue(code.relayUrl().orElseThrow().equals(relay.url()));
       assertTrue(code.directUrl().isEmpty());
       assertEquals(code.serverKey(), register.get("serverKey").getAsString());
-      assertTrue(verify(code.serverKey(), EditorRelayClient.CHALLENGE_PREFIX + nonce,
+      assertTrue(verify(code.serverKey(), EditorLink.PRODUCT.relayChallengePrefix() + nonce,
           register.get("signature").getAsString()));
 
       String browserChallenge = "C".repeat(43);
@@ -71,7 +74,7 @@ class EditorRelayClientTest {
       JsonObject proofHeaders = helloAnswer.getAsJsonObject("headers");
       assertEquals(200, helloAnswer.get("status").getAsInt());
       assertEquals(code.serverKey(), proofHeaders.get("X-Gloss-Server-Key").getAsString());
-      assertTrue(verify(code.serverKey(), EditorRelayClient.PROOF_PREFIX + browserChallenge,
+      assertTrue(verify(code.serverKey(), EditorLink.PRODUCT.proofPrefix() + browserChallenge,
           proofHeaders.get("X-Gloss-Proof").getAsString()));
 
       JsonObject exchange = new JsonObject();
@@ -254,6 +257,26 @@ class EditorRelayClientTest {
     }
   }
 
+  @Test
+  void aRelayFrameThatRepeatsAKeyEndsTheConnection() throws Exception {
+    try (FakeRelay relay = new FakeRelay()) {
+      EditorRelayClient client = registered(relay, new StreamHandler(false));
+      try {
+        relay.send("{\"type\":\"request\",\"id\":1,\"id\":2,\"method\":\"GET\",\"path\":\"/v1/hello\","
+            + "\"headers\":{\"Origin\":\"https://gloss.volmitsoftware.com\"}}");
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (relay.connections.get() < 2 && System.nanoTime() < deadline) {
+          Thread.sleep(20L);
+        }
+        int connections = relay.connections.get();
+
+        assertEquals(2, connections, "the client kept the connection after a frame with a repeated key");
+      } finally {
+        client.close();
+      }
+    }
+  }
+
   /** Opens every stream; {@code early} sends the first event before the stream is answered, as a frame tick can. */
   private static final class StreamHandler implements EditorRequestHandler {
     final CompletableFuture<EditorEventSink> sink = new CompletableFuture<>();
@@ -285,8 +308,9 @@ class EditorRelayClientTest {
   /** A relay client with a new identity answering through {@code handler}, registered with {@code relay}. */
   private static EditorRelayClient registered(FakeRelay relay, EditorRequestHandler handler) throws Exception {
     EditorIdentity identity = EditorIdentity.generate();
-    EditorRelayClient client = new EditorRelayClient(EditorTestServer.settings(false, true, relay.url()), identity,
-        handler, (String line) -> { }, (String line) -> { });
+    EditorRelayClient client = new EditorRelayClient(EditorLink.PRODUCT,
+        EditorLink.relay(EditorTestServer.settings(false, true, relay.url())), identity, handler,
+        EditorLog.of((String line) -> { }, (String line) -> { }));
     client.start();
     JsonObject challenge = new JsonObject();
     challenge.addProperty("type", "challenge");
@@ -309,8 +333,9 @@ class EditorRelayClientTest {
   /** A relay client of the server's identity, registered with {@code relay}, that gives up after {@code idle}. */
   private static EditorRelayClient registered(FakeRelay relay, EditorTestServer server, Duration idle) throws Exception {
     EditorApi api = server.service.api().orElseThrow();
-    EditorRelayClient client = new EditorRelayClient(EditorTestServer.settings(false, true, relay.url()),
-        api.parts().identity(), api, (String line) -> { }, (String line) -> { }, Duration.ofSeconds(10), idle);
+    EditorRelayClient client = new EditorRelayClient(EditorLink.PRODUCT,
+        EditorLink.relay(EditorTestServer.settings(false, true, relay.url())), api.parts().identity(), api,
+        EditorLog.of((String line) -> { }, (String line) -> { }), Duration.ofSeconds(10), idle);
     client.start();
     JsonObject challenge = new JsonObject();
     challenge.addProperty("type", "challenge");

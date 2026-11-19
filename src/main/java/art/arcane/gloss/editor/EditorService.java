@@ -1,9 +1,14 @@
 package art.arcane.gloss.editor;
 
 import art.arcane.gloss.doc.WriteNotices;
-import art.arcane.gloss.editor.relay.EditorRelayClient;
 import art.arcane.gloss.editor.sync.EditorWorkspace;
 import art.arcane.gloss.editor.sync.EditorWorkspaceWatch;
+import art.arcane.volmlib.util.editor.EditorIdentity;
+import art.arcane.volmlib.util.editor.EditorListener;
+import art.arcane.volmlib.util.editor.EditorLog;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.PairingCode;
+import art.arcane.volmlib.util.editor.relay.EditorRelayClient;
 
 import java.io.IOException;
 import java.net.BindException;
@@ -98,8 +103,8 @@ public final class EditorService implements AutoCloseable {
       return;
     }
     removeOldLinks();
-    EditorIdentity identity = EditorIdentity.loadOrCreate(data);
-    EditorTokens tokens = new EditorTokens(data, clock, host::warn);
+    EditorIdentity identity = EditorLink.identity(data);
+    EditorTokens<EditorScope> tokens = EditorLink.tokens(data, clock, host::warn);
     files = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(256),
         Thread.ofPlatform().daemon().name("Gloss-editor-files").factory());
     notesLane = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(4),
@@ -289,7 +294,7 @@ public final class EditorService implements AutoCloseable {
     if (now.isBefore(relayDown.plus(RELAY_GRACE))) {
       return;
     }
-    for (EditorTokens.Open open : opened.parts().tokens().openPairings()) {
+    for (EditorTokens.Open<EditorScope> open : opened.parts().tokens().openPairings()) {
       if (opened.parts().warnings().due("relay notice " + open.tokenId(), Duration.ofHours(1))) {
         opened.parts().notices().refused(open, "the relay " + settings.relayUrl() + " is unreachable");
       }
@@ -310,7 +315,8 @@ public final class EditorService implements AutoCloseable {
     if (active.parts().tokens().list().isEmpty() && active.parts().tokens().openPairings().isEmpty()) {
       return;
     }
-    relay = new EditorRelayClient(settings, active.parts().identity(), active, host::log, host::warn);
+    relay = new EditorRelayClient(EditorLink.PRODUCT, EditorLink.relay(settings), active.parts().identity(), active,
+        EditorLog.of(host::log, host::warn));
     relay.start();
     host.log("Editor relay connecting to " + settings.relayUrl() + " as " + active.parts().identity().fingerprint());
   }
@@ -327,7 +333,7 @@ public final class EditorService implements AutoCloseable {
     if (!settings.listenerEnabled()) {
       return;
     }
-    EditorListener started = new EditorListener(settings, data, api, host::warn);
+    EditorListener started = new EditorListener(EditorLink.PRODUCT, EditorLink.listener(settings), data, api, host::warn);
     try {
       started.start();
       listener = started;
@@ -391,7 +397,7 @@ public final class EditorService implements AutoCloseable {
         host.log("Editor listener stopped by gloss.toml");
       }
     } else if (listener != null) {
-      listener.settings(next);
+      listener.settings(EditorLink.listener(next));
     }
   }
 
@@ -414,7 +420,7 @@ public final class EditorService implements AutoCloseable {
   }
 
   /** A pairing link for {@code /gloss editor pair}. */
-  public PairingLink pair(EditorTokens.Grant grant) throws IOException {
+  public PairingLink pair(EditorTokens.Grant<EditorScope> grant) throws IOException {
     EditorApi active;
     synchronized (this) {
       active = api;
@@ -427,7 +433,7 @@ public final class EditorService implements AutoCloseable {
     if (direct.isEmpty() && relayUrl.isEmpty()) {
       throw new IOException("Nothing can reach this server: enable [editor] listenerEnabled or relayEnabled");
     }
-    EditorTokens.Pairing pairing;
+    EditorTokens.Pairing<EditorScope> pairing;
     try {
       pairing = active.parts().tokens().pair(grant);
     } catch (IllegalStateException full) {
@@ -440,7 +446,7 @@ public final class EditorService implements AutoCloseable {
     }
     PairingCode code;
     try {
-      code = new PairingCode(direct, relayUrl, active.parts().identity().fingerprint(),
+      code = new PairingCode(EditorLink.PRODUCT, direct, relayUrl, active.parts().identity().fingerprint(),
           active.parts().identity().serverKey(), pairing.tokenId(), pairing.secret(), pairing.expires(),
           grant.label().isEmpty() ? Optional.empty() : Optional.of(grant.label()), Optional.of(active.serverName()),
           grant.scopes().stream().map(EditorScope::wireName).toList(), grant.folders());
@@ -450,7 +456,7 @@ public final class EditorService implements AutoCloseable {
     return new PairingLink(EditorUrl.base(settings.editorUrl()) + "#/pair/" + code.encode(), pairing);
   }
 
-  public record PairingLink(String link, EditorTokens.Pairing pairing) {
+  public record PairingLink(String link, EditorTokens.Pairing<EditorScope> pairing) {
   }
 
   /** The address a browser uses on the direct path: advertisedUrl, or the listener when TLS or loopback allow. */

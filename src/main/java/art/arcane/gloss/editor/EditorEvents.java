@@ -1,6 +1,6 @@
 package art.arcane.gloss.editor;
 
-import art.arcane.gloss.editor.transport.EditorEventSink;
+import art.arcane.volmlib.util.editor.transport.EditorEventSink;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;

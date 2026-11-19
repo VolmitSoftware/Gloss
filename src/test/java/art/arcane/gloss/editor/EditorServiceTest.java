@@ -1,6 +1,7 @@
 package art.arcane.gloss.editor;
 
 import art.arcane.gloss.editor.sync.EditorWorkspaceFixtures;
+import art.arcane.volmlib.util.editor.EditorTokens;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,7 @@ class EditorServiceTest {
   @Test
   void aDamagedTokenStoreDoesNotStopTheEditor() throws Exception {
     Files.createDirectories(data.resolve("editor"));
-    Files.writeString(data.resolve(EditorTokens.PATH), "{\"tokens\":[");
+    Files.writeString(data.resolve(EditorLink.TOKENS_PATH), "{\"tokens\":[");
 
     try (EditorTestServer server = new EditorTestServer(data)) {
       String token = server.pair();
@@ -75,7 +76,7 @@ class EditorServiceTest {
       events.close();
 
       assertNotNull(closing);
-      assertTrue(failure.getMessage().contains(EditorTokens.PATH), failure.getMessage());
+      assertTrue(failure.getMessage().contains(EditorLink.TOKENS_PATH), failure.getMessage());
       assertEquals("token-revoked", server.get("/v1/token", token).code());
     }
   }
@@ -145,11 +146,11 @@ class EditorServiceTest {
   void aPlayerWhoLosesThePairNodeLosesTheTokenAndLosingCommandsDropsOnlyThatScope() throws Exception {
     try (EditorTestServer server = new EditorTestServer(data)) {
       UUID player = UUID.randomUUID();
-      String revoked = server.pair(new EditorTokens.Grant("", Optional.of(player), EditorScope.DEFAULT_PAIRING, List.of(),
+      String revoked = server.pair(new EditorTokens.Grant<>("", Optional.of(player), EditorScope.DEFAULT_PAIRING, List.of(),
           Duration.ofDays(7)));
       List<EditorScope> withCommands = new java.util.ArrayList<>(EditorScope.DEFAULT_PAIRING);
       withCommands.add(EditorScope.PUBLISH_COMMANDS);
-      String narrowed = server.pair(new EditorTokens.Grant("", Optional.of(player), withCommands, List.of(),
+      String narrowed = server.pair(new EditorTokens.Grant<>("", Optional.of(player), withCommands, List.of(),
           Duration.ofDays(7)));
       server.host.permissions.put(EditorPermissions.COMMANDS, EditorHost.Admin.NOT_ADMIN);
 
@@ -169,7 +170,7 @@ class EditorServiceTest {
   @Test
   void anUnconfirmedPlayerKeepsTheTokenForSevenDaysOnly() throws Exception {
     try (EditorTestServer server = new EditorTestServer(data)) {
-      String token = server.pair(new EditorTokens.Grant("", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING,
+      String token = server.pair(new EditorTokens.Grant<>("", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING,
           List.of(), Duration.ofDays(30)));
       server.host.permissions.put(EditorPermissions.PAIR, EditorHost.Admin.UNKNOWN);
 
@@ -209,7 +210,7 @@ class EditorServiceTest {
   @Test
   void aRefusedOriginTellsThePlayerWhoMadeTheLink() throws Exception {
     try (EditorTestServer server = new EditorTestServer(data)) {
-      server.link(new EditorTokens.Grant("", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING, List.of(),
+      server.link(new EditorTokens.Grant<>("", Optional.of(UUID.randomUUID()), EditorScope.DEFAULT_PAIRING, List.of(),
           Duration.ofDays(7)));
       server.send(HttpRequest.newBuilder(URI.create(server.base() + "/v1/hello")).header("Origin", "https://evil.example")
           .GET().build());

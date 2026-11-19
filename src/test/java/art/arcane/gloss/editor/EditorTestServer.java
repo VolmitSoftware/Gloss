@@ -1,6 +1,8 @@
 package art.arcane.gloss.editor;
 
 import art.arcane.gloss.editor.sync.EditorWorkspaceFixtures;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.PairingCode;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -158,13 +160,13 @@ final class EditorTestServer implements AutoCloseable {
   }
 
   /** A pairing link's code for the grant. */
-  PairingCode link(EditorTokens.Grant grant) throws Exception {
+  PairingCode link(EditorTokens.Grant<EditorScope> grant) throws Exception {
     String link = service.pair(grant).link();
-    return PairingCode.decode(link.substring(link.indexOf("#/pair/") + "#/pair/".length()));
+    return PairingCode.decode(EditorLink.PRODUCT, link.substring(link.indexOf("#/pair/") + "#/pair/".length()));
   }
 
-  static EditorTokens.Grant grant(List<EditorScope> scopes, List<String> folders) {
-    return new EditorTokens.Grant("laptop", Optional.empty(), scopes, folders, Duration.ofDays(7));
+  static EditorTokens.Grant<EditorScope> grant(List<EditorScope> scopes, List<String> folders) {
+    return new EditorTokens.Grant<>("laptop", Optional.empty(), scopes, folders, Duration.ofDays(7));
   }
 
   /** Pairs with every default scope and returns the token. */
@@ -172,7 +174,7 @@ final class EditorTestServer implements AutoCloseable {
     return pair(grant(EditorScope.DEFAULT_PAIRING, List.of()));
   }
 
-  String pair(EditorTokens.Grant grant) throws Exception {
+  String pair(EditorTokens.Grant<EditorScope> grant) throws Exception {
     PairingCode code = link(grant);
     JsonObject body = new JsonObject();
     body.addProperty("tokenId", code.tokenId());

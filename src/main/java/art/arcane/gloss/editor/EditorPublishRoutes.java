@@ -3,8 +3,9 @@ package art.arcane.gloss.editor;
 import art.arcane.gloss.editor.sync.EditorSyncChangeset;
 import art.arcane.gloss.editor.sync.EditorSyncConflict;
 import art.arcane.gloss.editor.sync.EditorWorkspace;
-import art.arcane.gloss.editor.transport.EditorRequest;
-import art.arcane.gloss.editor.transport.EditorResponse;
+import art.arcane.volmlib.util.editor.EditorTokens;
+import art.arcane.volmlib.util.editor.transport.EditorRequest;
+import art.arcane.volmlib.util.editor.transport.EditorResponse;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -65,7 +66,7 @@ final class EditorPublishRoutes {
     this.api = api;
   }
 
-  CompletionStage<EditorResponse> upload(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> upload(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     JsonObject body = EditorApi.body(request);
     EditorApi.fields(body, Set.of("mediaType", "data"));
@@ -105,7 +106,7 @@ final class EditorPublishRoutes {
     return EditorApi.done(EditorResponse.json(fresh && !known ? 201 : 200, answer));
   }
 
-  CompletionStage<EditorResponse> publish(EditorRequest request, EditorTokens.Token token, String[] segments)
+  CompletionStage<EditorResponse> publish(EditorRequest request, EditorTokens.Token<EditorScope> token, String[] segments)
       throws EditorError {
     JsonObject body = EditorApi.body(request);
     EditorApi.fields(body, Set.of("idempotencyKey", "documents", "images", "confirmDeletes"));
@@ -178,7 +179,7 @@ final class EditorPublishRoutes {
    * Every entry needs its scope and folder; a put that runs console commands, or a behavior that runs any command,
    * also needs publish:commands.
    */
-  private static void allowed(EditorTokens.Token token, List<EditorSyncChangeset.DocumentChange> documents,
+  private static void allowed(EditorTokens.Token<EditorScope> token, List<EditorSyncChangeset.DocumentChange> documents,
                               List<EditorSyncChangeset.ImageChange> images) throws EditorError {
     List<String> commands = new ArrayList<>();
     for (EditorSyncChangeset.DocumentChange change : documents) {
@@ -240,7 +241,7 @@ final class EditorPublishRoutes {
    * token published within {@link #CONFIRM_DELETES_WINDOW} count too, so splitting them into small publishes does
    * not get around it; a confirmation starts the count again.
    */
-  private synchronized void confirmDeletes(EditorTokens.Token token, List<EditorSyncChangeset.DocumentChange> documents,
+  private synchronized void confirmDeletes(EditorTokens.Token<EditorScope> token, List<EditorSyncChangeset.DocumentChange> documents,
                                            List<EditorSyncChangeset.ImageChange> images, EditorWorkspace.View view,
                                            long confirmed) throws EditorError {
     long deletes = documents.stream().filter(EditorSyncChangeset.DocumentChange::delete).count()

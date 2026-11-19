@@ -296,6 +296,10 @@ dependencies {
         changing = true
         transitive = false
     }
+    implementation("com.github.VolmitSoftware.VolmLib:volmlib-editor-link:${volmLibCoordinate.tokenize(':').last()}") {
+        changing = true
+        transitive = false
+    }
 
     compileOnly(libs.craftengine.core) { transitive = false }
     compileOnly(libs.craftengine.bukkit) { transitive = false }
