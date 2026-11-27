@@ -2204,6 +2204,17 @@
           "description": "Defines the count of the resolved item stack. Zero and negative values become 1.",
           "type": "integer"
         },
+        "name": {
+          "type": "string",
+          "description": "Display name for the inventory item, replacing the provider's name. Supports expressions and colors."
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Inventory item lore, replacing the provider's lore when not empty. Supports expressions and colors."
+        },
         "countFormat": {
           "type": "string",
           "default": "&f&l{count}",

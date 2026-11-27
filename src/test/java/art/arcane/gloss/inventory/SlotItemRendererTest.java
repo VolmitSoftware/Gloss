@@ -10,18 +10,23 @@ import art.arcane.gloss.config.icon.MenuIconData;
 import art.arcane.gloss.config.icon.PlayerHeadIconData;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.config.icon.TextImageIconData;
+import art.arcane.gloss.integration.ItemProvider;
+import art.arcane.gloss.integration.ItemProviderRegistry;
 import art.arcane.gloss.menu.CharacterizationSupport;
 import org.bukkit.Material;
 import org.bukkit.Server;
+import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -97,9 +102,32 @@ class SlotItemRendererTest {
     @Test
     void anUnresolvableCustomItemDegradesWithANote() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
-            new CustomItemIconData("nexo", "ruby", 1, null, null), null);
+            new CustomItemIconData("nexo", "ruby", 1, null, "&cRuby", List.of("&7Gem"), null), null);
         assertTrue(slot.unsupported());
         assertEquals(SlotItemRenderer.defaultUnsupportedMaterial(), slot.material());
+    }
+
+    @Test
+    void aResolvedCustomItemDrawsTheProviderStackWithAuthoredNameAndLore() throws ReflectiveOperationException {
+        installProvider(new StubProvider(Material.EMERALD));
+        SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
+            new CustomItemIconData("stub", "ruby", 2, null, "&cRuby Shop", List.of("&7Costs 5 coins"), null), null);
+        assertFalse(slot.unsupported());
+        assertEquals(Material.EMERALD, slot.material());
+        assertEquals(2, slot.amount());
+        assertEquals("&cRuby Shop", slot.name());
+        assertEquals(List.of("&7Costs 5 coins"), slot.lore());
+        assertEquals(Material.EMERALD, slot.prebuilt().getType());
+    }
+
+    @Test
+    void aResolvedCustomItemWithoutOverridesKeepsTheProviderText() throws ReflectiveOperationException {
+        installProvider(new StubProvider(Material.EMERALD));
+        SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
+            new CustomItemIconData("stub", "ruby", 1, null, null, null, null), null);
+        assertFalse(slot.unsupported());
+        assertNull(slot.name());
+        assertTrue(slot.lore().isEmpty());
     }
 
     @Test
@@ -119,5 +147,64 @@ class SlotItemRendererTest {
     void aMissingIconDegradesRatherThanLeavingTheSlotEmpty() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null, null, null);
         assertTrue(slot.unsupported());
+    }
+
+    private static void installProvider(ItemProvider provider) throws ReflectiveOperationException {
+        ItemProviderRegistry registry = new ItemProviderRegistry(Gloss.instance);
+        CharacterizationSupport.invoke(registry, "register", new Class<?>[]{ItemProvider.class}, provider);
+        CharacterizationSupport.setField(Gloss.instance, "itemProviders", registry);
+    }
+
+    private record StubProvider(Material material) implements ItemProvider {
+        @Override
+        public String id() {
+            return "stub";
+        }
+
+        @Override
+        public String pluginName() {
+            return "Stub";
+        }
+
+        @Override
+        public ItemStack resolve(String itemId) {
+            return new StubStack(material);
+        }
+
+        @Override
+        public Collection<String> listIds() {
+            return List.of("ruby");
+        }
+    }
+
+    private static final class StubStack extends ItemStack {
+        private final Material material;
+        private int amount = 1;
+
+        private StubStack(Material material) {
+            this.material = material;
+        }
+
+        @Override
+        public Material getType() {
+            return material;
+        }
+
+        @Override
+        public int getAmount() {
+            return amount;
+        }
+
+        @Override
+        public void setAmount(int amount) {
+            this.amount = amount;
+        }
+
+        @Override
+        public ItemStack clone() {
+            StubStack copy = new StubStack(material);
+            copy.amount = amount;
+            return copy;
+        }
     }
 }

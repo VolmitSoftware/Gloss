@@ -149,7 +149,7 @@ public class CustomItemIntegrationTest {
     assertEquals(1, data.count());
 
     JsonObject encoded = DocumentParsers.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
-    assertEquals(Set.of("type", "provider", "item", "count", "style", "countFormat"), encoded.keySet());
+    assertEquals(Set.of("type", "provider", "item", "count", "style", "name", "lore", "countFormat"), encoded.keySet());
     assertTrue(encoded.get("style").isJsonNull());
     assertEquals("customItem", encoded.get("type").getAsString());
     assertEquals("itemsadder", encoded.get("provider").getAsString());
@@ -161,7 +161,7 @@ public class CustomItemIntegrationTest {
 
   @Test
   public void customItemIconDataKeepsAuthoredIdsVerbatimAndToleratesOmittedKeys() {
-    CustomItemIconData mixedCase = new CustomItemIconData("mmoitems", "SWORD:CUTLASS", 64, null, null);
+    CustomItemIconData mixedCase = new CustomItemIconData("mmoitems", "SWORD:CUTLASS", 64, null, null, null, null);
     JsonObject encoded = DocumentParsers.GSON.toJsonTree(mixedCase, MenuIconData.class).getAsJsonObject();
     assertEquals("SWORD:CUTLASS", encoded.get("item").getAsString());
     assertEquals(mixedCase, DocumentParsers.GSON.fromJson(encoded, MenuIconData.class));
@@ -171,6 +171,21 @@ public class CustomItemIntegrationTest {
     assertNull(data.provider());
     assertEquals("ruby", data.item());
     assertEquals(0, data.count());
+    assertNull(data.name());
+    assertEquals(List.of(), data.lore());
+  }
+
+  @Test
+  public void customItemIconDataReadsNameAndLoreOverrides() {
+    MenuIconData decoded = DocumentParsers.GSON.fromJson(
+        "{\"type\":\"customItem\",\"provider\":\"itemsadder\",\"item\":\"myitems:ruby\","
+            + "\"name\":\"&cRuby Shop\",\"lore\":[\"&7Costs 5 coins\",\"&7Click to buy\"]}",
+        MenuIconData.class);
+    CustomItemIconData data = (CustomItemIconData) decoded;
+    assertEquals("&cRuby Shop", data.name());
+    assertEquals(List.of("&7Costs 5 coins", "&7Click to buy"), data.lore());
+    assertEquals(data, DocumentParsers.GSON.fromJson(
+        DocumentParsers.GSON.toJsonTree(data, MenuIconData.class), MenuIconData.class));
   }
 
   private static Plugin plugin() {

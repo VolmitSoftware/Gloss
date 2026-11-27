@@ -77,7 +77,7 @@ public final class SlotItemRenderer {
                 : new SlotItem(data.stack().getType(), data.stack().getAmount(), null, List.of(),
                     data.stack(), false);
             case BlockIconData data -> block(viewer, scope, data);
-            case CustomItemIconData data -> customItem(viewer, data);
+            case CustomItemIconData data -> customItem(viewer, scope, data);
             case PlayerHeadIconData data -> playerHead(viewer, scope, data);
             case TextIconData data -> new SlotItem(Material.PAPER, 1,
                 text(viewer, scope, data.text()), List.of(), null, false);
@@ -128,12 +128,13 @@ public final class SlotItemRenderer {
         }
     }
 
-    private static SlotItem customItem(Player viewer, CustomItemIconData data) {
+    private static SlotItem customItem(Player viewer, ExprScope scope, CustomItemIconData data) {
         ItemStack resolved = IconItems.resolve(data, viewer);
         if (resolved == null) {
             return unsupported(viewer, "customItem");
         }
-        return new SlotItem(resolved.getType(), Math.max(1, data.count()), null, List.of(), resolved, false);
+        return new SlotItem(resolved.getType(), Math.max(1, data.count()),
+            text(viewer, scope, data.name()), lore(viewer, scope, data.lore()), resolved, false);
     }
 
     private static SlotItem playerHead(Player viewer, ExprScope scope, PlayerHeadIconData data) {

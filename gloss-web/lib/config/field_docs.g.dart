@@ -367,6 +367,20 @@ const Map<String, HuiFieldDoc> huiGeneratedFieldDocs = <String, HuiFieldDoc>{
     body: 'Defines the provider-specific item id, passed through verbatim.',
     citation: 'gloss.schema.json#/\$defs/customItemIcon/properties/item',
   ),
+  'icon.customItem.lore': HuiFieldDoc(
+    title: 'Lore',
+    body:
+        'Inventory item lore, replacing the provider\'s lore when not '
+        'empty. Supports expressions and colors.',
+    citation: 'gloss.schema.json#/\$defs/customItemIcon/properties/lore',
+  ),
+  'icon.customItem.name': HuiFieldDoc(
+    title: 'Name',
+    body:
+        'Display name for the inventory item, replacing the provider\'s '
+        'name. Supports expressions and colors.',
+    citation: 'gloss.schema.json#/\$defs/customItemIcon/properties/name',
+  ),
   'icon.customItem.provider': HuiFieldDoc(
     title: 'Provider',
     body:
