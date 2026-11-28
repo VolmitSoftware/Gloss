@@ -205,10 +205,7 @@ public final class NametagService implements GlossService, Listener {
     }
 
     private String rawName(Player subject) {
-        if (FoliaScheduler.isOwnedByCurrentRegion(subject)) {
-            return subject.getName();
-        }
-        return String.valueOf(snapshots.view(subject).variable("subject.name"));
+        return subject.getName();
     }
 
     static String formatName(String name, String color, String prefix, String suffix) {

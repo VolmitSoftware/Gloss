@@ -13,10 +13,12 @@ import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.util.common.TextUtils;
+import art.arcane.volmlib.util.bukkit.BukkitCommandMaps;
 import art.arcane.volmlib.util.plugin.ComponentMessenger;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Material;
+import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
@@ -32,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
@@ -51,6 +54,9 @@ public final class ChannelService implements GlossService, Listener {
     private final ChatMessageRenderer renderer;
     private volatile Index index = Index.EMPTY;
     private volatile boolean started;
+    private volatile boolean privateChannels;
+    private volatile PrivateMessageOwnership privateOwnership;
+    private volatile PrivateMessageCommands privateCommands;
 
     public ChannelService(Gloss plugin) {
         this.plugin = plugin;
@@ -66,44 +72,30 @@ public final class ChannelService implements GlossService, Listener {
     }
 
     @Override
-    public void contribute() {
+    public void enable() {
+        if (plugin.cfg().modules().channels().enabled()) {
+            start();
+        }
         registerCommands();
     }
 
     @Override
-    public void enable() {
-        if (!plugin.cfg().modules().channels().enabled()) {
-            return;
-        }
-        started = true;
-        defaults.extractMissing();
-        registry.reload();
-        rebuild(registry.snapshot());
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        plugin.watchdog().register(ChannelDoc.KIND, this::poll);
-    }
-
-    @Override
     public void disable() {
-        started = false;
-        plugin.watchdog().unregister(ChannelDoc.KIND);
-        HandlerList.unregisterAll(this);
-        registry.close();
-        index = Index.EMPTY;
-        state.clear();
-        throttle.clear();
+        stop();
+        releaseCommands();
     }
 
     @Override
     public void reload() {
+        applyPrivateMessageOwnership();
         if (!plugin.cfg().modules().channels().enabled()) {
             if (started) {
-                disable();
+                stop();
             }
             return;
         }
         if (!started) {
-            enable();
+            start();
             return;
         }
         defaults.extractMissing();
@@ -368,37 +360,126 @@ public final class ChannelService implements GlossService, Listener {
         return new ChatBody.Item(stack.getType().getKey().toString(), name, stack.getAmount());
     }
 
+    private void start() {
+        started = true;
+        defaults.extractMissing();
+        registry.reload();
+        rebuild(registry.snapshot());
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        plugin.watchdog().register(ChannelDoc.KIND, this::poll);
+    }
+
+    private void stop() {
+        started = false;
+        plugin.watchdog().unregister(ChannelDoc.KIND);
+        HandlerList.unregisterAll(this);
+        registry.close();
+        index = Index.EMPTY;
+        state.clear();
+        throttle.clear();
+    }
+
     /**
-     * A server that loaded Gloss from {@code plugin.yml} binds the executors directly; one loaded
-     * from {@code paper-plugin.yml} has no {@code getCommand}, so the Brigadier registrar is used.
+     * A server that loaded Gloss from {@code plugin.yml} binds {@code /ch} from the descriptor and
+     * puts each private message label in the command map only while chat channels are on and no
+     * other plugin has that label; one loaded from {@code paper-plugin.yml} has no
+     * {@code getCommand}, so the Brigadier registrar is used. Ownership is decided once every
+     * plugin has enabled, so commands from plugins that enable after Gloss are seen.
      */
     private void registerCommands() {
         ChatCommands executor = new ChatCommands(plugin, this);
+        privateChannels = plugin.cfg().modules().channels().enabled();
+        PluginCommand channel;
         try {
-            for (String name : ChatCommands.COMMANDS) {
-                PluginCommand command = plugin.getCommand(name);
-                if (command == null) {
-                    Gloss.warn("Command '%s' is missing from plugin.yml and was not bound.", name);
-                    continue;
-                }
-                command.setExecutor(executor);
-                command.setTabCompleter(executor);
-            }
+            channel = plugin.getCommand(ChatCommands.CHANNEL_COMMAND);
         } catch (UnsupportedOperationException paperPlugin) {
             registerPaperCommands(executor);
+            return;
         }
+        if (channel == null) {
+            Gloss.warn("Command '%s' is missing from plugin.yml and was not bound.", ChatCommands.CHANNEL_COMMAND);
+        } else {
+            channel.setExecutor(executor);
+            channel.setTabCompleter(executor);
+        }
+        registerPrivateCommands(executor);
+    }
+
+    private void registerPrivateCommands(ChatCommands executor) {
+        try {
+            CommandMap commandMap = BukkitCommandMaps.commandMap(plugin.getServer());
+            PrivateMessageCommands commands = new PrivateMessageCommands(plugin, executor, commandMap,
+                BukkitCommandMaps.knownCommands(commandMap));
+            privateCommands = commands;
+            if (!FoliaScheduler.runGlobal(plugin, () -> claimPrivateCommands(commands), 1L)) {
+                Gloss.warn("Private message commands could not be scheduled for registration.");
+            }
+        } catch (IllegalStateException failure) {
+            privateCommands = null;
+            Gloss.logExceptionStack(false, failure, "Private message commands could not be registered.");
+        }
+    }
+
+    private void claimPrivateCommands(PrivateMessageCommands commands) {
+        if (privateCommands != commands || !plugin.isEnabled()) {
+            return;
+        }
+        announce(commands.apply(privateChannels));
     }
 
     private void registerPaperCommands(ChatCommands executor) {
         try {
             Class<?> registrar = Class.forName("art.arcane.gloss.paper.PaperChatCommandRegistrar",
                 true, getClass().getClassLoader());
-            registrar.getDeclaredMethod("register", Gloss.class, ChatCommands.class)
-                .invoke(null, plugin, executor);
+            Supplier<PrivateMessageOwnership> ownership = this::resolvePaperOwnership;
+            registrar.getDeclaredMethod("register", Gloss.class, ChatCommands.class, Supplier.class)
+                .invoke(null, plugin, executor, ownership);
         } catch (ReflectiveOperationException | LinkageError failure) {
             Gloss.logExceptionStack(false, failure,
                 "Chat commands could not be registered on this server flavour.");
         }
+    }
+
+    private PrivateMessageOwnership resolvePaperOwnership() {
+        PrivateMessageOwnership ownership;
+        try {
+            ownership = PrivateMessageOwnership.resolve(privateChannels, PrivateMessageOwnership.pluginHolders(
+                BukkitCommandMaps.knownCommands(BukkitCommandMaps.commandMap(plugin.getServer())), plugin));
+        } catch (IllegalStateException failure) {
+            Gloss.logExceptionStack(false, failure,
+                "The server command map could not be read, so Gloss leaves /msg, /tell, /w and /r alone.");
+            ownership = new PrivateMessageOwnership(false, Map.of());
+        }
+        announce(ownership);
+        return ownership;
+    }
+
+    private void announce(PrivateMessageOwnership ownership) {
+        if (!ownership.sameEffect(privateOwnership)) {
+            Gloss.info("%s", ownership.describe());
+        }
+        privateOwnership = ownership;
+    }
+
+    private void applyPrivateMessageOwnership() {
+        boolean next = plugin.cfg().modules().channels().enabled();
+        if (next == privateChannels) {
+            return;
+        }
+        privateChannels = next;
+        if (privateCommands == null) {
+            Gloss.info("This server registers Gloss chat commands at startup, so /msg, /tell, /w and /r follow the channels change after a restart.");
+            return;
+        }
+        announce(privateCommands.apply(next));
+    }
+
+    private void releaseCommands() {
+        if (privateCommands != null) {
+            privateCommands.release();
+            privateCommands = null;
+        }
+        privateOwnership = null;
     }
 
     private void poll() {

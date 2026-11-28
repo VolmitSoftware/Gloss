@@ -20,13 +20,6 @@ commands:
     description: Gloss scoreboard commands.
     aliases: [ sb, bd ]
     usage: /<command> help
-  msg:
-    description: Send a private message.
-    aliases: [ tell, w ]
-    usage: /<command> <player> <message>
-  r:
-    description: Reply to the last private message.
-    usage: /<command> <message>
   ch:
     description: Choose your chat channel.
     usage: /<command> <channel|list>

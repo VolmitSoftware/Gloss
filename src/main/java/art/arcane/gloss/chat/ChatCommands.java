@@ -24,7 +24,9 @@ public final class ChatCommands implements TabExecutor {
     public static final String MESSAGE_COMMAND = "msg";
     public static final String REPLY_COMMAND = "r";
     public static final String CHANNEL_COMMAND = "ch";
-    public static final List<String> COMMANDS = List.of(MESSAGE_COMMAND, REPLY_COMMAND, CHANNEL_COMMAND);
+    public static final String MESSAGE_DESCRIPTION = "Send a private message.";
+    public static final String REPLY_DESCRIPTION = "Reply to the last private message.";
+    public static final String CHANNEL_DESCRIPTION = "Choose your chat channel.";
 
     public static final String MESSAGE_PERMISSION = "gloss.chat.msg";
     public static final String CHANNEL_PERMISSION = "gloss.chat.channel";

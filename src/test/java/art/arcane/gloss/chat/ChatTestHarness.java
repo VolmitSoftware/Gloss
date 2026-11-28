@@ -8,9 +8,11 @@ import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.command.CommandMap;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.lang.reflect.Proxy;
@@ -23,6 +25,8 @@ import java.util.UUID;
 
 /** Headless Bukkit stand-ins for the chat dispatch suites. */
 final class ChatTestHarness {
+    private static final CommandMap COMMAND_MAP = Mockito.mock(CommandMap.class);
+
     private ChatTestHarness() {
     }
 
@@ -85,7 +89,7 @@ final class ChatTestHarness {
     private static Object server(Collection<Player> online) {
         Object pluginManager = Proxy.newProxyInstance(ChatTestHarness.class.getClassLoader(),
             new Class<?>[]{org.bukkit.plugin.PluginManager.class}, (proxy, method, args) -> switch (method.getName()) {
-                case "registerEvents", "callEvent" -> null;
+                case "registerEvents", "callEvent", "getPlugin" -> null;
                 case "isPluginEnabled" -> false;
                 case "hashCode" -> System.identityHashCode(proxy);
                 case "equals" -> proxy == args[0];
@@ -99,6 +103,7 @@ final class ChatTestHarness {
                 case "getPlayer" -> args[0] instanceof UUID id ? byId(online, id) : named(online, String.valueOf(args[0]));
                 case "getPluginManager" -> pluginManager;
                 case "getPluginCommand" -> null;
+                case "getCommandMap" -> COMMAND_MAP;
                 case "getLogger" -> CharacterizationSupport.mutedLogger();
                 case "getName", "getVersion", "getBukkitVersion" -> "chat-test";
                 case "isPrimaryThread" -> true;
